@@ -78,8 +78,8 @@ function Start-OnWsl2 {
 }
 
 if (Test-ServerListening) {
-    Write-Host "已經在跑了：http://127.0.0.1:8420" -ForegroundColor Green
-    Start-Process "http://127.0.0.1:8420"
+    Write-Host "已經在跑了：http://127.0.0.1:8420/workspace" -ForegroundColor Green
+    Start-Process "http://127.0.0.1:8420/workspace"
     exit
 }
 
@@ -124,8 +124,8 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 
 if ($ok) {
-    Write-Host "啟動成功（$mode）-> http://127.0.0.1:8420" -ForegroundColor Green
-    Start-Process "http://127.0.0.1:8420"
+    Write-Host "啟動成功（$mode）-> http://127.0.0.1:8420/workspace" -ForegroundColor Green
+    Start-Process "http://127.0.0.1:8420/workspace"
 } else {
     Write-Host "15 秒內沒有偵測到 8420 在監聽。查看 log：" -ForegroundColor Red
     if ($winOk) {

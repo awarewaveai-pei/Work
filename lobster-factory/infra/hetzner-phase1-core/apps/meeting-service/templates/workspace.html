@@ -25,8 +25,6 @@
   #topbar h1 { font-size: 16px; margin: 0 8px 0 0; }
   #topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
   #topbar .spacer { flex: 1; }
-  #topbar a.home { color: var(--muted); font-size: 13px; text-decoration: none; }
-  #topbar a.home:hover { color: var(--accent); }
   .tbtn {
     background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 8px;
     padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -172,7 +170,6 @@
   <span class="sep"></span>
   <button class="tbtn" type="button" id="resetLayout">恢復預設版面</button>
   <span class="spacer"></span>
-  <a class="home" href="/">← 回首頁</a>
 </div>
 <div id="dock" class="aw-dock"></div>
 
@@ -1216,6 +1213,7 @@ Sorry, could you repeat the question?
       <input type="file" class="po-file" accept=".mp4,.m4a,.mp3,.wav,.mov,.mkv,.webm,.aac,.flac">
       <button type="button" class="tbtn" data-act="upload">開始處理</button>
     </div>
+    <p class="po-note">選檔或把檔案拖到「選擇檔案」上：mp4 / m4a / mp3 / wav / mov / mkv / webm / aac / flac，上限 500MB。</p>
     <h3>目前這個工作</h3>
     <div class="po-job"><p class="placeholder">從上面開始一個，或在下面的工作清單按「打開」。</p></div>
     <h3>工作清單</h3>
@@ -1241,7 +1239,8 @@ Sorry, could you repeat the question?
     return opts.sync === null ? dests.filter(d => d.sync).map(d => d.name) : opts.sync.filter(n => names.includes(n));
   }
   let options = null, sessions = [], jobs = [], current = null, focus = null, timer = null, root = null;
-  window.Settings.on(() => paintOptions());      // 輸出目的地改了，同步按鈕跟著改
+  // 輸出目的地改了，同步按鈕跟著改；金鑰清掉了，「自動處理」一起關（它被藏起來，否則關不掉，三個入口都會回 400）。
+  window.Settings.on(() => { if (!hasKey()) opts.use_api = false; paintOptions(); });
 
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
@@ -1269,6 +1268,10 @@ Sorry, could you repeat the question?
   }
   function when(t) { const d = new Date(t * 1000); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
   function stageLabel(stage) { const s = STAGES.find(([k]) => k === stage); return s ? s[1] : stage; }
+  function hasKey() {
+    const d = window.Settings.data;
+    return d ? d.anthropic_api_key.set : options.has_api_key;
+  }
   function links(job) {
     return h("div", { class: "po-links" }, job.downloads.map(k => h("a", { href: "/api/download/" + job.id + "/" + k, target: "_blank" }, DOWNLOAD_LABELS[k] || k)),
       job.downloads.includes("merged_txt") ? h("a", { href: "/mindmap?job=" + job.id, target: "_blank" }, "心智圖") : null);
@@ -1290,7 +1293,7 @@ Sorry, could you repeat the question?
       opts.language === null ? h("p", { class: "po-note" }, "上傳的檔案當中文；聆聽場次用當時聽的語言。") : null,
       syncRow(),
       syncNames().length ? h("p", { class: "po-warn" }, "完成後會把 PPT／會議記錄／逐字稿複製到勾選的目的地；是雲端資料夾時，敏感會議不要勾。") : null,
-      options.has_api_key ? h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議記錄"), toggle("use_api", "自動處理（用 API，會計費）")) : null);
+      hasKey() ? h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議記錄"), toggle("use_api", "自動處理（用 API，會計費）")) : null);
   }
   function syncRow() {
     const dests = (window.Settings.data && window.Settings.data.destinations) || [];
@@ -1325,7 +1328,8 @@ Sorry, could you repeat the question?
           h("span", { class: "po-note" }, (s.live ? "有聆聽逐字稿" : "只有錄音") + (s.wavs ? "" : "、沒有錄音") + (s.jobs.length ? "・已整理 " + s.jobs.length + " 次" : ""))),
         rec.reason ? h("p", { class: rec.reuse ? "po-note" : "po-warn" }, rec.reason) : null,
         !s.live && !s.wavs ? h("p", { class: "po-note" }, "沒有錄音也沒有聆聽逐字稿，不能整理。") : null,
-        h("div", { class: "po-row" }, actions, last ? btn("看最近一次", () => open(last.id)) : null),
+        h("div", { class: "po-row" }, actions, last ? btn("看最近一次", () => open(last.id)) : null,
+          s.transcript ? h("a", { class: "tbtn", href: "/mindmap?session=" + encodeURIComponent(s.id), target: "_blank" }, "心智圖") : null),
         last && last.downloads.length ? links(last) : null);
     }));
     const f = focus && box.querySelector('[data-session="' + CSS.escape(focus) + '"]');
@@ -1372,7 +1376,9 @@ Sorry, could you repeat the question?
         btn("打開", () => open(j.id))),
       j.downloads.length ? links(j) : null)));
   }
-  function open(id) { current = id; clearTimeout(timer); paintJobs(); poll(); }
+  function open(id) { current = id; stuck = 0; clearTimeout(timer); paintJobs(); poll(); }
+  const STUCK_POLLS = 10;      // × 1.5 秒
+  let stuck = 0;
   async function poll() {
     const id = current;
     if (!id) return;
@@ -1383,6 +1389,9 @@ Sorry, could you repeat the question?
     const finished = status.done || status.error || status.stage === "awaiting_summary";
     if (finished) await refresh();
     if (id !== current) return;
+    stuck = status.stage === "starting" ? stuck + 1 : 0;
+    // "starting" 只該出現在背景工作剛建立 status.json 的頭一兩次；一直是它＝狀態檔讀不到（app.py status 的備援回應）。
+    if (stuck >= STUCK_POLLS) log.lines.push("⚠ 超過 15 秒讀不到這個工作的狀態檔，仍在重試；一直沒變化的話，工作可能已經在跑，重新整理頁面再看。");
     paintJob(id, status, log.lines);
     if (!finished) timer = setTimeout(poll, 1500);
   }
@@ -1399,7 +1408,12 @@ Sorry, could you repeat the question?
     if (status.error) parts.push(h("p", { class: "po-warn" }, status.error));
     if (status.diarize_error) parts.push(h("p", { class: "po-warn" }, "分講者失敗，已改用沒分講者的逐字稿：" + status.diarize_error));
     if (status.api_error) parts.push(h("p", { class: "po-warn" }, "API 自動處理失敗，改成手動貼上（逐字稿與講者的結果都還在）：" + status.api_error));
-    (status.sync_results || []).forEach(r => parts.push(h("p", { class: r.ok ? "po-note" : "po-warn" },
+    const ts = status.transcribe_stats;
+    if (ts) parts.push(h("p", { class: "po-note" }, ts.realtime_factor == null ? "逐字稿：" + ts.backend : "轉錄 " + ts.realtime_factor + "x 即時速度（" + ts.backend + "）"));
+    const ds = status.diarize_stats;
+    if (ds && ds.speakers) parts.push(h("p", { class: "po-note" }, "講者 " + ds.speakers.join("／") + (ds.overlap_sec == null ? "" : "・重疊語音 " + Math.round(ds.overlap_sec) + " 秒")));
+    // sync_results：每個目的地一筆（C16 起）；drive_sync_result：之前的工作只有一筆。
+    (status.sync_results || (status.drive_sync_result ? [Object.assign({ name: "Google Drive", failed: [] }, status.drive_sync_result)] : [])).forEach(r => parts.push(h("p", { class: r.ok ? "po-note" : "po-warn" },
       r.ok ? "已同步到「" + r.name + "」" + r.dest + "（" + r.files.length + " 個檔）"
         : "同步到「" + r.name + "」有問題：" + r.error + (r.failed || []).map(f => "；" + f.file + "：" + f.error).join("") + (r.files.length ? "（其餘 " + r.files.length + " 個檔已複製）" : ""))));
     if (status.stage === "awaiting_summary" && !status.done) parts.push(await pasteLoop(id));
@@ -1422,9 +1436,14 @@ Sorry, could you repeat the question?
         await refresh(); open(id);
       } catch (e) { err.textContent = e.message; send.disabled = false; }
     });
+    // ChatGPT／Claude 沒有用網址預填輸入框的方式：複製後開新分頁，貼上要自己按 Ctrl+V。
+    const copy = then => () => navigator.clipboard.writeText(promptBox.value)
+      .then(() => { say("已複製提示"); if (then) then(); }, () => say("沒有複製到，請自己選取上面的文字複製"));
+    const copyOpen = url => copy(() => window.open(url, "_blank"));
     return h("div", null,
-      h("p", { class: "po-note" }, "1. 複製下面的提示，貼進任一 AI 對話（用你自己的訂閱，不計 API 費）。"),
-      promptBox, h("div", { class: "po-row" }, btn("複製提示", () => navigator.clipboard.writeText(promptBox.value).then(() => say("已複製")))),
+      h("p", { class: "po-note" }, "1. 複製下面的提示，貼進任一 AI 對話（用你自己的訂閱，不計 API 費）。正在用 Claude Code 的話，直接說「處理 job " + id + "」。"),
+      promptBox, h("div", { class: "po-row" }, btn("複製提示", copy()), btn("複製並開啟 ChatGPT", copyOpen("https://chatgpt.com/")),
+        btn("複製並開啟 Claude", copyOpen("https://claude.ai/new"))),
       h("p", { class: "po-note" }, "2. 把 AI 回傳的 JSON 貼回來。"), paste, h("div", { class: "po-row" }, send), err);
   }
 
