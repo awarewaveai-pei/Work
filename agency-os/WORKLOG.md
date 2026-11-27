@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-27（續6）— meeting-service 段 4 批 3：C16 輸出目的地、C17 我／對方兩路聲音（上線 8420）
+
+- 根因：同步只能設一個環境變數、每次另勾；麥克風與電腦聲音混成一路，分不出我／對方；本機辨識載入模型期間丟開頭的話。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
+- 步驟：工人 C16 `0123f6778`、C17 `a7ab50f93`＋`cd728290d`；監工合併 `0b453e23d`；修正 `9bddbced0`、`61cb575cf`、`effb12162`；推 main `bdd19311e`
+  - C16：`lib/paths.py` 唯一路徑轉換（WSL `/mnt/<碟>`、雲端資料夾判斷）；錄音資料夾＋N 個輸出目的地；錄音資料夾不准在雲端同步資料夾；`ownvoice.sessions()` 列所有用過的錄音資料夾；每個目的地各自同步、一檔失敗不停；`MEETING_DRIVE_BASE` 轉一次
+  - C17：`proto: 2` 封包帶來源；`lib/live/hub.py` `Channel` 一路一個、共用 `Session`；顯卡由 Hub 拿一次；`stt_local.Recognizer` 載入中先排隊不丟；`lib/live/echo.py` 回音守衛；雙聲道 WAV（左我右對方）
+  - 監工自查：C17 頁面拿掉字幕原文那行（每句只剩翻譯、「我」整行空白）→ 補回；不翻譯的句子不再留「…」
+  - Codex（0c/4m）：junction／捷徑進雲端資料夾繞過檢查；上傳的普通雙聲道檔被當成我／對方（改 `Options.me_them`）；雙聲道換段未寫齊（`_flush_pending`）；對齊後未依時間排序、我與對方被併成一段
+  - critic（1c/0m/4n）：C1 開始聆聽未重設「最後一句字幕時間」，伺服器安靜 30 分鐘後一按聆聽就結束；m 一路辨識停了仍塞佇列並誤記遺失；Windows 網路路徑錄音資料夾放行；舊工作找不到舊資料夾時無聲不同步；不存檔時兩路位置未對齊（`archive.align_stereo` 一條規則）
+- 驗證：
+  - `python -m pytest tests -q` → 179 passed；突變：拿掉 junction 檢查 → 紅；拿掉 `last_caption` 重設 → 紅；還原皆綠；工人另做錄音資料夾檢查兩個突變
+  - 真實（8434）：雙聲道測試檔我＝本機、對方＝Gemini（付費 NT$1.9）：對方 14 句全翻、我 3 句繁體、回音段 0 句、`dropped_sec` 0、雙聲道 WAV；熱啟動模型 21 秒、最後一句「我」說完 1.5 秒出字；冷啟動 73 秒（晚到不遺失）；兩路本機不存檔：11＋3 句、回音段 0 句；換段腳本：麥克風先到的 1 秒留在第 1 段
+  - 工人實測：兩個暫存目的地各收到 5 檔；OneDrive 錄音資料夾被拒
+  - 8420 重啟：`/workspace`、`/api/ownvoice/sessions` 200；設定出現由 `MEETING_DRIVE_BASE` 轉成的「Google Drive」目的地
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py stereo_test.wav gemini 8434 save listen=auto target=zh-TW me=local; python -m pytest tests -q | exit=0 | ms=520000
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=1c/0m/4n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=align_stereo|_flush_pending|me_them|refuse_cloud|legacy_destinations|\.closed | hits=37
+- ORACLE: Codex review `agency-os/reports/oracle/2026-11-27-partialreview-f0dd0fe9.md`（4 條全修）
+- 已知、未改：冷啟動第一次載入模型可到 73 秒；回音門檻 0.7 只用合成回音量過（要操作者真實喇叭實測）；「我」用 Gemini 時回音守衛對不準；雙聲道「重新辨識」不分我／對方；Google Drive 磁碟偵測在這台筆電沒實測到（H: 目前沒掛載）
+- rollback：`git revert effb12162 61cb575cf 9bddbced0 0b453e23d`；設定新欄位舊程式忽略
 ## 2026-11-27（續5）— meeting-service 段 4 批 2：C14 語言、C15 會後整理＝產物鏈進工作區（上線 8420）
 
 - 根因：簡體字幕、語言寫死英翻中；聆聽場次做會後整理會整段重新轉錄（重複），兩個工具各一套流程。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
