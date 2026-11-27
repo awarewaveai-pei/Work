@@ -9,7 +9,7 @@ import { useBrandKit } from "./kit/useBrandKit";
 import { useSceneFlow } from "./steps/SceneFlow";
 import {
   BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, canClear, clearDesign, clearSizeTweak, editingSizeOf, enterSize, isUntouched, leaveSize,
-  presetLabel, pushHistory, selectedSizes, templatePatch, variantOf,
+  presetLabel, pushHistory, restoreSnapshot, selectedSizes, templatePatch, variantOf,
   type BannerStaffApi, type PresetKey, type State,
 } from "./banner-state";
 import { thumbOf } from "./steps/export-files";
@@ -168,14 +168,16 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     if (histIdxRef.current <= 0) return;
     histIdxRef.current -= 1;
     restoringRef.current = true;
-    setS(historyRef.current[histIdxRef.current]);
+    const snap = historyRef.current[histIdxRef.current];
+    setS((prev) => restoreSnapshot(snap, prev));
     bumpHist((v) => v + 1);
   }, []);
   const redo = useCallback(() => {
     if (histIdxRef.current >= historyRef.current.length - 1) return;
     histIdxRef.current += 1;
     restoringRef.current = true;
-    setS(historyRef.current[histIdxRef.current]);
+    const snap = historyRef.current[histIdxRef.current];
+    setS((prev) => restoreSnapshot(snap, prev));
     bumpHist((v) => v + 1);
   }, []);
   const canUndo = histIdxRef.current > 0;

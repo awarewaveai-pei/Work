@@ -646,6 +646,16 @@ export function sameVisible(a: State, b: State): boolean {
 /** 清除設計 does something visible. */
 export const canClear = (st: State): boolean => !sameVisible(clearDesign(st), st);
 
+/** Work in flight on the page (a paid run, a save, an AI call): not part of the design. Undo / redo never restore these
+ *  -- a snapshot taken before a paid run would otherwise clear `generating` mid-run and unlock 清除設計 / the sizes. */
+export const IN_FLIGHT = ["saving", "generating", "designing", "productRemoving", "copyGenerating", "copyStream"] as const satisfies readonly (keyof State)[];
+/** History step `snap` back on the page, keeping what is in flight now (IN_FLIGHT) from `cur`. */
+export function restoreSnapshot(snap: State, cur: State): State {
+  const keep: Partial<State> = {};
+  for (const k of IN_FLIGHT) (keep as Record<string, unknown>)[k] = cur[k];
+  return { ...snap, ...keep };
+}
+
 /** Undo history after recording `st` at `idx`: redo steps after `idx` go; a step equal to the current one is skipped --
  *  equal by design, or for a one-click change (清除設計…) by everything visible, so the copy list comes back on undo. */
 export const HISTORY_MAX = 25;
@@ -660,7 +670,7 @@ export function pushHistory(hist: State[], idx: number, st: State, oneClick = fa
 
 export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
-  const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
+  const skip = new Set<keyof State>([...IN_FLIGHT, "saved", "error", "copyVariants"]);
   const imgKeys = new Set<keyof State>(["bgImage", "productImage", "productOrig", "aiBgRefImage"]);
   const imgLen = (v: unknown) => (typeof v === "string" ? v.length : 0);
   // a size's own background (R3-C) sits in sizeOverrides / editingSize.main: reduced the same way

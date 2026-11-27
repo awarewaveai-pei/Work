@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { INIT, toggleSizePick, variantOf, type PresetKey, type State } from "./banner-state";
+import { INIT, IN_FLIGHT, restoreSnapshot, toggleSizePick, variantOf, type PresetKey, type State } from "./banner-state";
 import { EMPTY_VIEW, imageNtd, otherSizesLabel, otherSizesNtd, otherSizesOf, sceneFlow, type FlowView, type OkCell, type SceneSource } from "./scene-flow";
 
 const PRODUCT = "data:image/png;base64,PPPP", SCENE = "data:image/png;base64,SSSS";
@@ -200,5 +200,18 @@ describe("R4-D Codex 第三、四輪 AI 一鍵設計與付費場景互斥", () =
     expect(ai).toContain("await flow.hold(async (drawHere) => {");
     expect(ai).toContain("await drawHere(applied, scenesWanted, {");
     expect(ai).not.toMatch(/flow\.(draw|reset)\(/);
+  });
+});
+
+describe("R4-D Codex 第五輪 復原不解開付費鎖", () => {
+  it("undo / redo bring the design back but keep what is in flight now (generating stays on during a paid run)", () => {
+    const before: State = { ...design, headline: "舊標題", generating: false, designing: false };
+    const now: State = { ...design, headline: "新標題", generating: true, designing: true, saving: true };
+    const back = restoreSnapshot(before, now);
+    expect(back.headline).toBe("舊標題");
+    for (const k of IN_FLIGHT) expect(back[k]).toEqual(now[k]);
+    const page = readFileSync(join(__dirname, "BannerStudio.tsx"), "utf8");
+    expect(page.match(/setS\(\(prev\) => restoreSnapshot\(snap, prev\)\)/g)).toHaveLength(2);
+    expect(page).not.toMatch(/setS\(historyRef\.current\[/);
   });
 });
