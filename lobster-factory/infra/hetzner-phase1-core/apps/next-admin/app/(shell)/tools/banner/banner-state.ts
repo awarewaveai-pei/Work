@@ -349,6 +349,12 @@ function onMain(st: State, fn: (m: State) => State): State {
   const next = fn(leaveSize(st));
   return editing ? enterSize(next, editing) : next;
 }
+/** The one way a background picture is set: the picture, whether the product is baked into it and where (shares of the
+ *  picture; null = unknown -> the layout falls back to productPos) change together, placement back to centred cover.
+ *  Every bgImage write goes through this (withSharedBackground, withSizeBackgrounds, the canvas editor's return). */
+export function backgroundFields(image: string | null, hasProduct: boolean, area: PicArea | null) {
+  return { bgImage: image, bgImageHasProduct: hasProduct, bgProductArea: hasProduct ? area : null, ...BG_PLACE_RESET };
+}
 /** R3-C: one background for every size (uploaded, generated, an AI 一鍵設計 scene picked): the main size gets it centred,
  *  every size's own picture and placement go, so each size crops this one. */
 export function withSharedBackground(st: State, bg: SharedBackground): State {
@@ -359,23 +365,29 @@ export function withSharedBackground(st: State, bg: SharedBackground): State {
       for (const f of BG_SIZE_KEYS) delete rest[f];
       sizeOverrides[k] = rest;
     }
-    return { ...m, bgProductArea: null, ...bg, ...BG_PLACE_RESET, sizeOverrides, saved: false };
+    return { ...m, bgMode: bg.bgMode, ...backgroundFields(bg.bgImage, bg.bgImageHasProduct, bg.bgProductArea ?? null), sizeOverrides, saved: false };
   });
 }
 /** A background every size shares; `bgProductArea` only with the product baked in (absent = none). */
 export type SharedBackground = Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct"> & { bgProductArea?: PicArea | null };
 /** A picture with the product composited in and the area its generation asked the product into (shares of the picture). */
 export interface BakedPicture { image: string; area: PicArea | null }
-/** R3-C: 合成進場景 per size -- each size that got a picture holds it (centred) with its product area as its own
- *  background; a size missing from `pics` (its call failed) keeps what it had -- with no picture of its own it crops the
- *  main size's, whose product area then maps onto it (R3-E). The main size's picture is the main design's. */
-export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, BakedPicture>>): State {
-  const bg = (p: BakedPicture) => ({ bgImage: p.image, bgImageHasProduct: true, bgProductArea: p.area, ...BG_PLACE_RESET });
+/** R3-C: 合成進場景 per size over the `sizes` it ran for -- each size that got a picture holds it (centred) with its
+ *  product area as its own background; a size of this run whose call failed loses its own background (an older run's
+ *  picture and area are stale) and crops the main size's, whose product area maps onto it (R3-E). The main size's
+ *  picture is the main design's; the main size failing keeps the main picture it had. */
+export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, BakedPicture>>, sizes: readonly PresetKey[]): State {
+  const bg = (p: BakedPicture) => backgroundFields(p.image, true, p.area);
   return onMain(st, (m) => {
     const own = pics[m.preset];
     const sizeOverrides = { ...m.sizeOverrides };
-    for (const [k, p] of Object.entries(pics) as [PresetKey, BakedPicture][]) {
-      if (k !== m.preset) sizeOverrides[k] = { ...sizeOverrides[k], ...bg(p) };
+    for (const k of sizes) {
+      if (k === m.preset) continue;
+      const p = pics[k];
+      if (p) { sizeOverrides[k] = { ...sizeOverrides[k], ...bg(p) }; continue; }
+      const rest = { ...sizeOverrides[k] };
+      for (const f of BG_SIZE_KEYS) delete rest[f];
+      sizeOverrides[k] = rest;
     }
     return { ...m, ...(own ? bg(own) : {}), bgMode: "ai", sizeOverrides, saved: false };
   });

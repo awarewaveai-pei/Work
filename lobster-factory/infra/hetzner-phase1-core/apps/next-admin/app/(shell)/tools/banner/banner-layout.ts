@@ -131,7 +131,8 @@ type StackKey = (typeof STACK_KEYS)[number];
 
 /** Whether the product picture is drawn: not when the active AI background already has it baked in (keyed off
  *  bgImageHasProduct set at generation time, not the live toggle, so flipping it can't double-draw the product). */
-export const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
+const bgHasProduct = (f: BannerFields) => f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage;
+export const productDrawn = (f: BannerFields) => !!f.productImage && !bgHasProduct(f);
 
 /** R3-E: a baked-in product's box on the canvas -- `area` (shares of the background picture, natural size `pic`) through
  *  the background's cover fit and its bgImgScale / X / Y, as renderBannerLayers draws it; clipped to the canvas (null =
@@ -290,7 +291,8 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   // Reserved whether drawn or baked into the background. Baked with its area known (R3-E): the box is where the product
   // is in the picture as drawn now (`baked`, null = out of view) -- not productPos; older pictures fall back to productPos.
   const drawn = productDrawn(f);
-  const bgNat = !drawn && f.productImage && f.bgProductArea && f.bgImage ? picture(measure, f.bgImage) : null;
+  // the background decides it, not productImage: a product removed after baking is still in the picture
+  const bgNat = bgHasProduct(f) && f.bgProductArea ? picture(measure, f.bgImage!) : null;
   const baked = bgNat ? areaOnCanvas(f.bgProductArea!, bgNat, f, W, H) : undefined;
   const nat = f.productImage && baked === undefined ? picture(measure, f.productImage) : null;
   const g = f.grounding?.reflection;

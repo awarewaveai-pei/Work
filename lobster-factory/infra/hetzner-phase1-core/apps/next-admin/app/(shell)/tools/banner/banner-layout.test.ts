@@ -104,6 +104,14 @@ describe("R3-E: a baked product's reserved area = where the product is in the pi
   const bakedF: BannerFields = { ...everything, productPos: "right", bgMode: "ai", bgImage: "scene45", bgImageHasProduct: true, bgProductArea: area };
   const clear = (L: ReturnType<typeof layoutBanner>) => (["headline", "subtext", "price", "cta", "trust"] as const)
     .filter((k) => L.boxes[k] && overlap(L.boxes[k]!, L.product!.box));
+  // Codex on R3-E (F3): the product picture removed after baking -- the product is still in the background, so its area
+  // stays reserved (the background decides, not productImage)
+  it("F3: product picture removed -> the baked product's area is still reserved, text clear of it", () => {
+    const size = SIZES.r4x5, L = layoutBanner({ ...bakedF, productImage: null }, size, m2);
+    expect(L.product?.box).toEqual(areaOnCanvas(area, pics.scene45, bakedF, size.w, size.h));
+    expect(L.product!.drawn).toBe(false);
+    expect(clear(L)).toEqual([]);
+  });
   it("F1: the background dragged / zoomed -> the reserved box moves / grows with the picture; text keeps clear", () => {
     const size = SIZES.r4x5;
     const still = layoutBanner(bakedF, size, m2).product!.box;
@@ -119,7 +127,8 @@ describe("R3-E: a baked product's reserved area = where the product is in the pi
   });
   it("F2: a size whose composite failed uses the main picture -> its reservation is the main product on that size", () => {
     const st: State = { ...INIT, ...bakedF, preset: "r4x5", multiSizes: ["r9x16", "r16x9", "r1x1"], typeAuto: true } as State;
-    const done = withSizeBackgrounds(st, { r4x5: { image: "scene45", area }, r9x16: { image: "scene916", area: { x0: 0.2, y0: 0.55, x1: 0.8, y1: 0.95 } } });
+    const done = withSizeBackgrounds(st, { r4x5: { image: "scene45", area }, r9x16: { image: "scene916", area: { x0: 0.2, y0: 0.55, x1: 0.8, y1: 0.95 } } },
+      ["r4x5", "r9x16", "r16x9", "r1x1"]);
     for (const k of ["r16x9", "r1x1"] as const) { // failed: no picture of their own
       const v = variantOf(done, k), size = SIZES[k];
       expect(v).toMatchObject({ bgImage: "scene45", bgProductArea: area });
