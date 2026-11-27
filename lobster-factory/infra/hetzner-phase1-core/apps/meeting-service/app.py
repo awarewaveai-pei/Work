@@ -15,14 +15,15 @@ import os
 import shutil
 import threading
 import uuid
+from typing import List
 
-from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, UploadFile, WebSocket
+from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from lib import gpu_gate, jobs, lookup, mindmap, ownvoice, postmeeting, settings, summarize, workspace
+from lib import gpu_gate, jobs, lookup, mindmap, ownvoice, paths, postmeeting, settings, summarize, workspace
 from lib.live import hub as live_hub
 from lib.live import langs, script_store
 from lib.live.translate import TranslateError
@@ -142,12 +143,20 @@ def _batch_gpu():
         yield claim
 
 
-def _options(diarize, model, language, sync_drive, use_api) -> Options:
-    """會後整理的選項，三個入口（上傳、舊場次、聆聽場次）共用這一個檢查。"""
+def _options(diarize, model, language, sync, use_api) -> Options:
+    """會後整理的選項，三個入口（上傳、舊場次、聆聽場次）共用這一個檢查。
+    sync＝要同步去的輸出目的地名稱清單；在這裡換成名稱與資料夾，之後改設定不影響這個工作。"""
     if model not in MODELS:
         raise HTTPException(400, f"不支援的模型 {model}；可選：{', '.join(MODELS)}")
     _check_language(language)
-    return Options(diarize=bool(diarize), model=model, language=language, sync_drive=bool(sync_drive),
+    if not isinstance(sync, list) or not all(isinstance(n, str) for n in sync):
+        raise HTTPException(400, "同步要是輸出目的地名稱的清單")
+    known = {d["name"]: d["dir"] for d in settings.destinations()}
+    missing = [n for n in sync if n not in known]
+    if missing:
+        raise HTTPException(400, f"沒有這個輸出目的地：{'、'.join(missing)[:80]}（在「設定」裡新增）")
+    return Options(diarize=bool(diarize), model=model, language=language,
+                   destinations=tuple((n, known[n]) for n in dict.fromkeys(sync)),
                    use_api=bool(use_api), target=settings.pref("target"))
 
 
@@ -242,10 +251,10 @@ async def live_script_gloss(body: dict = Body(...)):
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), diarize: bool = True,
-                  model: str = "large-v3", sync_drive: bool = False,
+                  model: str = "large-v3", sync: List[str] = Query(default=[]),
                   use_api: bool = False, language: str = "zh",
                   gpu: _BatchGpu = Depends(_batch_gpu)):
-    opts = _options(diarize, model, language, sync_drive, use_api)
+    opts = _options(diarize, model, language, sync, use_api)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
@@ -298,18 +307,19 @@ def ownvoice_sessions():
     known = {j["id"]: j for j in jobs.listing(JOBS_DIR, DOWNLOADS)}
     found = ownvoice.sessions()
     for s in found:
-        sidecar = ownvoice.session_lines(s["id"])
+        sidecar = ownvoice.session_lines(s["id"], os.path.join(s["root"], s["id"]))
         s["live"] = sidecar is not None
         s["recommend"] = postmeeting.recommend(sidecar, s["wavs"])
-        linked = jobs.for_session(JOBS_DIR, os.path.join(ownvoice.base_dir(), s["id"]))
+        linked = jobs.for_session(JOBS_DIR, os.path.join(s["root"], s["id"]))
         s["jobs"] = sorted((known[i] for i in linked if i in known), key=lambda j: -j["started_at"])
-    return {"sessions": found, "language": ownvoice.language(), "dir": ownvoice.base_dir()}
+    roots = ownvoice.roots()
+    return {"sessions": found, "language": ownvoice.language(), "dir": roots[0] if roots else ownvoice.base_dir()}
 
 
 @app.post("/api/ownvoice/import")
 def ownvoice_import(body: dict = Body(...)):
     """一場會議交給會後整理產物鏈。body：session、reuse（true＝用聆聽的逐字稿，false＝從錄音重新辨識；
-    沒給＝postmeeting.recommend 的預設）、diarize、model、language、sync_drive、use_api。
+    沒給＝postmeeting.recommend 的預設）、diarize、model、language、sync（輸出目的地名稱清單）、use_api。
     顯卡只在要轉錄或要跑 pyannote 時登記。場次資料夾只讀，產物全在 job 資料夾。"""
     # "latest" 在這裡定成實際資料夾名，之後不再重新解析（中途開了新會議也不會接到另一場）。
     folder = _ownvoice(ownvoice.session_dir, str(body.get("session", "")))
@@ -319,7 +329,7 @@ def ownvoice_import(body: dict = Body(...)):
     # 沒指定語言：聆聽場次用它當時聽的語言，舊場次用 OwnVoice 的設定。
     language = body.get("language") or postmeeting.transcribe_language(sidecar) or ownvoice.language()
     opts = _options(body.get("diarize", True), str(body.get("model") or "large-v3"),
-                    language, body.get("sync_drive"), body.get("use_api"))
+                    language, body.get("sync", []), body.get("use_api"))
     api_key = _api_key_for(opts.use_api)
     reuse = body["reuse"] if isinstance(body.get("reuse"), bool) else postmeeting.recommend(sidecar, wavs)["reuse"]
     if reuse and sidecar is None:
@@ -524,6 +534,18 @@ def save_settings(body: dict = Body(...)):
         raise HTTPException(400, str(e))
     except OSError as e:
         raise HTTPException(503, str(e))
+
+
+@app.post("/api/settings/check")
+def check_folder(body: dict = Body(...)):
+    """設定面板的「檢查」：{path, recording}；recording＝錄音存檔資料夾（不可在雲端同步資料夾底下）。"""
+    return paths.check(str(body.get("path", ""))[:paths.MAX_LEN + 8], body.get("recording") is True)
+
+
+@app.get("/api/settings/folders")
+def folder_shortcuts():
+    """設定面板的捷徑按鈕：「文件」、偵測到的 Google Drive（只給輸出目的地用），以及 OwnVoice 的預設資料夾（顯示用）。"""
+    return {"documents": paths.documents(), "drives": paths.drive_roots(), "ownvoice": ownvoice.base_dir()}
 
 
 @app.get("/api/prompt/{job_id}")

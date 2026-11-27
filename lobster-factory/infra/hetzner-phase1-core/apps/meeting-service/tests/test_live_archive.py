@@ -201,7 +201,7 @@ class FolderCompatibility(TempDir):
         a.line_final(arc.Line(3, seg=1, text="Any questions?", final=True))
         a.end()
 
-        self.assertEqual(ownvoice.sessions(), [{"id": "2026-11-24 1003", "wavs": 2, "transcript": True, "summary": False}])
+        self.assertEqual(ownvoice.sessions(), [{"id": "2026-11-24 1003", "root": self.base, "wavs": 2, "transcript": True, "summary": False}])
         text = ownvoice.read_text("latest", "transcript.md")
         self.assertIn("Hello everyone.", text)
         self.assertIn("大家好。", text)
