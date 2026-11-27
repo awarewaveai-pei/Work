@@ -140,8 +140,9 @@ export function sceneFlow(deps: {
   let drawId = 0, paidRuns = 0;
   // Invariant: one paid run at a time, held from the click until its pictures are applied (contrast check included).
   // It holds `generating` (save / export / 清除設計 / sizes / AI 一鍵設計 / the other entry's buttons wait). Every entry
-  // that claims the lane -- draw, drawOthers, pick, reset -- is refused HERE while it runs, not only by disabled
-  // buttons, so nothing can supersede pictures already paid for or pay twice.
+  // that claims the lane -- draw, drawOthers, hold (through paid()) and pick -- is refused HERE while it runs, not only
+  // by disabled buttons, so nothing can supersede pictures already paid for, pay twice, or take the slot between a paid
+  // design call and its scenes.
   const paid = async (job: () => Promise<void>): Promise<boolean> => {
     if (paidRuns) return false;
     paidRuns++; deps.apply((prev) => ({ ...prev, generating: true }));
@@ -216,13 +217,13 @@ export function sceneFlow(deps: {
     }, deps.check, (built, g) => ({ ...built, ...g.patch }), failed("其他尺寸的圖沒有套用，請再按一次。"));
   }
 
-  /** Clear the candidates (a new AI design starts). false = refused: a paid run is in progress and owns the lane. */
-  function reset(): boolean {
-    if (paidRuns) return false;
-    drawId++; lane.claim(); deps.view(() => EMPTY_VIEW);
-    return true;
+  /** Paid work that starts outside the flow and ends in candidates (AI 一鍵設計: the design call, then its scenes) holds
+   *  the one paid slot for its whole span: the old candidates are cleared first and `drawHere` draws the new ones inside
+   *  the slot. false = refused (another paid run holds it), nothing sent. */
+  function hold(job: (drawHere: (st: State, n: number, src: SceneSource) => Promise<void>) => Promise<void>): Promise<boolean> {
+    return paid(async () => { drawId++; lane.claim(); deps.view(() => EMPTY_VIEW); await job(drawNow); });
   }
 
-  return { draw, pick, drawOthers, reset };
+  return { draw, pick, drawOthers, hold };
 }
 export type SceneFlow = ReturnType<typeof sceneFlow>;

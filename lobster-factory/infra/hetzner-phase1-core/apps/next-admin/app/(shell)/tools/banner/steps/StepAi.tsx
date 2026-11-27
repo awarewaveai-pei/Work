@@ -48,75 +48,78 @@ export default function StepAi({ slot, s, set, setS, flow, sRef, staff, brand, s
   async function generateFullDesign() {
     // the brand colours must be the picked client's: never design while its kit is still loading
     if (!s.copyBrief.trim() || !staff || brand.status === "loading") return;
-    // a paid scene run still owns the candidates (scene-flow.ts paid()): the design call would be billed and its scenes refused
-    if (s.generating || !flow.reset()) return;
-    setS((prev) => ({ ...prev, designing: true, error: null }));
+    // the design call and its scenes are ONE paid run (scene-flow.ts hold): no other paid scene work can take the slot
+    // between them; refused (another paid run holds it) = nothing sent, nothing billed
+    if (s.generating) return;
     const scenesWanted = drawsScenes ? flow.count : 0;
-    try {
-      // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
-      const m = mainOf(s);
-      const spec = (k: PresetKey): SizeSpec => ({ key: k, ratio: PRESETS[k].ratio, use: PRESETS[k].use, w: PRESETS[k].w, h: PRESETS[k].h });
-      const sel = selectedSizes(s);
-      const chosen = sel.length > 1 ? sel.map(spec) : [];
-      const mp = PRESETS[m.preset];
-      // C12: the background (measured here, free) and the palette the AI assigns from: the brand kit's colours when the
-      // organization has one, else the background's colours
-      const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
-      const kit = brand.kit;
-      const kitColors = kit?.colors.length ? kit.colors : null;
-      const orgAtStart = saveOrg;
-      const palette = usablePalette(bg, kitColors);
-      // R2-C: the client's kit brings its fonts and logo; the logo is read while the AI answers
-      const kitJob = kit ? brandKitPatch(kit, false) : Promise.resolve(null);
-      const fields = {
-        brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
-        bg: bgForPrompt(bg), palette, brandKit: !!kitColors,
-        hasProduct: !!m.productImage, productPos: m.productPos, hasLogo: !!(m.logoImage || kit?.logo),
-        ...(chosen.length ? { sizes: [spec(m.preset), ...chosen.filter((c) => c.key !== m.preset)] } : {}),
-      };
-      // C10: an answer that does not parse is asked once more; still broken = an error naming what was billed
-      const got = await askJsonWithRetry(async () => {
-        const res = await staff.scriptForge("design", fields, designModel);
-        if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
-        return readAiStream(res);
-      }, () => setAiRetrying("design"));
-      setAiRetrying(null);
-      if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(designModel, "design", Math.max(1, chosen.length))));
-      const raw = (got.value && typeof got.value === "object" ? got.value : {}) as Record<string, unknown>;
-      const kitPart = await kitJob;
-      // the client was changed while the AI answered: these colours are the previous client's -- not applied
-      if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
-      const variants = sanitizeCopyVariants(raw.copyVariants);
-      const plan = designPlan(raw, spec(m.preset), chosen);
-      // the design on a given state: the answer, the first word set, the kit's fonts / logo and type sized automatically,
-      // through applyLayout like any position button (a moved element loses its drag at every size that inherits the
-      // move); then each chosen size's own layout onto its tweak, the same way
-      const build = (prev: State): State => {
-        const main = applyLayout(leaveSize(prev), {
-          ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
-          ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
-        });
-        const sizeOverrides = { ...main.sizeOverrides };
-        for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
-        // a product the program draws over the design sits in it: contact shadow, reflection, tone match on
-        return { ...main, sizeOverrides, ...(productDrawn(main) ? { grounding: groundingOn(main.grounding) } : {}) };
-      };
-      // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
-      // is measured again); the roles index the palette the prompt was given
-      let applied = null as State | null; // set by the merge below (a closure: the cast keeps TS from narrowing it to null)
-      await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }),
-        (built, col) => (applied = { ...built, ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }),
-        (prev, err) => ({ ...prev, designing: false, error: `對比檢查失敗（${errText(err)}）：這次設計沒有套用，請再按一次。` }));
-      if (applied && scenesWanted) {
-        const am = mainOf(applied);
-        void flow.draw(applied, scenesWanted, {
-          scene: sceneOf(am), product: am.productImage, model: am.productImage ? compositeModel(am.aiBgModel) : am.aiBgModel, styleRefs: [],
-        });
+    await flow.hold(async (drawHere) => {
+      setS((prev) => ({ ...prev, designing: true, error: null }));
+      try {
+        // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
+        const m = mainOf(s);
+        const spec = (k: PresetKey): SizeSpec => ({ key: k, ratio: PRESETS[k].ratio, use: PRESETS[k].use, w: PRESETS[k].w, h: PRESETS[k].h });
+        const sel = selectedSizes(s);
+        const chosen = sel.length > 1 ? sel.map(spec) : [];
+        const mp = PRESETS[m.preset];
+        // C12: the background (measured here, free) and the palette the AI assigns from: the brand kit's colours when the
+        // organization has one, else the background's colours
+        const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
+        const kit = brand.kit;
+        const kitColors = kit?.colors.length ? kit.colors : null;
+        const orgAtStart = saveOrg;
+        const palette = usablePalette(bg, kitColors);
+        // R2-C: the client's kit brings its fonts and logo; the logo is read while the AI answers
+        const kitJob = kit ? brandKitPatch(kit, false) : Promise.resolve(null);
+        const fields = {
+          brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
+          bg: bgForPrompt(bg), palette, brandKit: !!kitColors,
+          hasProduct: !!m.productImage, productPos: m.productPos, hasLogo: !!(m.logoImage || kit?.logo),
+          ...(chosen.length ? { sizes: [spec(m.preset), ...chosen.filter((c) => c.key !== m.preset)] } : {}),
+        };
+        // C10: an answer that does not parse is asked once more; still broken = an error naming what was billed
+        const got = await askJsonWithRetry(async () => {
+          const res = await staff.scriptForge("design", fields, designModel);
+          if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
+          return readAiStream(res);
+        }, () => setAiRetrying("design"));
+        setAiRetrying(null);
+        if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(designModel, "design", Math.max(1, chosen.length))));
+        const raw = (got.value && typeof got.value === "object" ? got.value : {}) as Record<string, unknown>;
+        const kitPart = await kitJob;
+        // the client was changed while the AI answered: these colours are the previous client's -- not applied
+        if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
+        const variants = sanitizeCopyVariants(raw.copyVariants);
+        const plan = designPlan(raw, spec(m.preset), chosen);
+        // the design on a given state: the answer, the first word set, the kit's fonts / logo and type sized automatically,
+        // through applyLayout like any position button (a moved element loses its drag at every size that inherits the
+        // move); then each chosen size's own layout onto its tweak, the same way
+        const build = (prev: State): State => {
+          const main = applyLayout(leaveSize(prev), {
+            ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
+            ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
+          });
+          const sizeOverrides = { ...main.sizeOverrides };
+          for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
+          // a product the program draws over the design sits in it: contact shadow, reflection, tone match on
+          return { ...main, sizeOverrides, ...(productDrawn(main) ? { grounding: groundingOn(main.grounding) } : {}) };
+        };
+        // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
+        // is measured again); the roles index the palette the prompt was given
+        let applied = null as State | null; // set by the merge below (a closure: the cast keeps TS from narrowing it to null)
+        await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }),
+          (built, col) => (applied = { ...built, ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }),
+          (prev, err) => ({ ...prev, designing: false, error: `對比檢查失敗（${errText(err)}）：這次設計沒有套用，請再按一次。` }));
+        if (applied && scenesWanted) {
+          const am = mainOf(applied);
+          await drawHere(applied, scenesWanted, {
+            scene: sceneOf(am), product: am.productImage, model: am.productImage ? compositeModel(am.aiBgModel) : am.aiBgModel, styleRefs: [],
+          });
+        }
+      } catch (err) {
+        setAiRetrying(null);
+        setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
       }
-    } catch (err) {
-      setAiRetrying(null);
-      setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
-    }
+    });
   }
 
   // a word set swapped in: the new words' boxes are checked like an AI design (only colours that fail change); one

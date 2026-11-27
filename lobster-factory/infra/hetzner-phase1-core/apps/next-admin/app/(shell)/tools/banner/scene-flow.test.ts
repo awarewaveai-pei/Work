@@ -159,25 +159,46 @@ describe("R4-D Codex 複審 付費進行中不能再付費", () => {
   });
 });
 
-describe("R4-D Codex 第三輪 付費進行中 AI 一鍵設計不能清掉已付費的圖", () => {
-  it("reset() is refused while paid pictures are being checked; they still land; AI 一鍵設計 waits on generating", async () => {
+describe("R4-D Codex 第三、四輪 AI 一鍵設計與付費場景互斥", () => {
+  const rig = () => {
     let st: State = design, view: FlowView = EMPTY_VIEW, checking: (() => void) | null = null, checks = 0;
+    const generate = vi.fn(async () => SCENE);
     const flow = sceneFlow({
-      current: () => st, apply: (fn) => { st = fn(st); }, view: (fn) => { view = fn(view); }, generate: vi.fn(async () => SCENE), areas,
+      current: () => st, apply: (fn) => { st = fn(st); }, view: (fn) => { view = fn(view); }, generate, areas,
       check: () => { checks++; return checks === 1 ? Promise.resolve({ patch: {}, unmet: [] } as never)
         : new Promise((r) => { checking = () => r({ patch: {}, unmet: [] } as never); }); },
     });
-    await flow.pick(0, cell);
-    const run = flow.drawOthers(cell, src, "extend");
-    for (let i = 0; i < 20 && !checking; i++) await new Promise((r) => setTimeout(r, 0));
-    expect(flow.reset()).toBe(false);
-    checking!(); expect(await run).toBe(true);
-    expect(variantOf(st, "r9x16").bgProductArea).toEqual(areaOf.r9x16);
-    expect(view.picked).toBe(0);
-    expect(flow.reset()).toBe(true);
-    expect(view).toEqual(EMPTY_VIEW);
+    return { flow, generate, st: () => st, view: () => view, release: () => checking?.(), checking: () => checking };
+  };
+  it("AI 一鍵設計 pressed while paid other sizes are being checked is refused; the paid sizes still land", async () => {
+    const h = rig();
+    await h.flow.pick(0, cell);
+    const run = h.flow.drawOthers(cell, src, "extend");
+    for (let i = 0; i < 20 && !h.checking(); i++) await new Promise((r) => setTimeout(r, 0));
+    const job = vi.fn(async () => {});
+    expect(await h.flow.hold(job)).toBe(false);
+    expect(job).not.toHaveBeenCalled();             // the design call is never sent
+    h.release(); expect(await run).toBe(true);
+    expect(variantOf(h.st(), "r9x16").bgProductArea).toEqual(areaOf.r9x16);
+    expect(h.view().picked).toBe(0);
+  });
+  it("while AI 一鍵設計's design call runs, 合成進場景 is refused; the design's own scenes are drawn", async () => {
+    const h = rig();
+    let answer: (() => void) | null = null;
+    const design1 = h.flow.hold(async (drawHere) => {
+      await new Promise<void>((r) => { answer = r; });   // the paid design call
+      await drawHere(h.st(), 2, src);
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(h.st().generating).toBe(true);
+    expect(await h.flow.draw(h.st(), 3, src)).toBe(false);
+    answer!(); expect(await design1).toBe(true);
+    expect(h.generate).toHaveBeenCalledTimes(2);
+    expect(h.view().cells.map((c) => c.state)).toEqual(["ok", "ok"]);
+    expect(h.st().generating).toBe(false);
     const ai = readFileSync(join(__dirname, "steps/StepAi.tsx"), "utf8");
-    expect(ai).toContain("if (s.generating || !flow.reset()) return;");
-    expect(ai).toMatch(/disabled=\{\(s\.designing \|\| s\.generating \|\| flow\.busy/);
+    expect(ai).toContain("await flow.hold(async (drawHere) => {");
+    expect(ai).toContain("await drawHere(applied, scenesWanted, {");
+    expect(ai).not.toMatch(/flow\.(draw|reset)\(/);
   });
 });
