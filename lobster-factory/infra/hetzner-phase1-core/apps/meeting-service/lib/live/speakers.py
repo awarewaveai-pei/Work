@@ -162,17 +162,24 @@ def voices_path() -> str:
     return os.path.join(base, "meeting-service", "voices.json")
 
 
-def _synced_roots() -> list:
-    return [os.environ[k] for k in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial", "MEETING_DRIVE_BASE") if os.environ.get(k)]
-
-
 def check_location(path: str) -> None:
-    """Voices are biometric: never inside this folder (a git repository, public) or a synced folder."""
+    """Voices are biometric: never inside this folder (a git repository, public), a cloud-synced folder
+    (lib/paths.cloud, the one rule recordings use) or an output destination (they are synced)."""
+    from lib import paths, settings
     p = os.path.normcase(os.path.abspath(path))
-    for root in [HERE] + _synced_roots():
+    roots = [HERE]
+    for d in settings.destinations():
+        try:
+            roots.append(paths.local(d["dir"]))
+        except paths.PathError:
+            pass                        # a destination this process cannot reach cannot hold the file either
+    for root in roots:
         r = os.path.normcase(os.path.abspath(root))
         if p == r or p.startswith(r.rstrip("\\/") + os.sep):
             raise ValueError(f"聲音檔不能放在 {root} 底下")
+    name = paths.cloud(os.path.dirname(path))
+    if name:
+        raise ValueError(f"聲音檔不能放在 {name} 同步的資料夾裡")
 
 
 class Voices:
