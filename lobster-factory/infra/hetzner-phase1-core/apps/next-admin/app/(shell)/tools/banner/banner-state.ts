@@ -668,15 +668,20 @@ export function pushHistory(hist: State[], idx: number, st: State, oneClick = fa
   return { hist: next, idx: next.length - 1 };
 }
 
-/** A picture in the history signature: its length + an FNV-1a hash of 512 evenly spaced characters. Length alone let two
- *  different pictures of equal length count as one step (a paid picture then never reached history and redo lost it);
- *  sampling keeps it cheap on multi-MB data-URLs. */
+/** A picture in the history signature: its length + an FNV-1a hash of EVERY character. Length alone (and a sampled hash)
+ *  let two different pictures count as one step -- a paid picture then never reached history and redo lost it. Hashed
+ *  once per picture: designSig runs on every render (canClear), so the last pictures' signatures are cached. */
+const IMAGE_SIG_CACHE = new Map<string, string>();
 export function imageSig(v: unknown): string | number {
   if (typeof v !== "string") return 0;
-  const n = v.length, step = Math.max(1, Math.floor(n / 512));
+  const hit = IMAGE_SIG_CACHE.get(v);
+  if (hit) return hit;
   let h = 0x811c9dc5;
-  for (let i = 0; i < n; i += step) { h ^= v.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return `${n}:${h.toString(36)}`;
+  for (let i = 0; i < v.length; i++) { h ^= v.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const sig = `${v.length}:${h.toString(36)}`;
+  if (IMAGE_SIG_CACHE.size >= 64) IMAGE_SIG_CACHE.delete(IMAGE_SIG_CACHE.keys().next().value!);
+  IMAGE_SIG_CACHE.set(v, sig);
+  return sig;
 }
 
 export function designSig(st: State): string {

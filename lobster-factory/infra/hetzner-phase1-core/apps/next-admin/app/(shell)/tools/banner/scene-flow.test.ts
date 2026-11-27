@@ -217,6 +217,13 @@ describe("R4-D Codex 第五輪 復原不解開付費鎖", () => {
 });
 
 describe("R4-D Codex 第六輪 等長的新圖也進復原紀錄", () => {
+  it("a one-character difference anywhere (an SVG colour) is its own signature", () => {
+    const svg = (c: string) => "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><!--" + "x".repeat(4000) + `--><rect fill='#${c}'/></svg>`;
+    for (const [x, y] of [["ff0000", "0000ff"], ["ff0000", "ff0001"]]) {
+      expect(svg(x).length).toBe(svg(y).length);
+      expect(designSig({ ...design, bgImage: svg(x) })).not.toBe(designSig({ ...design, bgImage: svg(y) }));
+    }
+  });
   it("two different pictures of the same length are two history steps; the signature still never holds the data", () => {
     const a = "data:image/png;base64," + "A".repeat(4000) + "xyz", b = "data:image/png;base64," + "A".repeat(2000) + "Q".repeat(16) + "A".repeat(1984) + "xyz"; // real pictures differ throughout
     expect(a.length).toBe(b.length);
