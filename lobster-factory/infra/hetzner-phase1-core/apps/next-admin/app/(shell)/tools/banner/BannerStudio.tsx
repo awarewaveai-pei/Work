@@ -235,7 +235,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       case "text": return <StepText slot={slot} {...ctx} drawnType={drawnType} />;
       case "canvas": return <StepCanvas slot={slot} {...ctx} />;
       case "marketing": return <StepMarketing slot={slot} {...ctx} />;
-      case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} />;
+      case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} drawnType={drawnType} />;
       case "export": return <StepExport slot={slot} {...ctx} saveOrg={saveOrg} />;
     }
   };

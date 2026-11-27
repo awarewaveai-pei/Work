@@ -105,8 +105,9 @@ export interface PriceLayout { box: ElemBox; nowSize: number; wasSize: number; n
 export interface CtaLayout { box: ElemBox; size: number; text: string }
 export interface TrustLayout { box: ElemBox; size: number; stars: string; label: string; starW: number; gap: number }
 export interface BadgeLayout { box: ElemBox; size: number; text: string; textW: number; onLeft: boolean }
-/** `reflection`: the mirrored part below the product, inside the canvas (null = reflection off). */
-export interface ProductLayout { box: ElemBox; reflection: ElemBox | null }
+/** `reflection`: the mirrored part below the product, inside the canvas (null = reflection off). `drawn` false = the
+ *  product is baked into the AI background: the area stays reserved (text keeps clear of it), only the picture is not drawn. */
+export interface ProductLayout { box: ElemBox; reflection: ElemBox | null; drawn: boolean }
 export interface BannerLayout {
   w: number; h: number;
   align: BannerFields["textAlignH"];
@@ -127,8 +128,12 @@ type StackKey = (typeof STACK_KEYS)[number];
 
 /** Whether the product picture is drawn: not when the active AI background already has it baked in (keyed off
  *  bgImageHasProduct set at generation time, not the live toggle, so flipping it can't double-draw the product). */
-export function productShown(f: BannerFields): boolean {
-  return !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
+const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
+
+/** The areas a generated picture is asked to keep: the text stack's box and the product's (canvas px; null = none).
+ *  Scene / 合成進場景 prompts and the reservation the layout keeps after baking are this one box (R3-D 三3). */
+export function reservedAreas(L: BannerLayout): { text: ElemBox | null; product: ElemBox | null } {
+  return { text: union(STACK_KEYS.flatMap((k) => (L.boxes[k] ? [L.boxes[k]!] : []))), product: L.product?.box ?? null };
 }
 
 /** Logo rule (R3 二): height = the short side x LOGO_AUTO, at most the title's font size x LOGO_TITLE (logoAuto, the
@@ -265,8 +270,10 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     return { t, b };
   };
 
-  // product: its size and, beside the text, its place; centred, it shares the column with the stack (placed below)
-  const nat = productShown(f) && f.productImage ? picture(measure, f.productImage) : null;
+  // product: its size and, beside the text, its place; centred, it shares the column with the stack (placed below).
+  // Reserved whether drawn or baked into the background -- the generation put it in this same area.
+  const nat = f.productImage ? picture(measure, f.productImage) : null;
+  const drawn = productDrawn(f);
   const g = f.grounding?.reflection;
   const refl = g?.enabled && (g.fade ?? 0.3) > 0 ? Math.max(0, Math.min(1, g.height ?? 0.35)) : 0;
   const reflGap = refl ? Math.max(0, g?.gap ?? 0) : 0;
@@ -280,7 +287,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     const k = Math.max(0, Math.min(pMaxW / nat.w, Math.min(H * 0.85, maxH) / nat.h));
     const sw = nat.w * k, sh = nat.h * k, gh = sh * (1 + refl) + reflGap;
     const at = pos.product ? dropAt(pos.product, sw, gh, W, H) : { x: x(sw), y: top(gh), w: sw, h: gh };
-    return { box: { x: at.x, y: at.y, w: sw, h: sh }, reflection: refl ? { x: at.x, y: at.y + sh + reflGap, w: sw, h: sh * refl } : null };
+    return { box: { x: at.x, y: at.y, w: sw, h: sh }, reflection: refl ? { x: at.x, y: at.y + sh + reflGap, w: sw, h: sh * refl } : null, drawn };
   };
   const groupBox = (p: ProductLayout) => union([p.box, ...(p.reflection ? [p.reflection] : [])])!;
   let product: ProductLayout | undefined;
@@ -293,7 +300,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     const room = pos.product ? H : (b - t - reflGap) / (1 + refl);
     product = productAt(room, (sw) => (left ? pPad : W - pPad - sw),
       (gh) => (f.productPos === "bottom-right" ? b - gh : t + (b - t - gh) / 2));
-    if (product) boxes.product = product.box;
+    if (product?.drawn) boxes.product = product.box;
   }
 
   // the text column: the margins, minus a product beside the text
@@ -417,7 +424,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     else if (f.textPos === "bottom") { stackTop = b - stackH; pTop = t + (span - stackH - gap - gh) / 2; }
     else { stackTop = t + (span - stackH - gap - gh) / 2; pTop = stackTop + stackH + gap; }
     product = productAt(room, (sw) => (pCentre ? (W - sw) / 2 : W - pPad - sw), () => pTop);
-    if (product) boxes.product = product.box;
+    if (product?.drawn) boxes.product = product.box;
   } else {
     stackTop = f.textPos === "top" ? t : f.textPos === "bottom" ? b - stackH : t + (span - stackH) / 2;
   }

@@ -234,13 +234,6 @@ export function boxOnPicture(box: Box, size: { w: number; h: number }, aspect: s
   const c = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 100) / 100;
   return { x0: c(fx(box.x)), y0: c(fy(box.y)), x1: c(fx(box.x + box.w)), y1: c(fy(box.y + box.h)) };
 }
-/** The box around several (the text stack's blocks); null = none. */
-export function unionBox(boxes: readonly (Box | undefined)[]): Box | null {
-  const b = boxes.filter((x): x is Box => !!x);
-  if (!b.length) return null;
-  const x0 = Math.min(...b.map((v) => v.x)), y0 = Math.min(...b.map((v) => v.y));
-  return { x: x0, y: y0, w: Math.max(...b.map((v) => v.x + v.w)) - x0, h: Math.max(...b.map((v) => v.y + v.h)) - y0 };
-}
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const zoneWord = (a: PicArea) => {
   const cx = (a.x0 + a.x1) / 2, cy = (a.y0 + a.y1) / 2;
