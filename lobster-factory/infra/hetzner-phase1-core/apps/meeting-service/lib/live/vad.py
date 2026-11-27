@@ -178,9 +178,11 @@ def reanchor(spans: list, regions: list) -> list:
         return min(near, key=lambda x: abs(x - t)) if near else t
 
     out, last = [], 0.0
-    for s, e in spans:
+    for i, (s, e) in enumerate(spans):
         start = nearest(max(s - lag, last), starts, last)
         end = nearest(max(e - lag, start), ends, start)
+        if i + 1 < len(spans) and end > spans[i + 1][0] - lag >= e - lag:
+            end = max(e - lag, start)   # snapping would swallow the start of the next line
         out.append((round(start, 3), round(max(end, start), 3)))
         last = out[-1][1]
     return out

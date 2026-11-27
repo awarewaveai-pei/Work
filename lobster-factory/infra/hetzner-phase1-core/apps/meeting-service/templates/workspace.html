@@ -1243,13 +1243,17 @@ Sorry, could you repeat the question?
         options.models.map(m => btn(m === "large-v3" ? "large-v3（準）" : m === "medium" ? "medium（快）" : m,
           () => { opts.model = m; paintOptions(); paintSessions(); }, opts.model === m))),
       h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議語言"),
+        btn("依來源", () => { opts.language = null; paintOptions(); }, opts.language === null),
         options.languages.map(l => btn(l.label, () => { opts.language = l.code; paintOptions(); }, opts.language === l.code))),
+      opts.language === null ? h("p", { class: "po-note" }, "上傳的檔案當中文；聆聽場次用當時聽的語言。") : null,
       h("div", { class: "po-row" }, h("span", { class: "po-label" }, "同步"), toggle("sync_drive", "完成後同步到雲端硬碟")),
       opts.sync_drive ? h("p", { class: "po-warn" }, "會把 PPT／會議記錄／逐字稿複製到雲端，敏感會議不要開。") : null,
       options.has_api_key ? h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議記錄"), toggle("use_api", "自動處理（用 API，會計費）")) : null);
   }
   function body(extra) {
-    return JSON.stringify(Object.assign({ diarize: opts.diarize, model: opts.model, language: opts.language, sync_drive: opts.sync_drive, use_api: opts.use_api }, extra));
+    const o = { diarize: opts.diarize, model: opts.model, sync_drive: opts.sync_drive, use_api: opts.use_api };
+    if (opts.language !== null) o.language = opts.language;
+    return JSON.stringify(Object.assign(o, extra));
   }
 
   // ---------- 場次 ----------
@@ -1290,7 +1294,7 @@ Sorry, could you repeat the question?
     if (!input.files.length) { say("先選一個音檔或影片"); return; }
     const fd = new FormData();
     fd.append("file", input.files[0]);
-    const q = new URLSearchParams({ diarize: opts.diarize, model: opts.model, language: opts.language, sync_drive: opts.sync_drive, use_api: opts.use_api });
+    const q = new URLSearchParams({ diarize: opts.diarize, model: opts.model, language: opts.language || "zh", sync_drive: opts.sync_drive, use_api: opts.use_api });
     say("上傳中…");
     try {
       const r = await call("/api/upload?" + q, { method: "POST", body: fd });
@@ -1384,7 +1388,6 @@ Sorry, could you repeat the question?
     if (!options) {
       try {
         options = await call("/api/postmeeting/options");
-        if (opts.language === null) opts.language = options.language;
       } catch (e) { say("讀不到選項：" + e.message); }
     }
     paintOptions();

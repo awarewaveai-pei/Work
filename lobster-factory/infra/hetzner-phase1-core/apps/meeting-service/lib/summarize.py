@@ -83,12 +83,16 @@ Schema:
 
 def build_transcript_text(turns: list = None, merged: list = None) -> str:
     """優先用講者分離後的 turns；沒有就用合併後的 merged 輪次。每句有翻譯（聆聽時的即時翻譯）就附在它後面的括號裡（text_tr）。"""
-    lines = []
-    for t in turns or merged or []:
-        mm, ss = int(t["start"] // 60), int(t["start"] % 60)
-        who = f"{t['speaker']}：" if turns else ""
-        lines.append(f"[{mm:02d}:{ss:02d}] {who}{t.get('text_tr') or t['text']}")
-    text = "\n".join(lines)
+    def render(with_tr):
+        lines = []
+        for t in turns or merged or []:
+            mm, ss = int(t["start"] // 60), int(t["start"] % 60)
+            who = f"{t['speaker']}：" if turns else ""
+            lines.append(f"[{mm:02d}:{ss:02d}] {who}{(t.get('text_tr') if with_tr else None) or t['text']}")
+        return "\n".join(lines)
+    text = render(True)
+    if len(text) > MAX_TRANSCRIPT_CHARS:
+        text = render(False)   # the whole meeting without translations beats translations and a cut-off end
     if len(text) > MAX_TRANSCRIPT_CHARS:
         text = text[:MAX_TRANSCRIPT_CHARS] + "\n\n（逐字稿過長，已截斷，可能影響後段內容判讀）"
     return text

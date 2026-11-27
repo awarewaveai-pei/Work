@@ -93,6 +93,21 @@ class Adapter(unittest.TestCase):
         self.assertAlmostEqual(moved[-1][1], 13.0, delta=0.1)
 
 
+    def test_an_end_snapped_to_a_pause_never_runs_into_the_next_line(self):
+        # critic 2026-11-27: A's end jumped to the pause at 20 and pushed B into the next speaker's speech.
+        from lib.live import vad
+        moved = vad.reanchor([(10.2, 19.3), (19.4, 19.9)], [(10.0, 20.0), (20.8, 30.0)])
+        self.assertLessEqual(moved[0][1], moved[1][0])
+        self.assertLess(moved[1][0], 20.0)
+
+    def test_translations_are_dropped_before_the_end_of_a_long_meeting_is(self):
+        # critic 2026-11-27: bracketed translations made the 60k cap cut off the last quarter of a meeting.
+        merged = [{"start": i, "text": "x" * 90, "text_tr": "x" * 90 + "（譯" + "y" * 60 + "）"} for i in range(600)]
+        text = summarize.build_transcript_text(merged=merged)
+        self.assertNotIn("已截斷", text)
+        self.assertNotIn("（譯", text)
+
+
 class ChainSkipsWhatItHas(unittest.TestCase):
     def setUp(self):
         self.fakes = Fakes()

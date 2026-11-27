@@ -291,6 +291,7 @@ function renderStages(activeStage, doneSet) {
 }
 
 let currentJobId = null;
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 async function poll(jobId) {
   currentJobId = jobId;
@@ -432,10 +433,10 @@ function showResult(jobId, status) {
     html += s.realtime_factor == null ? `<p class="hint">逐字稿：${s.backend}` : `<p class="hint">轉錄 ${s.realtime_factor}x realtime（${s.backend}）`;
     if (status.diarize_stats) {
       const ov = status.diarize_stats.overlap_sec;
-      html += ` · 講者 ${status.diarize_stats.speakers.join("/")}` + (ov == null ? "" : ` · 重疊語音 ${ov.toFixed(0)}s`);
+      html += ` · 講者 ${escapeHtml(status.diarize_stats.speakers.join("/"))}` + (ov == null ? "" : ` · 重疊語音 ${ov.toFixed(0)}s`);
     }
     if (status.diarize_error) {
-      html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${status.diarize_error}）</span>`;
+      html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${escapeHtml(status.diarize_error)}）</span>`;
     }
     html += "</p>";
   }

@@ -97,6 +97,8 @@ def transcribe_language(sidecar) -> str:
 
 def language_name(code: str) -> str:
     """語言代碼（transcribe 的 zh／en、或 BCP-47）→ 提示詞用名；認不得就原樣。"""
+    if code in ("", "auto"):
+        return "未指定（辨識時自動判斷）"
     row = langs.find(code) or langs.from_whisper(code)
     return row.prompt if row and row.prompt else code
 

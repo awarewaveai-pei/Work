@@ -259,14 +259,17 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
 
     media_path = os.path.join(job_dir, f"input{ext}")
     size = 0
-    with open(media_path, "wb") as out:
-        while chunk := await file.read(1 << 20):
-            size += len(chunk)
-            if size > MAX_UPLOAD_MB * 1024 * 1024:
-                out.close()
-                shutil.rmtree(job_dir, ignore_errors=True)
-                raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
-            out.write(chunk)
+    try:
+        with open(media_path, "wb") as out:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB * 1024 * 1024:
+                    raise HTTPException(413, f"檔案超過 {MAX_UPLOAD_MB}MB 上限")
+                out.write(chunk)
+    except BaseException:
+        # No half-written job left in the job list.
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
 
     # 預設走人工回路（貼上/叫 Claude Code），不呼叫 API，不需要 ANTHROPIC_API_KEY。
     # use_api=True 且已設定 key 時，pipeline 內會直接呼叫 summarize_via_api()，
@@ -336,10 +339,10 @@ def ownvoice_import(body: dict = Body(...)):
                 duration = _ownvoice(ownvoice.join_wavs, session_id, media_path)
             if reuse:
                 postmeeting.write_products(job_dir, sidecar, duration)
+            jobs.link(JOBS_DIR, folder, job_id)
         except Exception:
             shutil.rmtree(job_dir, ignore_errors=True)
             raise
-        jobs.link(JOBS_DIR, folder, job_id)
         claim.start(run_pipeline_phase1, job_dir, media_path, opts, api_key)
     return {"job_id": job_id, "reuse": reuse}
 
