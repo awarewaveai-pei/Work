@@ -6,11 +6,12 @@ export const META = {
   updated: '2026-11-27',
   plan: 'agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md',
   plan3: 'agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R3.md',
+  plan4: 'agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R4.md',
 };
 
 // todo｜doing｜review｜done（done 要在 COMMITS 填 commit）
-export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done', 'R3-A': 'done', 'R3-B': 'done', 'R3-C': 'done', 'R3-D': 'doing' };
-export const COMMITS = { 'R2-A': 'ef6572105', 'R2-B1': '528cb59d5', 'R2-B2': '06c46341e', 'R2-C': 'e2d125cd9', 'R3-A': 'ccaa2d151', 'R3-B': '4e97d619a', 'R3-C': '6496abefc' };
+export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done', 'R3-A': 'done', 'R3-B': 'done', 'R3-C': 'done', 'R3-D': 'done', 'R4-A': 'doing', 'R4-B': 'doing', 'R4-C': 'todo' };
+export const COMMITS = { 'R2-A': 'ef6572105', 'R2-B1': '528cb59d5', 'R2-B2': '06c46341e', 'R2-C': 'e2d125cd9', 'R3-A': 'ccaa2d151', 'R3-B': '4e97d619a', 'R3-C': '6496abefc', 'R3-D': 'd137012fa' };
 
 // 等你決定：要提前手動部署或高風險時才放這裡。{ card, what, rollback }
 export const GO = [];
@@ -68,8 +69,10 @@ export const RISKS = [
   { card: 'R3-D', said: '介面新字樣（已縮、自動比例）只過型別檢查，沒在頁面看過；手動模式被縮時滑塊往上拖會跳回實際值。', handling: '監工部署前在本機實看；跳回是因為顯示的是實際畫出值，保留。' },
   { card: 'R3-D', said: '商品烤進背景後，舊的商品拖曳位置仍決定預留區，但預覽上拖不動。', handling: '保留：背景裡的商品本來就移不動；換位置用商品位置按鈕重生。' },
   { card: 'R3-D', said: 'AI 生成的商品不一定正好落在要求的區域。', handling: '保留：排版預留的是要求的區域；部署前本機實打一次看落點。' },
-  { card: 'R3-D', said: 'Codex：拖動或縮放含商品的背景後，保留的商品區沒跟著移。', handling: 'R3-E 修：每張含商品的圖記下商品區，跟著圖的位置與裁切換算。' },
-  { card: 'R3-D', said: 'Codex：某尺寸生成失敗、沿用主尺寸的圖時，保留區對不上圖裡的商品。', handling: 'R3-E 同一修法一起解決。' },
+  { card: 'R3-D', said: 'Codex：拖動或縮放含商品的背景後，保留的商品區沒跟著移。', handling: '已修 R3-E（d137012fa）。' },
+  { card: 'R3-D', said: 'Codex：某尺寸生成失敗、沿用主尺寸的圖時，保留區對不上圖裡的商品。', handling: '已修 R3-E（d137012fa）。' },
+  { card: 'R3-D', said: 'Codex：畫布編輯傳回新背景、重新合成時失敗尺寸、移除商品圖，三種情況商品區會錯。', handling: 'R4-A 修：背景圖、含商品、商品區三者只經一個函式一起換。' },
+  { card: 'R4-A', said: 'T1 實測：AI 有照做商品左右位置，沒照做大小；橫式商品畫成要求的兩倍高，每一張的商品頂端都衝進文字區、副標壓到滴管。', handling: 'R4-A／R4-B：字級設上下限、文字只用上三分之一、橫式只靠左右分區並把商品高度要求改成實測值。' },
 ];
 
 // 有預設、沒答就照做（PLAN-R2 §4 代決）
@@ -83,7 +86,7 @@ export const DECIDE = [
 export const COPY = {
   sub: '你的十點回饋與第三輪修改清單，共 {total} 張卡；每批交回後先處理風險再上線。',
   updated: '更新於 {date}',
-  nav: { now: '現況', open: '等你決定', b1: '第一批', b2: '第二批', b3: '第三輪', risks: '風險' },
+  nav: { now: '現況', open: '等你決定', b1: '第一批', b2: '第二批', b3: '第三輪', b4: '第四輪', risks: '風險' },
   now: { h: '現況', lead: '做到哪。' },
   steps: { h: '卡片', count: '{done}／{total} 完成' },
   open: { h: '等你決定', lead: '要你點頭才往下的事。', none: '目前沒有要你點頭的事。', count: '{n} 項' },
@@ -125,6 +128,15 @@ export const BATCHES = [
       C('R3-B', 'Low', 'Sonnet 5.5', '', '版面：拿掉頂部「橫幅」列；預覽欄固定在畫面上、高度不變；尺寸縮圖列填滿剩下的高度。'),
       C('R3-C', 'Medium', 'Opus 5.5', '', 'AI：一鍵設計直接生場景讓你挑、商品擬真預設開；「AI 合成進場景」每個已選尺寸各依比例生成，商品不被字遮住。'),
       C('R3-D', 'Medium', 'Opus 5.5', 'R3-A、R3-B、R3-C', '收尾：商品烤進場景時文字照樣讓開商品；Logo 自動／手動記在各尺寸；滑桿顯示實際畫出的大小。'),
+    ] },
+  { code: 'b4', no: '第四輪', title: '依實測定字級與構圖（T1：11 個尺寸實打一次）',
+    seen: '每個尺寸的標題大小有上下限（依實際顯示大小算，不再頂到畫面寬）；版面分三群：手機直式、卡片橫式、網頁；16:9 分成「網站 Hero」與「社群／縮圖」；AI 合成依實測調整，商品不再頂到文字。',
+    accept: '同一組素材再實打一次（約 NT$20）：每一張的商品與文字都不重疊、標題都在範圍內、縮到四分之一仍讀得到標題。',
+    rollback: '每張卡一個 commit，單獨還原。',
+    cards: [
+      C('R4-A', 'Medium', 'Opus 5.5', '', '排版：標題大小上下限、構圖三群、16:9 拆兩個；背景圖與商品位置一起換（R3-E 的三條）。'),
+      C('R4-B', 'Low', 'Sonnet 5.5', '', '合成指令：橫式商品在右欄、高度約一半；先查 AI 能不能直接出 21:9 給 3:1 用。'),
+      C('R4-C', 'Low', 'Sonnet 5.5', 'R4-A、R4-B', '驗收：同素材再實打一次並量測。'),
     ] },
 ];
 
