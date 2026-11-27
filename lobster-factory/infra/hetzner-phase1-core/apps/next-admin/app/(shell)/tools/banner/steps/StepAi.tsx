@@ -3,27 +3,29 @@
 import { useState, type MutableRefObject } from "react";
 import {
   BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, DEFAULT_SCENE_COUNT, SCENE_COUNTS, aiFormatError, askJsonWithRetry,
-  bannerCallNtd, copyWords, designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, scenePrompt, showsCopy,
+  bannerCallNtd, compositePrompt, copyWords, designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, scenePrompt, showsCopy,
   type BannerAiModel, type DesignCopy, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
 import { guardLane, sameDrawInputs } from "../contrast-run";
-import { applySemantic, productShown } from "../banner-layout";
+import { applySemantic } from "../banner-layout";
 import { bgForPrompt, bgStatsFromColors, guardDrawn, usablePalette, type GuardResult, type PxBox } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
 import {
-  COPY_TONES, PRESETS, applyLayout, groundingOn, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes,
-  variantOf, withSharedBackground, type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
+  COPY_TONES, PRESETS, applyLayout, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes,
+  variantOf, withSharedBackground, withSizeBackgrounds, type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
 } from "../banner-state";
-import { drawnAreas, generateBgPicture, imageNtd } from "./StepCanvas";
+import { compositeModel, compositeSizes, drawnAreas, generateBgPicture, imageNtd } from "./StepCanvas";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
 
 /** One AI 一鍵設計 scene cell: drawing, drawn (the picture), or failed (the message, billed amount at most one picture). */
 type SceneCell = { state: "wait" } | { state: "ok"; image: string } | { state: "err"; error: string };
+/** The scene description every picture of one design shares (the AI's subject and vibe). */
+const sceneOf = (st: State): string => [st.aiBgSubject.trim(), st.aiBgVibe.trim()].filter(Boolean).join(", ");
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 /** The elements drawn in textColor: the contrast guard measures the background under these boxes. */
@@ -61,8 +63,13 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   const [sceneCount, setSceneCount] = useState<number>(DEFAULT_SCENE_COUNT);
   const [scenes, setScenes] = useState<SceneCell[]>([]);
   const [scenePicked, setScenePicked] = useState<number | null>(null);
+  // the other picked sizes' pictures after a pick: "生成中…" while drawing, else the failure message
+  const [sizeJobs, setSizeJobs] = useState<Partial<Record<PresetKey, string>>>({});
   // an uploaded picture is the user's: the design keeps it and draws no scenes
   const drawsScenes = !(mainOf(s).bgMode === "upload" && !!mainOf(s).bgImage);
+  const hasProduct = !!mainOf(s).productImage;
+  const sceneNtd = imageNtd(hasProduct ? compositeModel(s.aiBgModel) : s.aiBgModel);
+  const otherSizes = hasProduct ? picked.length - 1 : 0; // a product scene is drawn again at each other size's ratio
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
@@ -117,9 +124,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
         });
         const sizeOverrides = { ...main.sizeOverrides };
         for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
-        // R3-C: a product drawn over the design sits in it (contact shadow, reflection, tone match on)
-        const grounded = productShown(main) ? { grounding: groundingOn(main.grounding) } : {};
-        return { ...main, sizeOverrides, ...grounded };
+        return { ...main, sizeOverrides };
       };
       // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
       // is measured again); the roles index the palette the prompt was given
@@ -134,36 +139,52 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
     }
   }
 
-  // R3-C: `n` scenes for the applied design, drawn in parallel at the main size's ratio with the image model of 畫面 --
-  // the AI's subject / vibe, no product, the text area kept calm and the product's area left open. A failed one shows
-  // its error in its own cell.
+  // R3-C (operator 2026-11-27): `n` candidates for the applied design at the main size's ratio, the scene from the AI's
+  // subject / vibe. With a product picture each candidate has the product composited into the product area the layout
+  // engine reserves (composite model, product as reference), the text area kept clear; without one, a plain scene.
+  // A failed one shows its error in its own cell.
   async function drawScenes(st: State, n: number) {
     setScenes(Array.from({ length: n }, () => ({ state: "wait" })));
-    const m = mainOf(st), k = m.preset;
-    const each = imageNtd(m.aiBgModel);
+    setSizeJobs({});
+    const m = mainOf(st), k = m.preset, product = m.productImage;
+    const model = product ? compositeModel(m.aiBgModel) : m.aiBgModel;
     const cell = (i: number, c: SceneCell) => setScenes((prev) => prev.map((x, j) => (j === i ? c : x)));
     try {
       const areas = await drawnAreas(variantOf(m, k), k);
-      const prompt = scenePrompt({ subject: m.aiBgSubject, vibe: m.aiBgVibe, textArea: areas.text, productArea: areas.product });
+      if (product && !areas.product) throw new Error("no_product_area");
+      const prompt = product
+        ? compositePrompt({ scene: sceneOf(m), productArea: areas.product!, textArea: areas.text })
+        : scenePrompt({ subject: m.aiBgSubject, vibe: m.aiBgVibe, textArea: areas.text, productArea: null });
       await Promise.all(Array.from({ length: n }, async (_, i) => {
-        try { cell(i, { state: "ok", image: await generateBgPicture({ model: m.aiBgModel, prompt, aspect: PRESETS[k].aspect }) }); }
-        catch (err) { cell(i, { state: "err", error: `${errText(err)}（最多已計費${ntdLabel(each)}）` }); }
+        try { cell(i, { state: "ok", image: await generateBgPicture({ model, prompt, aspect: PRESETS[k].aspect, refs: product ? [product] : [] }) }); }
+        catch (err) { cell(i, { state: "err", error: `${errText(err)}（最多已計費${ntdLabel(imageNtd(model))}）` }); }
       }));
     } catch (err) {
       // the layout could not be read: nothing was sent, nothing billed
       setScenes(Array.from({ length: n }, () => ({ state: "err", error: `版面讀取失敗（${errText(err)}），未生成、未計費` })));
     }
   }
-  // a scene picked: the background of every size (each crops it), contrast checked on it like a word set
+  // a candidate picked = the main size's background (contrast checked on it like a word set). With the product baked
+  // in, every other picked size then gets its own picture of the same scene at its own ratio; without a product the
+  // other sizes crop this one.
   async function pickScene(i: number, image: string) {
     const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+    const m = mainOf(sRef.current), product = m.productImage;
     setScenePicked(i);
-    await sceneLane.run((prev) => withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }),
-      (st) => guardOnDrawn(st, kitColors),
-      (built, g) => ({ ...built, ...g.patch, error: null }),
-      (prev, err) => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：沒有換成這張場景，請再點一次。` }));
+    const check = (st: State) => guardOnDrawn(st, kitColors);
+    const failed = (prev: State, err: unknown) => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：沒有換成這張場景，請再點一次。` });
+    await sceneLane.run((prev) => withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: !!product }),
+      check, (built, g) => ({ ...built, ...g.patch, error: null }), failed);
+    const others = selectedSizes(sRef.current).filter((k) => k !== m.preset);
+    if (!product || !others.length) return;
+    setSizeJobs(Object.fromEntries(others.map((k) => [k, "生成中…"])));
+    const { pics, errs } = await compositeSizes(sRef.current, others, { model: compositeModel(m.aiBgModel), scene: sceneOf(m), refs: [product] });
+    setSizeJobs(errs);
+    if (Object.keys(pics).length) {
+      await sceneLane.run((prev) => withSizeBackgrounds(prev, pics, true), check, (built, g) => ({ ...built, ...g.patch }), failed);
+    }
   }
-  const scenesBusy = scenes.some((c) => c.state === "wait");
+  const scenesBusy = scenes.some((c) => c.state === "wait") || Object.values(sizeJobs).includes("生成中…");
 
   // a word set swapped in: the new words' boxes are checked like an AI design (only colours that fail change); one
   // history step (words and any colour fix together)
@@ -249,7 +270,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
           <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || scenesBusy || s.copyGenerating || !s.copyBrief.trim() || brand.status === "loading") || !canUse("video.script")}
             onClick={generateFullDesign} data-testid="banner-ai-design">
             {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : scenesBusy ? "場景生成中…" : brand.status === "loading" ? "正在載入品牌色…"
-              : `✨ AI 一鍵設計整張（${drawsScenes ? `設計 ${ntdLabel(bannerCallNtd(designModel, "design", picked.length))} ＋ 場景 ${sceneCount} × ${ntdLabel(imageNtd(s.aiBgModel))}` : ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
+              : `✨ AI 一鍵設計整張（${drawsScenes ? `設計 ${ntdLabel(bannerCallNtd(designModel, "design", picked.length))} ＋ 場景 ${sceneCount} 張${otherSizes ? ` ＋ 其他尺寸 ${otherSizes} 張` : ""}，每張 ${ntdLabel(sceneNtd)}` : ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
           </button>
         </div>
         {drawsScenes ? (
@@ -258,17 +279,19 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
             {SCENE_COUNTS.map((n) => (
               <button key={n} type="button" className={sceneCount === n ? "btn btn-primary" : "btn btn-ghost"}
                 style={{ fontSize: 11, padding: "2px 7px", lineHeight: 1.3 }} onClick={() => setSceneCount(n)} data-testid={`banner-scene-count-${n}`}>
-                {n} 張<span style={{ opacity: 0.75, marginLeft: 4 }}>{ntdLabel(n * imageNtd(s.aiBgModel))}</span>
+                {n} 張<span style={{ opacity: 0.75, marginLeft: 4 }}>{ntdLabel((n + otherSizes) * sceneNtd)}</span>
               </button>
             ))}
-            <span className="form-hint" style={{ margin: 0 }}>圖片模型：{STUDIO_MODEL_OPTIONS.find((mo) => mo.value === s.aiBgModel)?.label ?? s.aiBgModel}（在「畫面」步驟換）</span>
+            <span className="form-hint" style={{ margin: 0 }}>圖片模型：{STUDIO_MODEL_OPTIONS.find((mo) => mo.value === (hasProduct ? compositeModel(s.aiBgModel) : s.aiBgModel))?.label}（在「畫面」步驟換{hasProduct ? "；有商品圖時用會合成商品的模型" : ""}）</span>
           </div>
         ) : (
           <p className="form-hint" style={{ margin: 0 }}>背景是你上傳的圖片：一鍵設計保留它，不另生成場景。</p>
         )}
         {scenes.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }} data-testid="banner-scenes">
-            <p className="form-hint" style={{ margin: 0 }}>點一張當背景（每個尺寸都用它裁切）；場景不含商品，商品由程式疊上並開啟擬真。</p>
+            <p className="form-hint" style={{ margin: 0 }}>{hasProduct
+              ? `點一張當背景：商品已合成在場景裡，文字仍可編輯。${otherSizes ? `選定後其他 ${otherSizes} 個尺寸各依自己的比例生成同一場景（${otherSizes} × ${ntdLabel(sceneNtd)}）。` : ""}`
+              : "點一張當背景（每個尺寸都用它裁切）。"}</p>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${scenes.length}, minmax(0, 1fr))`, gap: 6 }}>
               {scenes.map((c, i) => c.state === "ok" ? (
                 <button key={i} type="button" className="choice-card" aria-pressed={scenePicked === i} data-testid={`banner-scene-${i}`}
@@ -283,6 +306,11 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
                 </div>
               ))}
             </div>
+            {Object.entries(sizeJobs).map(([k, msg]) => (
+              <p key={k} className="form-hint" data-testid={`banner-scene-size-${k}`} style={{ margin: 0, ...(msg === "生成中…" ? {} : { color: "var(--badge-red-text)" }) }}>
+                {presetLabel(k as PresetKey)}：{msg === "生成中…" ? "依這個尺寸的比例生成同一場景中…" : `${msg}；這個尺寸暫用主尺寸的圖裁切`}
+              </p>
+            ))}
           </div>
         )}
         {brand.status === "error" && !brand.kit && (

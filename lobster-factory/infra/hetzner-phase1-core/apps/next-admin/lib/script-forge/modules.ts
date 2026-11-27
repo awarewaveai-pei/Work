@@ -90,7 +90,8 @@ function bannerColorPart(bg: unknown, palette: unknown, brandKit: unknown): stri
     `主要顏色 ${b.colors.join(" ") || "（無）"}；平均亮度 ${b.meanLum}（0 黑 1 白）；文字區 ${zoneText}（花 = 亮度起伏，越大越花）。\n` +
     (pal.length ? `可用色盤（索引從 0）：${pal.map((c, i) => `${i}=${c}`).join(" ")}。` : "") +
     (brandKit === true && pal.length
-      ? `這是品牌色：textColor / accentColor / ctaBg / ctaTextColor / badgeColor${picture ? "" : " / bgColor / gradFrom / gradTo"} 只能用色盤裡的顏色（填索引或色盤裡的 #hex），不在色盤內的會被丟棄。`
+      ? `這是品牌色：accentColor / ctaBg / badgeColor 只能用色盤裡的顏色（填索引或色盤裡的 #hex），不在色盤內的會被丟棄；` +
+        `textColor / ctaTextColor${picture ? "" : " / bgColor / gradFrom / gradTo"} 不限品牌色，依背景對比自由配。`
       : `文字與按鈕顏色優先取自背景主要顏色，也可自由配色。`) +
     `\n配色照 60-30-10：背景約 60%、文字等主色約 30%、重點約 10%；CTA 用最搶眼的一色，整張只留一個焦點。` +
     `文字顏色要和它所在那一帶的背景拉開明暗（亮背景用深字、暗背景用淺字）；那一帶很花時把 textScrim 設 true。顏色可填 #rrggbb 或色盤索引。`;

@@ -1,6 +1,7 @@
 // Card R3-C (named tests): a size's background -- own picture or the main size's -- and the scene / composite prompts
 // carrying the text area and the product area in the generated picture's coordinates.
 import { describe, expect, it } from "vitest";
+import { forgePrompt } from "@/lib/script-forge/modules";
 import { boxOnPicture, compositePrompt, scenePrompt } from "./banner-design";
 import { INIT, designSig, enterSize, leaveSize, variantOf, withSharedBackground, withSizeBackgrounds, type State } from "./banner-state";
 
@@ -44,6 +45,16 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
     const sig = designSig(withSizeBackgrounds(base, { r9x16: B }, true));
     expect(sig).not.toContain("BBBBBB");
     expect(sig).not.toContain(B);
+  });
+});
+
+describe("品牌色只限品牌角色", () => {
+  it("the design prompt limits accent / CTA / badge to the kit; text and background colours stay free", () => {
+    const bg = { mode: "color", colors: ["#112233"], meanLum: 0.2, zones: {} };
+    const p = forgePrompt("banner", "design", { brief: "x", bg, palette: ["#aa0000", "#00aa00"], brandKit: true },
+      { lang: "繁體中文", sceneCount: 6, customScenes: 3, brand: null })!.prompt;
+    expect(p).toContain("accentColor / ctaBg / badgeColor 只能用色盤裡的顏色");
+    expect(p).toContain("textColor / ctaTextColor / bgColor / gradFrom / gradTo 不限品牌色");
   });
 });
 

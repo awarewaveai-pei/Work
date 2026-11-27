@@ -12,7 +12,7 @@ import { renderBannerLayers } from "../banner-layers";
 import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
 import {
-  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
+  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
   type BgMode, type PresetKey, type ProductPos, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
@@ -103,6 +103,30 @@ export async function drawnAreas(v: State, k: PresetKey): Promise<{ text: PicAre
   return { text: text ? boxOnPicture(text, ps, ps.aspect) : null, product: prod ? boxOnPicture(prod, ps, ps.aspect) : null };
 }
 
+/** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside
+ *  the product area the layout engine reserves there. A failed size = its message with the at-most-billed amount. */
+export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: { model: StudioModel; scene: string; refs: string[] }):
+  Promise<{ pics: Partial<Record<PresetKey, string>>; errs: Partial<Record<PresetKey, string>> }> {
+  const got = await Promise.all(sizes.map(async (k) => {
+    try {
+      const areas = await drawnAreas(variantOf(st, k), k);
+      if (!areas.product) throw new Error("no_product_area");
+      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text });
+      return [k, await generateBgPicture({ model: o.model, prompt, aspect: PRESETS[k].aspect, refs: o.refs })] as const;
+    } catch (err) {
+      return [k, err instanceof Error ? err : new Error(String(err))] as const;
+    }
+  }));
+  const pics: Partial<Record<PresetKey, string>> = {}, errs: Partial<Record<PresetKey, string>> = {};
+  for (const [k, v] of got) {
+    if (typeof v === "string") pics[k] = v;
+    else errs[k] = `${v.message}（最多已計費${ntdLabel(imageNtd(o.model))}）`;
+  }
+  return { pics, errs };
+}
+/** The model a product composite runs on: the picked one when it places a product as an object, else Nano Banana 2. */
+export const compositeModel = (m: StudioModel): StudioModel => (modelCompositesProduct(m) ? m : "nano-banana-2");
+
 export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: StepSlot }) {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const bgFileRef         = useRef<HTMLInputElement>(null);
@@ -185,28 +209,17 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     if (!compositing) {
       try {
         const image = await generateBgPicture({ model: s.aiBgModel, prompt: effectiveBgPrompt, aspect: p.aspect, refs: trimmedRefs });
-        setS((prev) => ({ ...withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }), generating: false }));
+        // the product is drawn over this background (事後疊加): contact shadow, reflection, tone match on
+        setS((prev) => ({
+          ...withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }), generating: false,
+          ...(prev.productImage ? { grounding: groundingOn(prev.grounding) } : {}),
+        }));
       } catch (err) {
         setS((prev) => ({ ...prev, generating: false, error: String(err) }));
       }
       return;
     }
-    const sizes = picked, each = imageNtd(s.aiBgModel);
-    const got = await Promise.all(sizes.map(async (k) => {
-      try {
-        const areas = await drawnAreas(variantOf(s, k), k);
-        if (!areas.product) throw new Error("no_product_area");
-        const prompt = compositePrompt({ scene: effectiveBgPrompt, productArea: areas.product, textArea: areas.text });
-        return [k, await generateBgPicture({ model: s.aiBgModel, prompt, aspect: PRESETS[k].aspect, refs: trimmedRefs })] as const;
-      } catch (err) {
-        return [k, err instanceof Error ? err : new Error(String(err))] as const;
-      }
-    }));
-    const pics: Partial<Record<PresetKey, string>> = {}, errs: Partial<Record<PresetKey, string>> = {};
-    for (const [k, v] of got) {
-      if (typeof v === "string") pics[k] = v;
-      else errs[k] = `${v.message}（最多已計費${ntdLabel(each)}）`;
-    }
+    const { pics, errs } = await compositeSizes(s, picked, { model: s.aiBgModel, scene: effectiveBgPrompt, refs: trimmedRefs });
     setSizeErrors(errs);
     setS((prev) => ({
       ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics, true) : prev), generating: false,
