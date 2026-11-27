@@ -41,7 +41,7 @@ class ReplyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_one_reply_streams_then_finishes_and_is_remembered(self):
         s = self.s
-        s.finish(s.open(), "Can you hear me?")
+        s.finish(s.open(0.0), "Can you hear me?", 0.0)
         s.glossary = "上線 = go live"
         s.script = "# Pitch"
         id = s.compose_reply("聽得到")
@@ -61,7 +61,7 @@ class ReplyTests(unittest.IsolatedAsyncioTestCase):
             [self.ev(id, "聽得到", "", False), self.ev(id, "聽得到", "Yes", False), self.ev(id, "聽得到", "Yes, I can.", False), self.ev(id, "聽得到", "Yes, I can.", True)],
         )
         self.assertEqual(s.reply, {"id": id, "zh": "聽得到", "en": "Yes, I can.", "done": True})
-        self.assertEqual(s.my_lines, [(1, "Yes, I can.")])
+        self.assertEqual([(m.id, m.who, m.text) for m in s.my_lines], [(1, "me", "Yes, I can.")])
         self.assertIn("Me: Yes, I can.", s.context(None))
 
     async def test_a_newer_reply_silences_the_older_one(self):
@@ -84,7 +84,7 @@ class ReplyTests(unittest.IsolatedAsyncioTestCase):
         await s.drain()
         self.assertEqual([e["id"] for e in self.events[n:]], [second, second])
         self.assertTrue(self.events[-1]["done"])
-        self.assertEqual([en for _, en in s.my_lines], ["Second."])
+        self.assertEqual([m.text for m in s.my_lines], ["Second."])
 
     async def test_a_failing_model_shows_the_error_and_finishes(self):
         id = self.s.compose_reply("你好")

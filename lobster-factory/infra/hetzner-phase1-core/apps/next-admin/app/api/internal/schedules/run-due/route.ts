@@ -17,17 +17,22 @@
 // are listed in the answer (autoAdvance); the advancing runs after it, after the claimed jobs were handed over. A failure
 // there never stops a claimed job; a video list that cannot be read makes the answer a 500 (the host clock alerts), and a
 // stopped project or a failed organization raises one incident per organization.
+//
+// The same way every firing moves on the started content topics (a person's 「核准並開始」 or 「發布」) of every organization
+// whose content_pipeline schedule is off (K31, lib/content/topics/advance-started.ts): the press is the consent. Listed in
+// the answer (topicAdvance); an organization whose schedule is on is left to its own content_pipeline run.
 
 import { after, NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
-import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordScheduleRun, type StoredSchedule } from "@/lib/schedules/store";
+import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordScheduleRun, storedPerTopicCap, type StoredSchedule } from "@/lib/schedules/store";
 import { NotDueYet, isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
 import { asRegistered, clientJob, jobAppliesTo } from "@/lib/schedules/jobs";
 import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
-import { raiseNotice, videoStopNotice } from "@/lib/schedules/stop-notice";
+import { raiseNotice, videoStopNotice, withTopicStopNotices } from "@/lib/schedules/stop-notice";
 import { advanceAutoProjects, autoAdvanceDeps, autoAdvanceOrganizations } from "@/lib/content/video/advance-auto-projects";
+import { advanceStartedOrganizations, startedTopicOrganizations, TOPIC_ADVANCE_ACTOR } from "@/lib/content/topics/advance-started";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,6 +115,32 @@ async function startAutoAdvance(now: Date): Promise<{ organizations: string[] } 
   }
 }
 
+/** Started content topics of organizations whose content_pipeline is off (`skip` = the ones whose schedule is on): listed
+ *  now, advanced after the answer. Never throws; not part of ok/status except a list that cannot be read. */
+async function startTopicAdvance(now: Date, skip: ReadonlySet<string>): Promise<{ organizations: string[] } | { error: string }> {
+  const sb = getSupabaseWriteClient();
+  try {
+    if (!sb) throw new Error("no_supabase_client");
+    const organizations = (await startedTopicOrganizations(sb)).filter((o) => !skip.has(o));
+    const runKey = `content_topic_advance:${now.toISOString()}`;
+    if (organizations.length) after(() => advanceStartedOrganizations({
+      async advanceOrganization(organizationId) {
+        const [{ advanceStartedTopics }, { topicDeps }] = await Promise.all([import("@/lib/content/topics/tick"), import("@/lib/content/topics/make")]);
+        // the brand's per-topic cap set on /ops/schedules, the same one its schedule and 「核准並開始」 use (null = NT$15)
+        const capTwd = await storedPerTopicCap(organizationId, "content_pipeline");
+        return advanceStartedTopics(withTopicStopNotices(topicDeps(sb, organizationId, TOPIC_ADVANCE_ACTOR, { capTwd }), (n) => raiseNotice(sb, organizationId, n)));
+      },
+      failed: (organizationId, error) => raiseIncident({ jobKey: "content_topic_advance", organizationId }, runKey, error),
+      log: (message) => console.info(message),
+    }, organizations));
+    return { organizations };
+  } catch (e) {
+    const error = String(e).slice(0, 200);
+    console.error(`[schedules] content_topic_advance not started: ${error}`);
+    return { error };
+  }
+}
+
 export async function POST(request: Request) {
   if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
@@ -121,8 +152,10 @@ export async function POST(request: Request) {
   try {
     schedules = (await listEnabledSchedules()).map(asRegistered);
   } catch (e) {
-    // client_schedules unreadable: the 做到草稿 projects need no row there, so they still move on
-    return NextResponse.json({ ok: false, error: String(e).slice(0, 200), autoAdvance: await startAutoAdvance(now) }, { status: 500 });
+    // client_schedules unreadable: the 做到草稿 projects and started topics need no row there, so they still move on (no
+    // content_pipeline runs this firing, so no organization is left to it)
+    return NextResponse.json({ ok: false, error: String(e).slice(0, 200), autoAdvance: await startAutoAdvance(now),
+      topicAdvance: await startTopicAdvance(now, new Set()) }, { status: 500 });
   }
   const due = schedules.filter((s) => isDueNow(s, now));
 
@@ -139,11 +172,12 @@ export async function POST(request: Request) {
   if (claimed.length) after(() => runClaimed(claimed));
 
   const autoAdvance = await startAutoAdvance(now);
+  const topicAdvance = await startTopicAdvance(now, new Set(schedules.filter((s) => s.jobKey === "content_pipeline").map((s) => s.organizationId)));
 
-  // A video list that could not be read is a failure the host clock must see (500), though the claimed jobs still run.
-  const failed = claimErrors.length > 0 || "error" in autoAdvance;
+  // A video or topic list that could not be read is a failure the host clock must see (500), though the claimed jobs still run.
+  const failed = claimErrors.length > 0 || "error" in autoAdvance || "error" in topicAdvance;
   return NextResponse.json(
-    { ok: !failed, checked: schedules.length, due: due.length, started: claimed.map((c) => c.runKey), claimErrors, autoAdvance },
+    { ok: !failed, checked: schedules.length, due: due.length, started: claimed.map((c) => c.runKey), claimErrors, autoAdvance, topicAdvance },
     { status: failed ? 500 : 200 },
   );
 }

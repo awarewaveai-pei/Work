@@ -1,7 +1,11 @@
 """The one live meeting of this process, and the browser pages watching it.
 
 A page connects over WebSocket (/api/live/ws). Text frames are JSON commands, binary frames are audio
-(16 kHz mono PCM16) from the page that pressed 聆聽. Everything a page shows comes back as JSON events:
+(16 kHz mono PCM16) from the page that pressed 聆聽: one source = the frame is the PCM of the 「對方」
+channel (a page that sends no `proto`, as before C17); `proto: 2` = two sources, each frame is one byte
+(0 我 = microphone, 1 對方 = computer sound) + PCM16 (parse_frame). Each source is a Channel with its own
+recogniser; the speech service gets each chunk as (its start in the recording in samples, pcm).
+Everything a page shows comes back as JSON events:
 the Session's own (caption, caption-remove, status, clear) plus
   {"type":"snapshot","segments":[...],"status":str,"listening":bool,"stt":str,"usage":{...},
    "reply":{id,zh,en,done}|null,"script":str,"glossary":str,
@@ -12,22 +16,23 @@ the Session's own (caption, caption-remove, status, clear) plus
       index 0 (name "", dir "") = nothing is being saved
   {"type":"summary","text","updated","lines","working","error","enabled"}  the live summary (enabled = on for this listening) (lib/live/summary.py)
 Commands from the page include {"type":"reply","zh":str} (works without listening),
-{"type":"start", ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true),
+{"type":"start", "stt", "listen", "target" (lib/live/langs.py codes), ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true;
+"proto":2 with "stt_me" = two channels, `stt` being the 「對方」 one),
 {"type":"segment-next","name":str|null} and {"type":"segment-rename","name":str} (while saving).
-Keys never leave the server: Gemini from the environment, Anthropic from the settings page."""
+Keys never leave the server; they are read through lib/settings.py (settings panel, else environment)."""
 import asyncio
 import functools
 import json
 import logging
-import os
 import time
+from dataclasses import asdict
 from urllib.parse import urlsplit
 
-from lib import ownvoice, settings
+from lib import gpu_gate, ownvoice, settings
 
-from . import gloss, idle, script_store, stt_gemini, stt_local
-from .archive import Archive, ArchiveError
-from .prompts import SUMMARY_SYSTEM, parse_glossary, system_blocks
+from . import echo, gloss, idle, langs, script_store, stt_gemini, stt_local
+from .archive import RATE, Archive, ArchiveError, align_stereo
+from .prompts import parse_glossary, summary_system, system_blocks
 from .session import Session
 from .summary import DEFAULT_EVERY_MIN, Summary
 from .translate import ANTHROPIC_MODEL, GEMINI_MODEL, Translator
@@ -50,6 +55,20 @@ ARCHIVE_TICK = 1.0
 # At the end of listening: how long to wait for the translations still running, and for the last summary update.
 DRAIN_TIMEOUT, SUMMARY_TIMEOUT = 15.0, 20.0
 NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
+# proto 2: the first byte of every audio frame says which channel it is.
+SOURCES = {0: "me", 1: "them"}
+BUSY_TEXT = "顯卡正在跑會後整理，本機辨識要等它結束"
+
+
+def parse_frame(data: bytes, proto: int):
+    """(who, pcm) of one binary frame, or None = drop it. Without proto 2 the whole frame is the one
+    channel's PCM, 「對方」 (as before C17; never guessed from the first byte). proto 2: a known source
+    byte and a whole number of 16-bit samples, at least one."""
+    if proto != 2:
+        return "them", data
+    if len(data) < 3 or len(data) % 2 != 1 or data[0] not in SOURCES:
+        return None
+    return SOURCES[data[0]], data[1:]
 
 
 def origin_allowed(origin: str, host: str) -> bool:
@@ -94,7 +113,8 @@ class Hub:
         self.translator = Translator(self.usage, "", "")
         self.task = None
         self.ticker = None
-        self.audio = None
+        self.channels = {}           # who -> Channel of this listening
+        self.proto = 1
         self.owner = None
         self.stt = ""
         self.last_caption = time.monotonic()
@@ -110,38 +130,56 @@ class Hub:
             s = self.session = Session(self._translate, self.emit, compose=self._compose)
             saved = script_store.load()
             s.script, s.glossary = saved["script"], saved["glossary"]
-            self.summary = Summary(self._complete, lambda: system_blocks(SUMMARY_SYSTEM, parse_glossary(s.glossary), s.script), self.emit)
-            s.on_open.append(lambda id: self.archive and self.archive.open_line(id))
+            self.summary = Summary(self._complete, lambda: system_blocks(summary_system(langs.mine(s.target), langs.theirs(s.listen)),
+                                                                         parse_glossary(s.glossary), s.script), self.emit)
+            self.summary.languages = lambda: (langs.theirs(s.listen), langs.mine(s.target))
             s.on_final.append(self._line_final)
             s.on_translated.append(self._line_translated)
             s.on_drop.append(lambda id: self.archive and self.archive.drop_line(id))
             s.on_clear.append(self.summary.clear)
+            s.on_lost.append(self._audio_lost)
         return self.session
 
+    def _audio_lost(self, seconds: float) -> None:
+        if self.archive is not None:
+            self.archive.dropped_sec += seconds
+
     def _complete(self, system, user):
-        return self.translator.complete(system, user)
+        return self.translator.complete(system, user, langs.mine(self._session().target))
 
-    def _line_final(self, id: int, en: str) -> None:
+    def _line_final(self, line) -> None:
         if self.archive is not None:
-            self.archive.set_en(id, en)
-        self.summary.line_finished(id, en)
+            self.archive.line_final(line)
+        self.summary.line_finished(line.id, line.text)
 
-    def _line_translated(self, id: int, zh: str) -> None:
+    def _line_translated(self, id: int, tr: str, failed: bool) -> None:
         if self.archive is not None:
-            self.archive.set_zh(id, zh)
-        self.summary.line_translated(id, zh)
+            self.archive.line_translated(id, tr, failed)
+        self.summary.line_translated(id, tr)
+
+    def _segment_changed(self, info: dict) -> None:
+        """The recording segment began (by the page, or a WAV reaching its size limit) or was renamed:
+        new lines belong to it."""
+        self._session().seg = info["index"] - 1
+        self.emit({"type": "segment", **info})
 
     def _problem(self, text: str) -> None:
         self._session().status(text)
 
-    def _begin_archive(self, stt: str):
-        """Open the folder for this listening, or say why not and carry on without saving."""
-        about = ["收音：瀏覽器（麥克風／電腦聲音）", "辨識：" + ("Gemini Live" if stt == "gemini" else "本機 faster-whisper"),
+    def _begin_archive(self, stt: str, listen: str, target: str, stt_me: str = None):
+        """Open the folder for this listening, or say why not and carry on without saving.
+        Two channels (stt_me given): a stereo recording, left 我, right 對方; session.json says both recognisers."""
+        def name(x):
+            return "Gemini Live" if x == "gemini" else "本機 faster-whisper"
+        about = ["收音：瀏覽器（麥克風／電腦聲音）" if stt_me is None else "收音：我＝麥克風（左聲道），對方＝電腦聲音（右聲道）",
+                 "辨識：" + (name(stt) if stt_me is None else f"我＝{name(stt_me)}，對方＝{name(stt)}"),
                  "翻譯：" + (ANTHROPIC_MODEL if settings.get_api_key() else GEMINI_MODEL)]
+        meta = {"listen": listen, "target": target, "stt": stt, "channels": 1 if stt_me is None else 2}
+        if stt_me is not None:
+            meta["stt_me"] = stt_me
         try:
-            return Archive(ownvoice.base_dir(), about, on_problem=self._problem,
-                           on_segment=lambda info: self.emit({"type": "segment", **info}))
-        except ArchiveError as e:
+            return Archive(ownvoice.recording_dir(), about, meta, on_problem=self._problem, on_segment=self._segment_changed)
+        except (ArchiveError, ValueError) as e:      # ValueError: the recording folder cannot be opened (lib/paths.PathError)
             self._session().status(str(e))
             return None
 
@@ -149,11 +187,11 @@ class Hub:
         return self.archive.info() if self.archive is not None else NOT_SAVING
 
     async def _translate(self, system, user, on_delta, stop, early):
-        return await self.translator(system, user, on_delta, stop, early)
+        return await self.translator(system, user, on_delta, stop, early, self._session().target)
 
     def _refresh_keys(self) -> str:
         """Read the keys now (the settings page may have changed them); returns the Gemini key."""
-        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        gemini_key = settings.key("gemini_api_key")
         self.translator.set_keys(settings.get_api_key(), gemini_key)
         return gemini_key
 
@@ -196,6 +234,9 @@ class Hub:
     def emit(self, event: dict) -> None:
         if event.get("type") == "caption":
             self.last_caption = time.monotonic()
+            ch = self.channels.get(event.get("who"))
+            if ch is not None:
+                ch.last_caption = self.last_caption
         for q in self.clients.values():
             q.put_nowait(event)
 
@@ -203,7 +244,11 @@ class Hub:
         s = self._session()
         return {
             "type": "snapshot",
-            "segments": [{"id": g.id, "en": g.en, "zh": g.zh, "final": g.final} for g in s.segments],
+            # The language buttons (lib/live/langs.py): every row; target also offers `none` (不翻譯);
+            # mine / theirs = what 不翻譯 and auto fall back to.
+            "langs": {"rows": [{"code": l.code, "label": l.label} for l in langs.LANGS], "none": langs.NONE,
+                      "mine": langs.MINE, "theirs": langs.THEIRS},
+            "segments": [asdict(g) for g in s.segments],
             "status": s.status_text,
             "listening": self.listening,
             "stt": self.stt,
@@ -224,14 +269,16 @@ class Hub:
         """What has been said so far in this page's meeting (finished lines), for 問 AI's context."""
         if self.session is None:
             return ""
-        return "\n".join(f"{g.en}\n{g.zh}".strip() for g in self.session.segments if g.final)
+        return "\n".join(f"{g.text}\n{g.tr}".strip() for g in self.session.segments if g.final)
 
     # ---- listening ----
 
-    async def start(self, owner, stt: str, language: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN,
-                    save: bool = False, summary: bool = False, summary_min: float = DEFAULT_EVERY_MIN) -> None:
+    async def start(self, owner, stt: str, listen: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN,
+                    save: bool = False, summary: bool = False, summary_min: float = DEFAULT_EVERY_MIN,
+                    target: str = langs.MINE, stt_me: str = None) -> None:
         """`save`: keep the recording and transcript in OwnVoice's folder format (archive.py);
-        `summary`: the live summary (paid model call every `summary_min` minutes, summary.py). Both off unless asked."""
+        `summary`: the live summary (paid model call every `summary_min` minutes, summary.py). Both off unless asked.
+        `stt_me`: two channels (proto 2), the user's own microphone recognised by `stt_me`, the others by `stt`."""
         # No await between this check and `self.task = ...`: two pages pressing 聆聽 at once must not
         # both get through (the first task would be orphaned and keep a paid connection open).
         if self.listening:
@@ -239,91 +286,72 @@ class Hub:
         session = self._session()
         if self.finalizing is not None:
             return self._refuse("上一場還在收尾存檔，幾秒後再按「聆聽」")
-        if stt not in STT:
-            return self._refuse(f"不認得的辨識方式：{stt}")
+        kinds = {"them": stt} if stt_me is None else {"me": stt_me, "them": stt}
+        if any(k not in STT for k in kinds.values()):
+            return self._refuse(f"不認得的辨識方式：{'、'.join(kinds.values())}")
+        if listen not in langs.listen_codes() or target not in langs.target_codes():
+            return self._refuse(f"不認得的語言：{listen} → {target}")
         gemini_key = self._refresh_keys()
-        if stt == "gemini" and not gemini_key:
-            return self._refuse("這台電腦沒有設定 Gemini 金鑰（環境變數 GEMINI_API_KEY），請改用「本機（免費）」")
-        self.archive = self._begin_archive(stt) if save else None
+        if "gemini" in kinds.values() and not gemini_key:
+            return self._refuse("還沒填 Gemini 金鑰：到「設定」面板填，或改用「本機（免費）」")
+        # The GPU rule, in one place: any local channel claims it once for the whole listening.
+        local = "local" in kinds.values()
+        if local and not gpu_gate.acquire_live():
+            return self._refuse(BUSY_TEXT)
+        session.listen, session.target = listen, target
+        self.archive = self._begin_archive(stt, listen, target, stt_me) if save else None
         if self.archive is not None:
             self.archive_task = asyncio.ensure_future(self._archive_loop(self.archive))
+        session.seg = 0
         if summary:
             self.summary.begin(summary_min)
         self.summary.on_update = self.archive.set_summary if summary and self.archive is not None else None
         self.emit({"type": "segment", **self._segment()})
-        self.audio = asyncio.Queue(maxsize=AUDIO_QUEUE)
-        self.owner, self.stt = owner, stt
-        if stt == "gemini":
-            def run(audio):
-                return stt_gemini.run(session, self.usage, gemini_key, language, audio)
-        else:
-            # Local recognition costs nothing while quiet, and pausing would unload the model:
-            # only the end time applies.
-            pause_min = 0
-
-            def run(audio):
-                return stt_local.run(session, self.usage, language, audio)
+        self.owner, self.stt, self.proto = owner, stt, 1 if stt_me is None else 2
+        recognizer = stt_local.Recognizer(session, self.usage) if local else None
+        self.last_caption = time.monotonic()      # "quiet for end_min" counts from this listening's start
+        self.positions = [0] * len(kinds)          # recording positions when nothing is saved
+        self.channels = {}
+        for i, (who, kind) in enumerate(kinds.items()):
+            # The user's own channel is recognised in whatever language they speak (lib/live/session.py).
+            language = "auto" if who == "me" else listen
+            if kind == "gemini":
+                run = functools.partial(stt_gemini.run, session, self.usage, gemini_key, language, who=who)
+                pause = pause_min
+            else:
+                run = functools.partial(stt_local.run, session, recognizer, language, who=who)
+                # Local recognition costs nothing while quiet, and pausing would unload the model:
+                # only the end time applies.
+                pause = 0
+            self.channels[who] = Channel(self, who, i, run, pause)
+        session.echo = self._echo if stt_me is not None else None
         self.ticker = asyncio.ensure_future(self._tick())
-        self.task = asyncio.ensure_future(self._supervise(run, pause_min, end_min))
+        self.task = asyncio.ensure_future(self._listen(list(self.channels.values()), end_min, recognizer, local))
         # This listening's own archive and ticker: by the time the callback runs `self` may hold the next one's.
         self.task.add_done_callback(functools.partial(self._ended, archive=self.archive, archive_task=self.archive_task, ticker=self.ticker))
         self.emit({"type": "listening", "on": True, "stt": stt})
 
-    async def _supervise(self, run, pause_min: float, end_min: float) -> None:
-        """Sit between the page's audio and the speech service (idle.py): forward audio, let the
-        service go when it is quiet, bring it back when someone speaks, end when quiet too long."""
-        session = self._session()
-        gate = idle.Gate(idle.minutes(pause_min), idle.minutes(end_min))
-        self.last_caption = time.monotonic()
-        inner = task = None
+    def _echo(self, start: float, end: float) -> bool:
+        """Is the 「我」 line start..end the others' voice coming back through the microphone (lib/live/echo.py)?"""
+        me, them = self.channels.get("me"), self.channels.get("them")
+        if me is None or them is None:
+            return False
+        a, b = int(start * RATE), int(end * RATE)
+        return echo.is_echo(me.ring.slice(a, b), them.ring.slice(a, b))
 
-        def begin(first):
-            nonlocal inner, task
-            inner = asyncio.Queue(maxsize=AUDIO_QUEUE)
-            for c in first:
-                inner.put_nowait(c)
-            task = asyncio.ensure_future(run(inner))
-
-        async def end():
-            nonlocal inner, task
-            if task is None:
-                return
-            if inner.full():
-                inner.get_nowait()
-            inner.put_nowait(None)
-            await task
-            inner = task = None
-
-        begin([])
+    async def _listen(self, channels: list, end_min: float, recognizer, gpu: bool) -> None:
+        """Every channel until it ends; then the shared local recognizer finishes and the GPU claim goes."""
         try:
-            while True:
-                try:
-                    chunk = await asyncio.wait_for(self.audio.get(), IDLE_TICK)
-                except asyncio.TimeoutError:
-                    chunk = b""
-                if chunk is None:
-                    return await end()
-                if task is not None and task.done():
-                    return  # the speech service gave up on its own (a rejected key, say) and said why
-                quiet = time.monotonic() - self.last_caption
-                step, payload = gate.on_chunk(chunk, idle.rms(chunk), quiet) if chunk else gate.on_tick(quiet)
-                if step == idle.FORWARD:
-                    if inner.full():
-                        inner.get_nowait()
-                    inner.put_nowait(payload)
-                elif step == idle.PAUSE:
-                    await end()
-                    session.status(f"已暫停辨識：安靜超過 {idle.minutes_label(pause_min)} 分鐘，不再送出聲音、不計費；有人說話會自動接上")
-                elif step == idle.RESUME:
-                    session.status("有聲音，重新連線中…")
-                    begin(payload)
-                elif step == idle.END:
-                    await end()
-                    session.status(f"安靜超過 {idle.minutes_label(end_min)} 分鐘，已自動結束聆聽")
-                    return
+            ended = await asyncio.gather(*(c.supervise(idle.minutes(end_min)) for c in channels))
+            if any(ended):
+                self._session().status(f"安靜超過 {idle.minutes_label(end_min)} 分鐘，已自動結束聆聽")
         finally:
-            if task is not None and not task.done():
-                task.cancel()
+            try:
+                if recognizer is not None:
+                    await recognizer.close()
+            finally:
+                if gpu:
+                    gpu_gate.release_live()
 
     def _refuse(self, why: str) -> None:
         """Not started: say why, and tell the page so it lets go of the microphone it already opened."""
@@ -384,22 +412,41 @@ class Hub:
                 # One failed write must not end the writing for the rest of the meeting.
                 log.exception("archive tick failed")
 
-    def feed(self, sender, chunk: bytes) -> None:
+    def _put(self, queue: asyncio.Queue, item) -> None:
+        """Into a queue on the way to the speech service; when it is full (the service fell behind) the
+        oldest chunk goes, and is reported lost (the saved session's dropped_sec)."""
+        if queue.full():
+            old = queue.get_nowait()
+            if old:
+                self._session().lost(len(old[1]) // 2 / RATE)
+        queue.put_nowait(item)
+
+    def feed(self, sender, data: bytes) -> None:
         if not self.listening or sender is not self.owner:
             return
+        frame = parse_frame(data, self.proto)
+        ch = self.channels.get(frame[0]) if frame is not None else None
+        if ch is None:
+            return
+        pcm = frame[1]
+        # Saving: the recording says where the chunk lands (silence it filled in for a break counts).
         if self.archive is not None:
-            self.archive.feed(chunk)
-        if self.audio.full():
-            self.audio.get_nowait()
-        self.audio.put_nowait(chunk)
+            at = self.archive.feed(pcm, ch.index)
+        elif len(self.positions) == 2:
+            at, _ = align_stereo(self.positions, ch.index, len(pcm) // 2)
+        else:
+            at, self.positions[0] = self.positions[0], self.positions[0] + len(pcm) // 2
+        if self.proto == 2:
+            ch.ring.add(at, pcm)
+        if not ch.closed:
+            self._put(ch.audio, (at, pcm))   # a channel whose recogniser gave up takes no more (not "lost" audio)
 
     async def stop(self) -> None:
         if not self.listening:
             return
         task = self.task
-        if self.audio.full():
-            self.audio.get_nowait()
-        self.audio.put_nowait(None)
+        for ch in self.channels.values():
+            self._put(ch.audio, None)
         done, _ = await asyncio.wait({task}, timeout=STOP_TIMEOUT)
         if not done:
             task.cancel()
@@ -450,7 +497,7 @@ class Hub:
             info = self.archive.next_segment(name) if kind == "segment-next" else self.archive.rename_segment(name)
         except ValueError as e:
             return self._session().status(str(e))
-        self.emit({"type": "segment", **info})
+        self._segment_changed(info)
 
     async def _command(self, ws, text: str) -> None:
         try:
@@ -459,10 +506,12 @@ class Hub:
         except (ValueError, KeyError, TypeError):
             return
         if kind == "start":
-            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("language", "en-US"))[:16],
+            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("listen", langs.THEIRS))[:16],
                              _minutes(cmd.get("pause_min"), PAUSE_MIN), _minutes(cmd.get("end_min"), END_MIN),
                              cmd.get("save") is True, cmd.get("summary") is True,
-                             min(max(_minutes(cmd.get("summary_min"), DEFAULT_EVERY_MIN), 1.0), 60.0))
+                             min(max(_minutes(cmd.get("summary_min"), DEFAULT_EVERY_MIN), 1.0), 60.0),
+                             str(cmd.get("target", langs.MINE))[:16],
+                             str(cmd.get("stt_me", ""))[:16] if cmd.get("proto") == 2 else None)
         elif kind == "stop":
             await self.stop()
         elif kind in ("segment-next", "segment-rename"):
@@ -472,4 +521,74 @@ class Hub:
         elif kind == "reply":
             zh = clean_text(str(cmd.get("zh", ""))).strip()[:REPLY_MAX].strip()
             if zh:
-                self._session().compose_reply(zh)
+                s = self._session()
+                # While listening or closing out (the last summary still runs), the languages it started with.
+                if not self.listening and self.finalizing is None:
+                    s.listen, s.target = settings.pref("listen"), settings.pref("target")
+                s.compose_reply(zh)
+
+
+class Channel:
+    """One audio source on its way to its recogniser: its queue, its idle gate (a quiet Gemini channel is
+    let go and comes back when someone speaks, idle.py) and its recogniser task. `index`: its channel in
+    the recording (0 = the only one, or left = 我; 1 = right = 對方)."""
+
+    def __init__(self, hub: "Hub", who: str, index: int, run, pause_min: float):
+        self.hub, self.who, self.index, self.run, self.pause_min = hub, who, index, run, pause_min
+        self.audio = asyncio.Queue(maxsize=AUDIO_QUEUE)
+        self.closed = False              # its recogniser ended (stopped, or gave up on its own)
+        self.ring = echo.Ring()          # recent audio, for the echo guard (two channels only)
+        self.last_caption = time.monotonic()
+
+    async def supervise(self, end_after) -> bool:
+        """Until stopped or quiet too long (every channel quiet for `end_after` seconds: then True)."""
+        hub, session = self.hub, self.hub._session()
+        gate = idle.Gate(idle.minutes(self.pause_min), None)
+        self.last_caption = time.monotonic()
+        inner = task = None
+
+        def begin(first):
+            nonlocal inner, task
+            inner = asyncio.Queue(maxsize=AUDIO_QUEUE)
+            for c in first:
+                inner.put_nowait(c)
+            task = asyncio.ensure_future(self.run(inner))
+
+        async def end():
+            nonlocal inner, task
+            if task is None:
+                return
+            hub._put(inner, None)
+            await task
+            inner = task = None
+
+        begin([])
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(self.audio.get(), IDLE_TICK)
+                except asyncio.TimeoutError:
+                    item = ()
+                if item is None:
+                    await end()
+                    return False
+                if task is not None and task.done():
+                    return False  # the speech service gave up on its own (a rejected key, say) and said why
+                now = time.monotonic()
+                if end_after is not None and now - hub.last_caption >= end_after:
+                    await end()
+                    return True
+                quiet = now - self.last_caption
+                step, payload = gate.on_chunk(item, idle.rms(item[1]), quiet) if item else gate.on_tick(quiet)
+                if step == idle.FORWARD:
+                    hub._put(inner, payload)
+                elif step == idle.PAUSE:
+                    await end()
+                    session.status(f"已暫停辨識：安靜超過 {idle.minutes_label(self.pause_min)} 分鐘，不再送出聲音、不計費；有人說話會自動接上")
+                elif step == idle.RESUME:
+                    session.status("有聲音，重新連線中…")
+                    begin(payload)
+        finally:
+            self.closed = True
+            if task is not None and not task.done():
+                task.cancel()

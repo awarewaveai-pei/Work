@@ -211,7 +211,8 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
                   mock.patch.object(arc, "MIN_FREE_BYTES", 0),
                   mock.patch.object(hub_mod.script_store, "load", lambda: {"script": "", "glossary": ""}),
                   mock.patch.object(hub_mod.settings, "get_api_key", lambda: ""),
-                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt)):
+                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt),
+                  mock.patch.object(hub_mod.stt_local, "Recognizer", self.NoModel)):
             p.start()
             self.addCleanup(p.stop)
         self.hub = hub_mod.Hub(Usage(os.path.join(self._tmp.name, "usage.json")))
@@ -227,12 +228,22 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         async def __call__(self, system, user, on_delta, stop, early):
             return "譯文"
 
-        async def complete(self, system, user):
+        async def complete(self, system, user, target="zh-TW"):
             self.completes.append(user)
             return "- 重點"
 
+    class NoModel:
+        """The shared local recognizer without a model (the fake run never hands it an utterance)."""
+        failed = False
+
+        def __init__(self, session, usage):
+            pass
+
+        async def close(self):
+            pass
+
     @staticmethod
-    async def idle_stt(session, usage, language, audio):
+    async def idle_stt(session, recognizer, language, audio, who="them"):
         while await audio.get() is not None:
             pass
 
@@ -241,7 +252,7 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         await hub.start(owner, "local", "en-US", **flags)
         s = hub.session
         for text in ("one two three.", "four five six.", "seven eight nine."):
-            s.finish(s.open(), text)
+            s.finish(s.open(0.0), text, 0.0)
         await s.drain()
         hub.summary.last -= 3600       # the interval is over
         hub.summary.tick()

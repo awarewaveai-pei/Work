@@ -9,7 +9,8 @@ recognition firms up, the same shape as Windows Live Captions' text, which this 
 for. The place reached is found by words (ignoring case and punctuation), and a sentence end only
 counts once it has stayed put. Changes from the Rust source: `skip()` is not ported (nothing runs
 before listening here); byte lengths are UTF-8 lengths of str; `update(..., final=True)` finishes
-every word now (Gemini ended the turn, or listening stopped)."""
+every word now (Gemini ended the turn, or listening stopped); `clean` also drops spaces between two
+Chinese or Japanese characters (`_cj_spaces`)."""
 from dataclasses import dataclass
 
 EOS = ".?!。？！"
@@ -83,12 +84,27 @@ def words(text: str) -> list:
 
 
 def clean(raw: str) -> str:
-    """Join acronyms, one space after Latin punctuation and none around CJK punctuation, line breaks
-    into sentence ends or dashes."""
+    """Join acronyms, one space after Latin punctuation and none around CJK punctuation, none between
+    two Chinese or Japanese characters, line breaks into sentence ends or dashes."""
     t = _acronyms(raw, False)
     t = _acronyms(t, True)
     t = _punctuation_spaces(t)
+    t = _cj_spaces(t)
     return _replace_newlines(t, MEDIUM_BYTES).strip()
+
+
+def _cj_spaces(s: str) -> str:
+    """Gemini's interim Chinese has spaces where its chunks meet ("今天我 們討 論新"); the final text has none."""
+    out = []
+    for i, ch in enumerate(s):
+        if ch == " " and out and is_cj(out[-1]):
+            j = i
+            while j < len(s) and s[j] == " ":
+                j += 1
+            if j < len(s) and is_cj(s[j]):
+                continue
+        out.append(ch)
+    return "".join(out)
 
 
 def _acronyms(s: str, before_word: bool) -> str:

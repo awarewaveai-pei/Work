@@ -1,0 +1,274 @@
+<!-- 設定面板（唯一一份）：app.py _page() 把它放進 index.html 與 workspace.html 的 SETTINGS_SLOT 位置。
+     window.Settings = 伺服器設定（/api/settings）的頁面端：ready、put(patch)、on(fn)、prefs(...)、mount(root)。
+     金鑰只有遮罩會到頁面。 -->
+<style>
+  .st { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--ink); }
+  .st-hint { margin: 0; color: var(--muted); line-height: 1.6; }
+  .st-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .st-name { font-weight: 600; min-width: 96px; }
+  .st-state { color: var(--muted); font-family: Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+  .st-state.on { color: var(--green); }
+  .st-use { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+  .st-in {
+    flex: 1 1 220px; min-width: 0; font: 12px Consolas, monospace; padding: 6px 8px;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card);
+  }
+  .st-in:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .st-btn {
+    background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 0;
+  }
+  .st-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+  .st-btn[hidden] { display: none; }
+  .st-h { margin: 14px 0 0; font-size: 14px; }
+  .st-dest { flex-wrap: wrap; }
+  .st-dest .st-state { flex: 1 1 220px; }
+  .st-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--card); }
+  .st-name-in { flex: 0 1 140px; }
+  .st-msg { margin: 0; min-height: 1.4em; color: var(--muted); }
+  .st-msg.bad { color: var(--red); }
+</style>
+<template id="tpl-settings">
+  <div class="st panel-body">
+    <p class="st-hint">金鑰只存在這台電腦（不進版本控制），頁面上只看得到前後幾個字。用到 AI 的功能會把金鑰當認證送到那家服務，逐字稿也會一起送出，每次呼叫都計費；敏感會議請用「複製 prompt → 貼回」的做法。</p>
+    <div class="st-keys"></div>
+    <h3 class="st-h">錄音存檔資料夾</h3>
+    <p class="st-hint">聆聽時開「存檔」，錄音和逐字稿存在這裡。錄音含聲紋，不能放在雲端同步的資料夾（OneDrive、Google Drive、Dropbox 等）。換了資料夾，舊資料夾的場次仍會列在會後整理。</p>
+    <div class="st-row st-rec">
+      <span class="st-state st-rec-now"></span>
+      <input type="text" class="st-in" data-in="rec" spellcheck="false" placeholder="資料夾完整路徑，例如 D:\會議錄音" aria-label="錄音存檔資料夾">
+      <button type="button" class="st-btn" data-act="rec-check">檢查</button>
+      <button type="button" class="st-btn" data-act="rec-save">儲存</button>
+      <button type="button" class="st-btn" data-act="rec-default">用 OwnVoice 的資料夾</button>
+      <button type="button" class="st-btn" data-act="rec-docs" hidden>文件</button>
+    </div>
+    <h3 class="st-h">輸出目的地</h3>
+    <p class="st-hint">會後整理做完，PPT、會議記錄、逐字稿會複製到勾選的目的地（每個資料夾底下再分日期資料夾），錄音不複製。打開「預設同步」的目的地，會後整理時會先勾好，每次都能改。</p>
+    <div class="st-dests"></div>
+    <div class="st-row st-add">
+      <input type="text" class="st-in st-name-in" data-in="name" maxlength="40" placeholder="名稱，例如 公司雲端" aria-label="目的地名稱">
+      <input type="text" class="st-in" data-in="dir" spellcheck="false" placeholder="資料夾完整路徑" aria-label="目的地資料夾">
+      <span class="st-shortcuts"></span>
+      <button type="button" class="st-btn" data-act="add-check">檢查</button>
+      <button type="button" class="st-btn" data-act="add">新增</button>
+    </div>
+    <p class="st-msg" aria-live="polite"></p>
+  </div>
+</template>
+<script>
+window.Settings = (function () {
+  const KEY_ROWS = [
+    ["anthropic_api_key", "Anthropic", "翻譯、回覆、會後自動整理、心智圖。沒填時翻譯改用 Gemini。", "sk-ant-..."],
+    ["gemini_api_key", "Gemini", "即時辨識選 Gemini 時要用；沒填 Anthropic 時也負責翻譯。", "AIza..."],
+    ["hf_token", "Hugging Face", "會後整理的講者分離。", "hf_..."],
+    ["serper_api_key", "Serper 搜尋", "查詢面板的網路搜尋。", ""],
+  ];
+  let data = null, root = null, msg = "", bad = false, folders = null;
+  const subs = [];
+  function notify() { subs.forEach(fn => fn(data)); }
+  const ready = fetch("/api/settings")
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d) { data = d; notify(); } return d; })
+    .catch(() => null);
+
+  // Writes go out one at a time: an older PUT still on its way (the migration below) must not land after a newer one.
+  let queue = Promise.resolve();
+  function put(patch) {
+    const p = queue.then(() => send(patch));
+    queue = p.catch(() => {});
+    return p;
+  }
+
+  async function send(patch) {
+    const r = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(typeof body.detail === "string" ? body.detail : "設定沒存到（" + r.status + "）"), { status: r.status });
+    data = body;
+    notify();
+    return body;
+  }
+
+  function on(fn) { subs.push(fn); if (data) fn(data); }
+
+  // 一個面板的偏好：map（頁面名 → 設定欄位）列的存在伺服器，其餘只存在這個瀏覽器的 localStorage[storageKey]。
+  // 舊資料：storageKey 裡 map 列到的欄位逐欄 PUT 上去，伺服器回成功才從本機刪掉那一欄；連不上的下次載入再試，
+  // 400（舊版沒擋的值，例如超過上限的分鐘數）永遠存不進去，也刪掉，改用伺服器的值。
+  function prefs(storageKey, map, defaults, onChange) {
+    const read = () => { try { const v = JSON.parse(localStorage.getItem(storageKey) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+    const write = v => { try { Object.keys(v).length ? localStorage.setItem(storageKey, JSON.stringify(v)) : localStorage.removeItem(storageKey); } catch (e) {} };
+    const old = read();
+    const forget = k => { delete old[k]; const cur = read(); delete cur[k]; write(cur); };
+    const values = Object.assign({}, defaults, old);
+    const fromServer = d => { Object.entries(map).forEach(([k, s]) => { values[k] = d[s]; }); onChange(); };
+    ready.then(async () => {
+      for (const [k, s] of Object.entries(map)) {
+        if (!(k in old)) continue;
+        if (data && data.stored.includes(s)) { forget(k); continue; }   // the server already holds a newer value (another browser)
+        try { await put({ [s]: old[k] }); forget(k); } catch (e) { if (e.status === 400) forget(k); }
+      }
+      on(fromServer);
+    });
+    return {
+      values,
+      // 改一個值：伺服器欄位走 PUT（失敗時退回伺服器的值並把錯誤往外丟），其餘寫回本機。
+      set(name, value) {
+        values[name] = value;
+        if (name in map) {
+          forget(name);      // 使用者剛改的值優先，搬移不能再拿舊值把它蓋回去
+          return put({ [map[name]]: value }).catch(e => { if (data) fromServer(data); throw e; });
+        }
+        const cur = read(); cur[name] = value; write(cur);
+        return Promise.resolve();
+      },
+      // 本機欄位改了名字：舊鍵的值搬到新鍵（新鍵已有值就不搬），舊鍵刪掉。
+      rename(from, to) {
+        const cur = read();
+        if (!(from in cur)) return;
+        if (!(to in cur)) values[to] = cur[to] = cur[from];
+        delete cur[from]; delete values[from];
+        write(cur);
+      },
+    };
+  }
+
+  function say(text, isBad) { msg = text; bad = !!isBad; paint(); }
+
+  function paint() {
+    if (!root) return;
+    const m = root.querySelector(".st-msg");
+    m.textContent = msg;
+    m.classList.toggle("bad", bad);
+    KEY_ROWS.forEach(([name]) => {
+      const row = root.querySelector('[data-key="' + name + '"]');
+      const k = data && data[name];
+      const state = row.querySelector(".st-state");
+      state.textContent = !data ? "讀取中…" : !k.set ? "未填" : (k.source === "env" ? "用環境變數 " : "已填 ") + k.masked;
+      state.classList.toggle("on", !!(k && k.set));
+      row.querySelector('[data-act="clear"]').hidden = !(k && k.source === "settings");
+    });
+    paintFolders();
+  }
+
+  // ---------- 資料夾：錄音存檔資料夾、輸出目的地（lib/paths.py；存 Windows 寫法） ----------
+  function el(tag, cls, text) { const x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+  function button(text, act, pressed) {
+    const b = el("button", "st-btn", text);
+    b.type = "button"; b.dataset.act = act;
+    if (pressed != null) b.setAttribute("aria-pressed", String(pressed));
+    return b;
+  }
+  function paintFolders() {
+    if (!root || !data) return;
+    root.querySelector(".st-rec-now").textContent = "現在：" + (data.recording_dir || "OwnVoice 的資料夾" + (folders ? "（" + folders.ownvoice + "）" : ""));
+    root.querySelector('[data-act="rec-default"]').hidden = !data.recording_dir;
+    const docs = root.querySelector('[data-act="rec-docs"]');
+    docs.hidden = !(folders && folders.documents);
+    root.querySelector(".st-dests").replaceChildren(...data.destinations.map((d, i) => {
+      const row = el("div", "st-row st-dest");
+      row.dataset.i = i;
+      row.append(el("span", "st-name", d.name), el("span", "st-state", d.dir),
+        button("預設同步", "dest-sync", d.sync), button("檢查", "dest-check"), button("刪除", "dest-del"));
+      return row;
+    }));
+    if (!data.destinations.length) root.querySelector(".st-dests").append(el("p", "st-hint", "還沒有輸出目的地：會後整理的產出只留在這台電腦的工作資料夾。"));
+    const cuts = root.querySelector(".st-shortcuts");
+    cuts.replaceChildren(...(folders ? folders.drives.map(p => { const b = button("Google Drive " + p.slice(0, 2), "add-pick"); b.dataset.path = p; return b; }) : []),
+      ...(folders && folders.documents ? [Object.assign(button("文件", "add-pick"), { title: folders.documents })] : []));
+    cuts.querySelectorAll('[data-act="add-pick"]').forEach(b => { if (!b.dataset.path) b.dataset.path = folders.documents; });
+  }
+  async function check(path, recording) {
+    if (!path.trim()) return say("先填資料夾路徑", true);
+    try {
+      const r = await fetch("/api/settings/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, recording }) });
+      const res = await r.json();
+      say((res.path || path) + "：" + res.message, !res.ok);
+      return res.ok;
+    } catch (e) { say("檢查失敗：" + e.message, true); return false; }
+  }
+  async function save(patch, done) {
+    try { await put(patch); say(done); return true; } catch (e) { say(e.message, true); return false; }
+  }
+  async function onFolders(e) {
+    const b = e.target.closest("button[data-act]");
+    if (!b || !data) return;
+    const act = b.dataset.act, rec = root.querySelector('[data-in="rec"]');
+    const name = root.querySelector('[data-in="name"]'), dir = root.querySelector('[data-in="dir"]');
+    const dests = data.destinations.map(d => Object.assign({}, d));
+    const i = b.closest(".st-dest") ? Number(b.closest(".st-dest").dataset.i) : -1;
+    if (act === "rec-check") return check(rec.value, true);
+    if (act === "rec-save") {
+      if (!rec.value.trim()) return say("先填資料夾路徑", true);
+      if (await save({ recording_dir: rec.value.trim() }, "錄音存檔資料夾已儲存，下一次聆聽開始用")) rec.value = "";
+    } else if (act === "rec-default") {
+      await save({ recording_dir: "" }, "改回 OwnVoice 的資料夾");
+    } else if (act === "rec-docs") {
+      rec.value = folders.documents + "\\會議錄音";
+    } else if (act === "add-pick") {
+      dir.value = b.dataset.path;
+      if (!name.value.trim()) name.value = b.textContent;
+    } else if (act === "add-check") {
+      return check(dir.value, false);
+    } else if (act === "add") {
+      if (!name.value.trim() || !dir.value.trim()) return say("名稱和資料夾都要填", true);
+      dests.push({ name: name.value.trim(), dir: dir.value.trim(), sync: false });
+      if (await save({ destinations: dests }, "已新增「" + name.value.trim() + "」")) { name.value = ""; dir.value = ""; }
+    } else if (act === "dest-sync") {
+      dests[i].sync = !dests[i].sync;
+      await save({ destinations: dests }, "「" + dests[i].name + "」" + (dests[i].sync ? "會後整理時預設同步" : "不再預設同步"));
+    } else if (act === "dest-check") {
+      return check(dests[i].dir, false);
+    } else if (act === "dest-del") {
+      const gone = dests.splice(i, 1)[0];
+      await save({ destinations: dests }, "已刪除「" + gone.name + "」（資料夾裡的檔案不動）");
+    }
+  }
+
+  function mount(el) {
+    root = el;
+    const box = el.querySelector(".st-keys");
+    box.replaceChildren(...KEY_ROWS.map(([name, label, use, hint]) => {
+      const row = document.createElement("div");
+      row.className = "st-row";
+      row.dataset.key = name;
+      row.innerHTML = '<span class="st-name"></span><span class="st-state"></span><span class="st-use"></span>' +
+        '<input type="password" class="st-in" autocomplete="off" spellcheck="false">' +
+        '<button type="button" class="st-btn" data-act="save">儲存</button><button type="button" class="st-btn" data-act="clear">清除</button>';
+      row.querySelector(".st-name").textContent = label;
+      row.querySelector(".st-use").textContent = use;
+      row.querySelector(".st-in").placeholder = hint ? "貼上金鑰，例如 " + hint : "貼上金鑰";
+      row.querySelector(".st-in").setAttribute("aria-label", label + " 金鑰");
+      return row;
+    }));
+    box.addEventListener("click", async e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const row = b.closest(".st-row"), input = row.querySelector(".st-in"), label = row.querySelector(".st-name").textContent;
+      const value = b.dataset.act === "save" ? input.value.trim() : "";
+      if (b.dataset.act === "save" && !value) return say("先貼上 " + label + " 金鑰再按儲存", true);
+      try {
+        await put({ [row.dataset.key]: value });
+        input.value = "";
+        say(label + (value ? " 金鑰已儲存" : " 金鑰已清除"));
+      } catch (err) {
+        say(err.message, true);
+      }
+    });
+    box.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.isComposing && e.target.matches(".st-in")) e.target.closest(".st-row").querySelector('[data-act="save"]').click();
+    });
+    el.addEventListener("keydown", e => {      // 資料夾欄位：Enter＝這一列的儲存／新增
+      if (e.key !== "Enter" || e.isComposing || !e.target.matches(".st-rec .st-in, .st-add .st-in")) return;
+      const b = e.target.closest(".st-row").querySelector('[data-act="rec-save"], [data-act="add"]');
+      if (b) b.click();
+    });
+    ["st-rec", "st-dests", "st-add"].forEach(c => el.querySelector("." + c).addEventListener("click", onFolders));
+    if (!folders) {
+      fetch("/api/settings/folders").then(r => r.ok ? r.json() : null).then(f => { folders = f; paintFolders(); }).catch(() => {});
+    }
+    paint();
+  }
+
+  on(paint);
+  return { ready, put, on, prefs, mount, get data() { return data; } };
+})();
+</script>

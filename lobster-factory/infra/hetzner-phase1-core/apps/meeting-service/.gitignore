@@ -1,6 +1,7 @@
 jobs/*
 !jobs/.gitkeep
 .settings.json
+.settings.json.tmp*
 # 伺服器執行期日誌（原生 Windows 啟動時產生；WSL2 版寫在 /tmp 不在這裡）
 server.log
 server.err.log
@@ -12,3 +13,4 @@ __pycache__/
 .live-usage.json
 .live-script.json
 .live-script.json.corrupt-*
+.settings.json.bad-*

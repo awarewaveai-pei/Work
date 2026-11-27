@@ -90,28 +90,12 @@
   <p style="margin:-8px 0 20px"><a href="/workspace" style="display:inline-block;background:var(--accent);color:#fff;text-decoration:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600">會議工作區 →</a></p>
 
   <div class="card" id="settingsCard">
-    <div id="settingsHeader" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
-      <b style="font-size:14px">⚙ API 設定 <span id="apiStatusBadge" class="badge" style="background:#f1f5f9;color:var(--muted)">檢查中...</span></b>
-      <span id="settingsToggle" style="font-size:12px;color:var(--muted)">展開 ▾</span>
-    </div>
-    <div id="settingsBody" style="display:none;margin-top:14px">
-      <p class="hint" style="margin-top:0">
-        選填。填入自己的 Anthropic API key 後，上傳時可勾選「自動處理」，
-        不用手動貼 prompt——但每次呼叫會真的計費（不是訂閱額度）。
-        不填就只能用下面「貼上」的免費做法。<b>key 存檔只存在這台電腦本機</b>
-        （不進版本控制、不會被其他頁面讀到）；但勾選「自動處理」時，key 本身
-        會當作認證資訊送到 Anthropic 的伺服器——這是呼叫 API 本來就需要的，
-        逐字稿內容也會一起送出去，跟下面「貼上」做法音檔/逐字稿完全不外流
-        不是同一回事，敏感會議請用「貼上」。
-      </p>
-      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:Consolas,monospace">
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <button class="copyBtn" id="saveApiKeyBtn" style="margin-top:0">儲存</button>
-        <button class="copyBtn" id="clearApiKeyBtn" style="margin-top:0">清除</button>
-        <span id="apiKeySaveMsg" class="hint" style="margin:0"></span>
-      </div>
-    </div>
+    <details>
+      <summary style="cursor:pointer;font-size:14px;font-weight:600">⚙ 設定（金鑰）</summary>
+      <div id="settingsMount" style="margin-top:12px"></div>
+    </details>
   </div>
+<!-- settings-panel -->
 
   <div class="card" id="ownvoiceCard" style="display:none">
     <b style="font-size:14px">OwnVoice 會議</b>
@@ -126,24 +110,21 @@
       <input type="file" id="fileInput" accept=".mp4,.m4a,.mp3,.wav,.mov,.mkv,.webm,.aac,.flac">
     </div>
     <div class="opts">
-      <label><input type="checkbox" id="diarizeOpt" checked> 講者分離（需 HF_TOKEN，較慢）</label>
-      <label>模型
-        <select id="modelOpt">
-          <option value="large-v3" selected>large-v3（準）</option>
-          <option value="medium">medium（快）</option>
-        </select>
-      </label>
+      <label><input type="checkbox" id="diarizeOpt" checked> 講者分離（需 Hugging Face 金鑰，較慢）</label>
+      <span style="color:var(--muted)">模型</span>
+      <label><input type="radio" name="modelOpt" value="large-v3" checked> large-v3（準）</label>
+      <label><input type="radio" name="modelOpt" value="medium"> medium（快）</label>
     </div>
     <div class="opts" style="margin-top:10px">
       <span style="color:var(--muted)">會議語言</span>
       <label><input type="radio" name="langOpt" value="zh" checked> 中文</label>
       <label><input type="radio" name="langOpt" value="en"> 英文</label>
+      <label><input type="radio" name="langOpt" value="ja"> 日文</label>
+      <label><input type="radio" name="langOpt" value="ko"> 韓文</label>
       <label><input type="radio" name="langOpt" value="auto"> 自動判斷</label>
     </div>
-    <div class="opts" style="margin-top:10px">
-      <label><input type="checkbox" id="syncDriveOpt"> 完成後同步到 Google Drive（ECT/會議記錄/日期）</label>
-    </div>
-    <p class="hint">⚠️ 勾選會把 PPT/會議記錄/逐字稿複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
+    <div class="opts" id="syncOpts" style="margin-top:10px"></div>
+    <p class="hint">⚠️ 勾選的目的地若是雲端資料夾，PPT/會議記錄/逐字稿會複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
     <div class="opts" id="useApiRow" style="margin-top:10px;display:none">
       <label><input type="checkbox" id="useApiOpt"> 自動處理（用 API，會計費，跳過手動貼上）</label>
     </div>
@@ -198,55 +179,36 @@ const DOWNLOAD_LABELS = {
   transcript_srt: "字幕檔 (.srt)", diarized_txt: "逐字稿-含講者 (.txt)", merged_txt: "逐字稿 (.txt)",
 };
 
-// --- API 設定 ---
-async function loadApiSettings() {
-  const s = await (await fetch("/api/settings")).json();
-  const badge = document.getElementById("apiStatusBadge");
-  if (s.has_api_key) {
-    badge.textContent = `已設定 (${s.masked_api_key})`;
-    badge.style.background = "#dcfce7"; badge.style.color = "#166534";
-    document.getElementById("useApiRow").style.display = "flex";
-  } else {
-    badge.textContent = "未設定";
-    badge.style.background = "#f1f5f9"; badge.style.color = "var(--muted)";
-    document.getElementById("useApiRow").style.display = "none";
-  }
-  return s;
+// --- 設定（面板本體在 templates/_settings.html，與會議工作區共用） ---
+{
+  const mount = document.getElementById("settingsMount");
+  mount.append(document.getElementById("tpl-settings").content.cloneNode(true));
+  Settings.mount(mount);
+  // 同步：每個輸出目的地一個勾選框，預設勾「預設同步」的（設定改了才重畫，不蓋掉這次手動的勾選）。
+  let shown = "";
+  Settings.on(d => {
+    const key = JSON.stringify(d.destinations);
+    if (key === shown) return;
+    shown = key;
+    const box = document.getElementById("syncOpts");
+    box.replaceChildren(...d.destinations.map(dest => {
+      const label = document.createElement("label"), input = document.createElement("input");
+      input.type = "checkbox"; input.name = "syncOpt"; input.value = dest.name; input.checked = dest.sync;
+      label.append(input, " 完成後同步到「" + dest.name + "」");
+      label.title = dest.dir;
+      return label;
+    }));
+    if (!d.destinations.length) box.textContent = "沒有輸出目的地（在上面「設定」新增），產出只留在這台電腦。";
+  });
+  // 沒填 Anthropic 金鑰就不提供「自動處理」。
+  Settings.on(d => {
+    document.getElementById("useApiRow").style.display = d.anthropic_api_key.set ? "flex" : "none";
+    if (!d.anthropic_api_key.set) document.getElementById("useApiOpt").checked = false;
+  });
 }
-loadApiSettings();
 
-document.getElementById("settingsHeader").addEventListener("click", () => {
-  const body = document.getElementById("settingsBody");
-  const toggle = document.getElementById("settingsToggle");
-  const open = body.style.display !== "none";
-  body.style.display = open ? "none" : "block";
-  toggle.textContent = open ? "展開 ▾" : "收合 ▴";
-});
-
-document.getElementById("saveApiKeyBtn").addEventListener("click", async () => {
-  const key = document.getElementById("apiKeyInput").value.trim();
-  const msg = document.getElementById("apiKeySaveMsg");
-  if (!key) { msg.textContent = "先貼上 key 再儲存"; msg.style.color = "var(--red)"; return; }
-  await fetch("/api/settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anthropic_api_key: key }),
-  });
-  document.getElementById("apiKeyInput").value = "";
-  msg.textContent = "已儲存 ✓"; msg.style.color = "var(--green)";
-  await loadApiSettings();
-});
-
-document.getElementById("clearApiKeyBtn").addEventListener("click", async () => {
-  const msg = document.getElementById("apiKeySaveMsg");
-  await fetch("/api/settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anthropic_api_key: "" }),
-  });
-  document.getElementById("apiKeyInput").value = "";
-  document.getElementById("useApiOpt").checked = false;
-  msg.textContent = "已清除"; msg.style.color = "var(--muted)";
-  await loadApiSettings();
-});
+// 這次勾選要同步去的輸出目的地名稱。
+const syncChoice = () => [...document.querySelectorAll("input[name=syncOpt]:checked")].map(x => x.value);
 
 let file = null;
 const drop = document.getElementById("drop");
@@ -272,8 +234,7 @@ startBtn.addEventListener("click", async () => {
   if (!file) return;
   startBtn.disabled = true;
   const diarize = document.getElementById("diarizeOpt").checked;
-  const model = document.getElementById("modelOpt").value;
-  const syncDrive = document.getElementById("syncDriveOpt").checked;
+  const model = document.querySelector("input[name=modelOpt]:checked").value;
   const useApi = document.getElementById("useApiOpt").checked;
   const language = document.querySelector("input[name=langOpt]:checked").value;
 
@@ -286,7 +247,9 @@ startBtn.addEventListener("click", async () => {
 
   let resp;
   try {
-    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}&use_api=${useApi}&language=${language}`, { method: "POST", body: fd });
+    const q = new URLSearchParams({ diarize, model, use_api: useApi, language });
+    syncChoice().forEach(n => q.append("sync", n));
+    resp = await fetch(`/api/upload?${q}`, { method: "POST", body: fd });
   } catch (e) {
     showError("上傳失敗：" + e);
     return;
@@ -301,7 +264,7 @@ startBtn.addEventListener("click", async () => {
 });
 
 // --- OwnVoice 會議 ---
-const LANGUAGE_LABELS = { zh: "中文", en: "英文", auto: "自動判斷" };
+const LANGUAGE_LABELS = { zh: "中文", en: "英文", ja: "日文", ko: "韓文", auto: "自動判斷" };      // 鍵＝lib/transcribe.py LANGUAGES
 async function loadOwnvoice() {
   const data = await (await fetch("/api/ownvoice/sessions")).json();
   if (!data.sessions.length) return;
@@ -325,6 +288,8 @@ document.getElementById("ownvoiceList").addEventListener("click", async (e) => {
   const resp = await fetch("/api/ownvoice/import", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session, diarize: document.getElementById("diarizeOpt").checked,
+                           model: document.querySelector("input[name=modelOpt]:checked").value,
+                           sync: syncChoice(),
                            use_api: document.getElementById("useApiOpt").checked }),
   });
   const body = await resp.json().catch(() => ({}));
@@ -344,6 +309,7 @@ function renderStages(activeStage, doneSet) {
 }
 
 let currentJobId = null;
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 async function poll(jobId) {
   currentJobId = jobId;
@@ -481,23 +447,27 @@ function showResult(jobId, status) {
   let html = "";
   if (status.transcribe_stats) {
     const s = status.transcribe_stats;
-    html += `<p class="hint">轉錄 ${s.realtime_factor}x realtime（${s.backend}）`;
+    // 聆聽場次沿用聆聽逐字稿時沒有轉錄速度；講者是聆聽時標的就沒有重疊語音（只有 pyannote 算得出）。
+    html += s.realtime_factor == null ? `<p class="hint">逐字稿：${s.backend}` : `<p class="hint">轉錄 ${s.realtime_factor}x realtime（${s.backend}）`;
     if (status.diarize_stats) {
-      html += ` · 講者 ${status.diarize_stats.speakers.join("/")} · 重疊語音 ${status.diarize_stats.overlap_sec.toFixed(0)}s`;
+      const ov = status.diarize_stats.overlap_sec;
+      html += ` · 講者 ${escapeHtml(status.diarize_stats.speakers.join("/"))}` + (ov == null ? "" : ` · 重疊語音 ${ov.toFixed(0)}s`);
     }
     if (status.diarize_error) {
-      html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${status.diarize_error}）</span>`;
+      html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${escapeHtml(status.diarize_error)}）</span>`;
     }
     html += "</p>";
   }
-  if (status.drive_sync_result) {
-    const r = status.drive_sync_result;
+  // sync_results：每個目的地一筆（C16 起）；drive_sync_result：之前的工作只有一筆。
+  (status.sync_results || (status.drive_sync_result ? [status.drive_sync_result] : [])).forEach(r => {
+    const name = r.name ? `「${escapeHtml(r.name)}」` : "";
     if (r.ok) {
-      html += `<p class="hint">☁ 已同步到 ${r.dest}（${r.files.length} 個檔案）</p>`;
+      html += `<p class="hint">☁ 已同步到${name} ${escapeHtml(r.dest)}（${r.files.length} 個檔案）</p>`;
     } else {
-      html += `<p class="hint" style="color:var(--red)">☁ Drive 同步失敗：${r.error}（本地檔案不受影響）</p>`;
+      const failed = (r.failed || []).map(f => `；${escapeHtml(f.file)}：${escapeHtml(f.error)}`).join("");
+      html += `<p class="hint" style="color:var(--red)">☁ 同步到${name}有問題：${escapeHtml(r.error)}${failed}（本地檔案不受影響）</p>`;
     }
-  }
+  });
   html += `<div class="downloads">${Object.entries(DOWNLOAD_LABELS).map(([kind, label]) =>
     `<a href="/api/download/${jobId}/${kind}" target="_blank">${label}</a>`).join("")}<a href="/mindmap?job=${jobId}" target="_blank">心智圖</a></div>`;
   document.getElementById("resultBody").innerHTML = html;

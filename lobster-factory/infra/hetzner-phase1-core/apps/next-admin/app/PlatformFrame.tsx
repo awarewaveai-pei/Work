@@ -21,6 +21,17 @@ import { ClientRail } from "./ClientRail";
 import { MobileShell } from "./MobileShell";
 import { bottomItems } from "./bottom-items";
 import { STAFF_HOST_KEY } from "@/lib/client-context/use-client-context";
+import { buildSearchIndex, type SearchFrame } from "@/lib/portal/search-index";
+import { SearchBox } from "./SearchBox";
+
+/** The top-bar search row (U18): the index is built here on the server; the browser never imports the registry. */
+function SearchBar({ frame }: { frame: SearchFrame }) {
+  return (
+    <div style={{ padding: "10px 24px", borderBottom: "1px solid var(--card-border)", background: "var(--topbar-bg)" }}>
+      <SearchBox index={buildSearchIndex(frame)} />
+    </div>
+  );
+}
 
 
 /** Every next-admin door's https origin plus the staff console's, from config (never written out in code). */
@@ -115,6 +126,7 @@ async function StaffFrame({ navLayout, internalOrgId, sitesPath, visible, inboxB
           <div style={{ display: "flex", flex: 1 }}>
             <ClientRail />
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              <SearchBar frame="staff" />
               {notice}
               {children}
             </div>
@@ -165,6 +177,7 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
         {!bare && <NavRail kind="door" page={door.page} name={product!.name} />}
         {!bare && <ClientRail />}
         <div className="door-content">
+          {!bare && <SearchBar frame="door" />}
           {children}
           {!bare && <div className="door-foot"><LogoutButton variant="page" /></div>}
         </div>

@@ -56,6 +56,10 @@ class CaptionsTests(unittest.TestCase):
         self.assertFalse(reads_as_subtitle("to the new cluster and then retire the old build servers once every"))
         self.assertFalse(reads_as_subtitle("遷移到新的叢集\n\nWait, I must output only the translation."))
         self.assertFalse(reads_as_subtitle(""))
+        # Other targets go by their own script (C14): English and Japanese early translations are shown.
+        self.assertTrue(reads_as_subtitle("migrate to the new cluster and then", "en-US"))
+        self.assertFalse(reads_as_subtitle("遷移到新叢集", "en-US"))
+        self.assertTrue(reads_as_subtitle("新しいクラスタに移行して", "ja-JP"))
 
     def test_a_short_final_translation_still_lands_when_complete(self):
         t0 = 100.0

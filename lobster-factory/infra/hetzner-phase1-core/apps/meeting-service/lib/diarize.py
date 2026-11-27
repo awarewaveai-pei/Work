@@ -1,6 +1,6 @@
 """講者分離（pyannote）。標籤貼回既有 transcript segments。
 
-需要 HF_TOKEN 環境變數，且帳號需同意三個 gated repo（文件只寫兩個，2026-08-17
+需要 Hugging Face 金鑰（設定面板，否則環境變數 HF_TOKEN；讀法在 lib/settings.py），且帳號需同意三個 gated repo（文件只寫兩個，2026-08-17
 實測 pyannote 4.x 額外拉 PLDA 元件，缺一失敗）：
   - https://huggingface.co/pyannote/segmentation-3.0
   - https://huggingface.co/pyannote/speaker-diarization-3.1
@@ -31,11 +31,13 @@ def spk_name(n: int) -> str:
     return s
 
 
-def _load_audio(path: str):
+def _load_audio(path: str, channel: int = None):
+    """Mono float audio; channel 0/1 = only that channel of a stereo file (a two-channel live session:
+    1 = 對方), else everything mixed to mono."""
     import av
     import numpy as np
     c = av.open(path)
-    rs = av.AudioResampler(format="s16", layout="mono", rate=SR)
+    rs = av.AudioResampler(format="s16", layout="mono" if channel is None else "stereo", rate=SR)
     out = []
     for frame in c.decode(audio=0):
         for rf in rs.resample(frame):
@@ -43,7 +45,10 @@ def _load_audio(path: str):
     for rf in rs.resample(None):
         out.append(rf.to_ndarray().reshape(-1))
     c.close()
-    return np.concatenate(out).astype(np.float32) / 32768.0
+    pcm = np.concatenate(out)
+    if channel is not None:
+        pcm = pcm.reshape(-1, 2)[:, channel]
+    return pcm.astype(np.float32) / 32768.0
 
 
 def _join(a: str, b: str) -> str:
@@ -55,14 +60,25 @@ def _join(a: str, b: str) -> str:
     return a + ("" if re.search(r"[一-鿿]$", a) and re.match(r"^[一-鿿]", b) else " ") + b
 
 
-def _run_pyannote(media_path: str, log=print):
+def _hf_token() -> str:
+    # 本檔也會被別的專案按檔案路徑單獨載入（不在 lib 套件裡），不能 `from lib import settings`；
+    # 改按路徑載入同資料夾的 settings.py（只用標準庫）。
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_meeting_service_settings", os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.key("hf_token")
+
+
+def _run_pyannote(media_path: str, log=print, channel: int = None):
     import torch
-    hf = os.environ.get("HF_TOKEN")
+    hf = _hf_token()
     if not hf:
-        raise RuntimeError("環境變數 HF_TOKEN 未設定")
+        raise RuntimeError("還沒填 Hugging Face 金鑰（到「設定」面板填）")
 
     log("[1/4] 載入音檔 ...")
-    wav = _load_audio(media_path)
+    wav = _load_audio(media_path, channel)
     dur = len(wav) / SR
     log(f"      {dur:.1f}s")
 
@@ -119,8 +135,9 @@ def _run_pyannote(media_path: str, log=print):
     }
 
 
-def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=print) -> dict:
-    """執行（或載入快取的）講者分離，並把標籤貼回 segments。
+def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=print, channel: int = None) -> dict:
+    """執行（或載入快取的）講者分離，並把標籤貼回 segments。channel：只分這一聲道（兩路錄音的對方＝1）。
+    已經有講者的 segment（兩路錄音的「我」）保留原標籤。
 
     回傳 {"speakers": [...], "overlap_sec": float, "turns": [...]}。
     segments 會被原地加上 "speaker" / "speaker_inferred" 欄位。
@@ -132,7 +149,7 @@ def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=p
         log(f"[1-3/4] 從快取載入 spans（excl {len(spans['exclusive'])} / full {len(spans['full'])}）")
 
     if spans is None:
-        spans = _run_pyannote(media_path, log)
+        spans = _run_pyannote(media_path, log, channel)
         if spans_cache_path:
             import json
             json.dump(spans, open(spans_cache_path, "w", encoding="utf-8"))
@@ -165,7 +182,11 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
     excl, full = spans["exclusive"], spans["full"]
 
     n_excl = n_full = n_near = n_unk = 0
+    kept = []
     for s in segments:
+        if s.get("speaker") and "speaker_inferred" not in s and s["speaker"] not in spans["speakers"]:
+            kept.append(s["speaker"])        # labelled by its source (the 「我」 channel): not pyannote's to change
+            continue
         s.pop("speaker_inferred", None)
         bl = _match(s, excl)
         if bl:
@@ -181,16 +202,24 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
         s["speaker"] = bl or "?"
     log(f"      標籤來源：直接 {n_excl} / 重疊回退 {n_full} / 鄰近推定 {n_near} / 無法判定 {n_unk}")
 
-    turns = []
+    out = turns(segments)
+    short = sum(1 for t in out if t["end"] - t["start"] < 1.5)
+    log(f"      {len(out)} 輪次 / 極短(<1.5s) {short} ({short/max(len(out),1)*100:.1f}%)")
+
+    return {"speakers": spans["speakers"] + sorted(set(kept)), "overlap_sec": spans["overlap_sec"], "turns": out}
+
+
+def turns(segments: list) -> list:
+    """已標講者的 segments → 說話輪次：同一人、間隔 < 2 秒的接在一起。沒標的算「?」。
+    text_tr＝每句原文後面括號附它的翻譯（tr，聆聽時的即時翻譯），給會議記錄的輸入用。"""
+    out = []
     for s in segments:
-        if turns and turns[-1]["speaker"] == s["speaker"] and s["start"] - turns[-1]["end"] < 2.0:
-            turns[-1]["text"] = _join(turns[-1]["text"], s["text"])
-            turns[-1]["end"] = s["end"]
+        who = s.get("speaker") or "?"
+        text_tr = s["text"] + (f"（{s['tr']}）" if s.get("tr") else "")
+        if out and out[-1]["speaker"] == who and s["start"] - out[-1]["end"] < 2.0:
+            out[-1]["text"] = _join(out[-1]["text"], s["text"])
+            out[-1]["text_tr"] = _join(out[-1]["text_tr"], text_tr)
+            out[-1]["end"] = s["end"]
         else:
-            turns.append({"speaker": s["speaker"], "start": s["start"],
-                          "end": s["end"], "text": s["text"]})
-
-    short = sum(1 for t in turns if t["end"] - t["start"] < 1.5)
-    log(f"      {len(turns)} 輪次 / 極短(<1.5s) {short} ({short/max(len(turns),1)*100:.1f}%)")
-
-    return {"speakers": spans["speakers"], "overlap_sec": spans["overlap_sec"], "turns": turns}
+            out.append({"speaker": who, "start": s["start"], "end": s["end"], "text": s["text"], "text_tr": text_tr})
+    return out

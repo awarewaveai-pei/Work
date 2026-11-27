@@ -35,13 +35,23 @@ def base(tmp_path, monkeypatch):
 def test_sessions_are_newest_first_and_only_ownvoice_folders(base):
     found = ownvoice.sessions()
     assert [s["id"] for s in found] == ["2026-11-22 1630-2", "2026-11-21 0900"]
-    assert found[0] == {"id": "2026-11-22 1630-2", "wavs": 2, "transcript": True, "summary": False}
+    assert found[0] == {"id": "2026-11-22 1630-2", "root": str(base), "wavs": 2, "transcript": True, "summary": False}
     assert found[1]["wavs"] == 0
 
 
 def test_latest_and_missing_text(base):
     assert ownvoice.read_text("latest", "transcript.md") == "# 逐字稿\n"
     assert ownvoice.read_text("latest", "summary.md") == ""
+
+
+def test_a_session_without_session_json_is_an_old_one(base):
+    assert ownvoice.session_lines("latest") is None
+
+
+def test_an_unreadable_session_json_is_treated_as_an_old_session(base):
+    # A cut-off write must send the session down the full post-meeting path, not fail it.
+    (base / "2026-11-22 1630-2" / "session.json").write_text('{"version": 1, "lines": [', encoding="utf-8")
+    assert ownvoice.session_lines("latest") is None
 
 
 @pytest.mark.parametrize("bad", ["..", "not a session", "2026-11-22 1630-2/..", "2026-01-01 0000"])

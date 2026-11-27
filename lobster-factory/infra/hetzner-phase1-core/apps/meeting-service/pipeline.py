@@ -19,8 +19,14 @@ import os
 import threading
 import time
 import traceback
+import wave
+from dataclasses import dataclass
 
-from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, speaker_notes, summarize, word
+import numpy as np
+
+from lib import (archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, postmeeting, settings,
+                 speaker_notes, summarize, word)
+from lib.live import vad
 from lib.transcribe import transcribe, write_srt, write_vtt
 
 
@@ -97,33 +103,88 @@ def write_status(job_dir: str, **fields):
             time.sleep(min(0.5, 0.02 * (2 ** attempt)))
 
 
-def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
-                         do_diarize: bool = True, sync_drive: bool = False,
-                         use_api: bool = False, api_key: str = "", language: str = "zh") -> None:
+MODELS = ("large-v3", "medium")
+REUSED = "沿用聆聽結果"
+
+
+@dataclass(frozen=True)
+class Options:
+    """會後整理的選項：上傳、舊場次、聆聽場次三個入口共用一份（app.py 驗證後建立）。
+    target＝設定的「翻譯成」，決定會議記錄用哪種語言寫（lib/postmeeting.minutes_language）。"""
+    diarize: bool = True
+    model: str = "large-v3"
+    language: str = "zh"
+    # 這個工作要同步去的輸出目的地，((名稱, 資料夾存檔寫法), …)；空＝不同步。
+    destinations: tuple = ()
+    use_api: bool = False
+    target: str = "zh-TW"
+    # The recording is a two-channel listening (left me, right them): speakers are split on the right only.
+    me_them: bool = False
+
+
+def _reanchor(result: dict, media_path: str, log) -> None:
+    """Gemini 聆聽逐字稿的句子時間是文字到達的時間：用錄音的發聲區段對回發聲位置（lib/live/vad.reanchor）。
+    只動 arrival 的句子；雙聲道錄音每一路用自己那一聲道（左我、右對方）。"""
+    with wave.open(media_path, "rb") as w:
+        nch = w.getnchannels()
+        if nch > 2 or w.getsampwidth() != 2:
+            log("[對齊] 錄音不是 16 位元單／雙聲道，句子時間維持文字到達的時間")
+            return
+        rate = w.getframerate()
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").reshape(-1, nch)
+    for who in ("me", "them"):
+        segs = [s for s in result["segments"] if s.get("arrival") and s.get("who", "them") == who]
+        if not segs:
+            continue
+        regions = vad.speech_regions(pcm[:, (0 if who == "me" else 1) if nch == 2 else 0], rate)
+        for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
+            s["start"], s["end"], s["arrival"] = start, end, False
+        log(f"[對齊] {'我' if who == 'me' else '對方'} {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
+    result["segments"].sort(key=lambda s: s["start"])
+    result["times"] = postmeeting.SPEECH
+
+
+def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = "") -> None:
     """呼叫端（app.py）用背景執行緒跑這個函式。結束時 stage 為
     awaiting_summary（成功）或 error（失敗），不會是 done。
 
-    sync_drive 在上傳當下就決定（勾選框），要持久化到 status.json，
-    因為 resume_after_summary() 是後續另一次 HTTP 請求才觸發，
-    中間隔著使用者去別的對話貼摘要，不能靠記憶體變數傳遞。
+    產物鏈：每一步先看 job 資料夾有沒有它的產物（transcript.json、speakers.json，聆聽場次由
+    app.py 事先用 lib/postmeeting.py 寫好），有就沿用、沒有才跑。合併與幻覺偵測一律跑。
+    media_path＝None：這場沒有錄音（只能沿用聆聽逐字稿，不能分講者）。
+
+    同步去哪幾個目的地在開始當下就決定（勾選），連名稱與資料夾一起存進 status.json：
+    resume_after_summary() 是後續另一次 HTTP 請求才觸發，中間隔著使用者去別的對話貼摘要，
+    不能靠記憶體變數傳遞，之後改了設定也不影響這個工作要去的地方。
 
     api_key 同理在上傳當下由 app.py 讀出、當參數傳進來，不在這裡才去讀
     settings.py 目前的值——轉錄+講者分離常跑好幾分鐘，這段時間夠使用者在
     設定頁換掉或清除 key；若這裡才讀，job 實際用的 key 會跟使用者上傳當下
     看到的「已設定」狀態對不上。"""
     log = JobLogger(job_dir)
+    steps = {}
     write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(),
-                 sync_drive=sync_drive)
+                 destinations=[{"name": n, "dir": d} for n, d in opts.destinations], steps=steps)
     keep_awake.prevent_sleep()
 
     try:
         write_status(job_dir, stage="transcribe")
-        result = transcribe(media_path, model_name=model_name, log=log, language=language)
-        json.dump(result, open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8"),
-                  ensure_ascii=False, indent=2)
+        transcript_path = os.path.join(job_dir, postmeeting.TRANSCRIPT)
+        if os.path.exists(transcript_path):
+            with open(transcript_path, encoding="utf-8") as f:
+                result = json.load(f)
+            steps["transcribe"] = REUSED
+            log(f"[逐字稿] {REUSED}（{result['backend']}，{len(result['segments'])} 句）")
+        else:
+            if not media_path:
+                raise RuntimeError("沒有錄音，也沒有聆聽逐字稿，無法整理")
+            result = transcribe(media_path, model_name=opts.model, log=log, language=opts.language)
+            steps["transcribe"] = "done"
+        if result.get("times") == postmeeting.ARRIVAL and media_path:
+            _reanchor(result, media_path, log)
+        postmeeting.write_json(transcript_path, result)
         write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))
         write_vtt(result["segments"], os.path.join(job_dir, "transcript.vtt"))
-        write_status(job_dir, transcribe_stats={
+        write_status(job_dir, steps=steps, transcribe_stats={
             "audio_duration_sec": result["audio_duration_sec"],
             "realtime_factor": result["realtime_factor"],
             "backend": result["backend"],
@@ -143,28 +204,54 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         log(f"[幻覺偵測] 可疑段落 {hall_stats['suspect_pct_segments']}% / "
             f"可疑文字 {hall_stats['suspect_pct_chars']}%")
 
-        turns = speakers = overlap_sec = None
-        if do_diarize:
-            write_status(job_dir, stage="diarize")
+        turns = speakers = overlap_sec = labels = None
+        speakers_path = os.path.join(job_dir, postmeeting.SPEAKERS)
+        product = None
+        if os.path.exists(speakers_path):
+            with open(speakers_path, encoding="utf-8") as f:
+                product = json.load(f)
+            steps["diarize"] = REUSED
+            log(f"[講者] {REUSED}：{', '.join(product['speakers'])}")
+            turns = diarize.turns(result["segments"])
+        elif opts.diarize and not media_path:
+            steps["diarize"] = "沒有錄音，不能分講者"
+            log("[講者] 這場沒有錄音，不能分講者")
+        elif opts.diarize:
+            write_status(job_dir, stage="diarize", steps=steps)
             try:
                 spans_cache = os.path.join(job_dir, "diarize_spans.json")
-                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log)
-                turns, speakers, overlap_sec = dr["turns"], dr["speakers"], dr["overlap_sec"]
-                with open(os.path.join(job_dir, "diarized.txt"), "w", encoding="utf-8") as f:
-                    for t in turns:
-                        mm, ss = int(t["start"] // 60), int(t["start"] % 60)
-                        f.write(f"[{mm:02d}:{ss:02d}] {t['speaker']}：{t['text']}\n")
-                write_status(job_dir, diarize_stats={"speakers": speakers, "overlap_sec": overlap_sec,
-                                                      "turns": len(turns)})
+                # 雙聲道（兩路聆聽）只分對方那一聲道；「我」的句子已經標好。
+                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log,
+                                     channel=1 if opts.me_them else None)
+                turns = dr["turns"]
+                product = {"speakers": dr["speakers"], "overlap_sec": dr["overlap_sec"], "source": "pyannote"}
+                postmeeting.write_json(speakers_path, product)
+                postmeeting.write_json(transcript_path, result)        # the segments now carry their speaker labels
+                steps["diarize"] = "done"
             except Exception as e:
                 log(f"[warn] 講者分離失敗，改用未分離逐字稿繼續: {type(e).__name__}: {e}")
                 write_status(job_dir, diarize_error=str(e))
+        if product is not None:
+            speakers, overlap_sec = product["speakers"], product["overlap_sec"]
+            labels = summarize.DEFAULT_ABOUT["labels"] if product["source"] == "pyannote" else product["source"]
+            with open(os.path.join(job_dir, "diarized.txt"), "w", encoding="utf-8") as f:
+                for t in turns:
+                    mm, ss = int(t["start"] // 60), int(t["start"] % 60)
+                    f.write(f"[{mm:02d}:{ss:02d}] {t['speaker']}：{t['text']}\n")
+            write_status(job_dir, diarize_stats={"speakers": speakers, "overlap_sec": overlap_sec, "turns": len(turns)})
 
-        write_status(job_dir, stage="preparing_prompt")
+        write_status(job_dir, stage="preparing_prompt", steps=steps)
+        live = result.get("model") == "live"
+        about = {"source": f"即時辨識（{result['backend']}）" if live else f"本機 faster-whisper 轉錄（{opts.model}）",
+                 "language": postmeeting.language_name(result.get("language") or opts.language),
+                 "output": postmeeting.minutes_language(opts.target),
+                 "translated": any(s.get("tr") for s in result["segments"])}
+        if labels:
+            about["labels"] = labels
         transcript_text = summarize.build_transcript_text(turns=turns, merged=merged)
         prompt = summarize.build_prompt(
             transcript_text, result["audio_duration_sec"],
-            hallucination_stats=hall_stats, overlap_sec=overlap_sec, speakers=speakers,
+            hallucination_stats=hall_stats, overlap_sec=overlap_sec, speakers=speakers, about=about,
         )
         # 無論走哪條路都先寫 prompt.txt——API 模式失敗時退回人工回路，
         # 轉錄/分離的工作不能因為 API 出錯就整份作廢。
@@ -172,14 +259,14 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
             f.write(prompt)
         log(f"[prompt] {len(prompt)} 字元 -> prompt.txt")
 
-        if use_api and api_key:
+        if opts.use_api and api_key:
             write_status(job_dir, stage="summarize_via_api")
             minutes = None
             try:
                 minutes = summarize.summarize_via_api(
                     transcript_text, result["audio_duration_sec"], api_key,
                     hallucination_stats=hall_stats, overlap_sec=overlap_sec,
-                    speakers=speakers, log=log,
+                    speakers=speakers, about=about, log=log,
                 )
             except Exception as e:
                 # 只有「拿摘要」這步失敗才叫得動人工回路退路——重貼一次
@@ -278,25 +365,52 @@ def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
     word.build_coach(minutes["coaching"], minutes, os.path.join(job_dir, "coach.docx"))
     log("[Word] 報告教練 -> coach.docx")
 
-    # 讀失敗不該讓已經產出的 PPT/Word/Excel 全部作廢——同步是選配功能，
-    # 讀不到旗標時保守地當作「不同步」（不會誤傳到雲端），繼續走完 done。
-    try:
-        with open(_status_path(job_dir), encoding="utf-8") as f:
-            sync_drive = json.load(f).get("sync_drive", False)
-    except (OSError, json.JSONDecodeError) as e:
-        log(f"[warn] 讀不到 sync_drive 旗標（{type(e).__name__}），本次不同步 Drive")
-        sync_drive = False
-    if sync_drive:
-        write_status(job_dir, stage="sync_drive")
-        result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))
-        if result["ok"]:
-            log(f"[Drive 同步] {len(result['files'])} 個檔案 -> {result['dest']}")
-        else:
-            log(f"[warn] Drive 同步失敗（本地產出不受影響）: {result['error']}")
-        write_status(job_dir, drive_sync_result=result)
+    _sync(job_dir, minutes, log)
 
     write_status(job_dir, stage="done", done=True, finished_at=time.time())
     log("[完成] 全流程結束")
+    return []
+
+
+def _sync(job_dir: str, minutes: dict, log) -> None:
+    """產出複製到這個工作選的每個目的地；一個目的地失敗不影響其他的，結果各記一筆（status.json sync_results）。"""
+    dests = _sync_destinations(job_dir, log)
+    if not dests:
+        return
+    write_status(job_dir, stage="sync_drive")
+    results = []
+    for dest in dests:
+        result = archive.sync_to(dest, job_dir, minutes, os.path.basename(job_dir))
+        results.append(result)
+        if result["ok"]:
+            log(f"[同步] {dest['name']}：{len(result['files'])} 個檔案 -> {result['dest']}")
+        else:
+            log(f"[warn] 同步到 {dest['name']} 有問題（本地產出不受影響）: {result['error']}"
+                + "".join(f"\n  {f['file']}: {f['error']}" for f in result["failed"]))
+    write_status(job_dir, sync_results=results)
+
+
+def _sync_destinations(job_dir: str, log) -> list:
+    """這個工作開始時選的目的地（status.json destinations）。C16 之前開始的工作只有 sync_drive：
+    true＝當時的 MEETING_DRIVE_BASE（已轉成設定裡的目的地）。
+    讀不到 status.json 時當作不同步：不該讓已經產出的 PPT/Word/Excel 作廢，也不會誤傳到雲端。"""
+    try:
+        with open(_status_path(job_dir), encoding="utf-8") as f:
+            status = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"[warn] 讀不到同步設定（{type(e).__name__}），本次不同步")
+        return []
+    dests = status.get("destinations")
+    if isinstance(dests, list):
+        return [d for d in dests if isinstance(d, dict) and d.get("dir")]
+    if status.get("sync_drive") is True:
+        legacy = [{"name": d["name"], "dir": d["dir"]} for d in settings.legacy_destinations()]
+        if not legacy:
+            msg = "這個工作開始時勾了同步，但找不到當時的雲端資料夾（環境變數 MEETING_DRIVE_BASE）：到「設定」加一個輸出目的地，再重做一次"
+            log(f"[warn] {msg}")
+            write_status(job_dir, sync_results=[{"name": "Google Drive", "ok": False, "dest": None, "files": [],
+                                                  "failed": [], "error": msg}])
+        return legacy
     return []
 
 

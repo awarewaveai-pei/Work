@@ -262,21 +262,17 @@ function count(n: Record<string, number>, r: Outcome) {
   if (r !== "moved_elsewhere") n[r]++;
 }
 
-export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?: number } = {}): Promise<string> {
-  const cap = opts.cap ?? DAILY_START_CAP;
-  const budget = opts.budgetMs ?? TICK_BUDGET_MS;
-  const t0 = deps.now();
-  const n = { interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
-    video_started: 0, expired: 0, publishing: 0 };
+/** Rows a firing moves on without starting anything: the topic was started already (by a person's 「核准並開始」, or by the
+ *  schedule), or a person pressed 「發布」; 'scheduled' = its site's publish mode dated it (publishReviewed). */
+export const STARTED_STATUSES: TopicStatus[] = ["generating", "drafted", "waiting_video", "embedded", "scheduled", "publishing"];
 
-  // A proposal nobody approved seven days after its day is returned (rejected = the 退回 button's move) with the reason;
-  // a person who changes the date and approves it again starts it over. Rejected rows are not read again: once per topic.
-  // At most EXPIRE_PER_TICK per firing: the first run over a backlog spreads its notices over several 5-minute firings.
-  for (const t of (await deps.inStatus(["proposed"])).filter((x) => isExpiredProposal(x, t0)).slice(0, EXPIRE_PER_TICK)) {
-    if (await deps.move(t, "rejected", { last_error: expiredReason(t.scheduled_for!) })) n.expired++;
-  }
+const newCounts = () => ({ interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
+  video_started: 0, expired: 0, publishing: 0 });
+const summaryOf = (n: Record<string, number>) => Object.entries(n).map(([k, v]) => `${k}=${v}`).join(" ");
 
-  for (const t of await deps.inStatus(["generating", "drafted", "waiting_video", "embedded", "scheduled", "publishing"])) {
+/** Each row in `statuses` moved on as far as it goes now: the video started, checked and attached, a publish continued. */
+async function advanceRows(deps: TickDeps, n: Record<string, number>, t0: Date, budget: number, statuses: TopicStatus[]): Promise<void> {
+  for (const t of await deps.inStatus(statuses)) {
     if (t.status === "generating" && t0.getTime() - Date.parse(t.updated_at) >= STALE_GENERATING_MS) {
       if (await deps.move(t, "failed", { last_error: "做到一半中斷了（伺服器重新啟動），按重試會重新製作" })) n.interrupted++;
     } else if (t.status === "drafted" && !waitsForVideo(t)) {
@@ -297,6 +293,32 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
       count(n, await continuePublishing(deps, t, false));
     }
   }
+}
+
+/** K31: one push of a brand whose content_pipeline schedule is off. What was started is finished whatever the switch
+ *  (its video made and attached, a pressed 「發布」 continued), and whether it then goes out is its site's publish mode,
+ *  as with the schedule on (publishReviewed: auto publish now or on its day, else 'reviewed' for a person's 「發布」).
+ *  What only the schedule does is not done: nothing is started, no proposal expired. */
+export async function advanceStartedTopics(deps: TickDeps, opts: { budgetMs?: number } = {}): Promise<string> {
+  const n = newCounts();
+  await advanceRows(deps, n, deps.now(), opts.budgetMs ?? TICK_BUDGET_MS, STARTED_STATUSES);
+  return summaryOf(n);
+}
+
+export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?: number } = {}): Promise<string> {
+  const cap = opts.cap ?? DAILY_START_CAP;
+  const budget = opts.budgetMs ?? TICK_BUDGET_MS;
+  const t0 = deps.now();
+  const n = newCounts();
+
+  // A proposal nobody approved seven days after its day is returned (rejected = the 退回 button's move) with the reason;
+  // a person who changes the date and approves it again starts it over. Rejected rows are not read again: once per topic.
+  // At most EXPIRE_PER_TICK per firing: the first run over a backlog spreads its notices over several 5-minute firings.
+  for (const t of (await deps.inStatus(["proposed"])).filter((x) => isExpiredProposal(x, t0)).slice(0, EXPIRE_PER_TICK)) {
+    if (await deps.move(t, "rejected", { last_error: expiredReason(t.scheduled_for!) })) n.expired++;
+  }
+
+  await advanceRows(deps, n, t0, budget, STARTED_STATUSES);
 
   for (const t of (await deps.due(t0)).filter(makesNow)) {
     if (deps.now().getTime() - t0.getTime() >= budget) break;
@@ -310,5 +332,5 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     n.started++;
     count(n, await makeStarted(deps, started, t0.getTime() + budget));   // the article sizes its subscription wait to what is left
   }
-  return Object.entries(n).map(([k, v]) => `${k}=${v}`).join(" ");
+  return summaryOf(n);
 }

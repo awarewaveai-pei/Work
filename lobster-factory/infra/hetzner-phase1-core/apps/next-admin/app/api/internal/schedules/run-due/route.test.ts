@@ -7,7 +7,7 @@ const claimScheduleRun = vi.hoisted(() => vi.fn());
 const run = vi.hoisted(() => vi.fn());
 const ingestIncident = vi.hoisted(() => vi.fn());
 const refreshClaimReviewIfDue = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/schedules/store", () => ({ listEnabledSchedules, recordScheduleRun, recordScheduleError, claimScheduleRun }));
+vi.mock("@/lib/schedules/store", () => ({ listEnabledSchedules, recordScheduleRun, recordScheduleError, claimScheduleRun, storedPerTopicCap: async () => 20 }));
 vi.mock("@/lib/schedules/jobs", () => ({
   clientJob: (key: string) => (key === "collect_crawl" ? { key, run } : key === "claude_usage_window" ? { key, run, onlyOrgSlugs: ["awarewave-ops"] } : undefined),
   asRegistered: <T,>(row: T) => row,
@@ -17,9 +17,10 @@ vi.mock("@/lib/ops-inbox/ingest", () => ({ ingestIncident }));
 vi.mock("@/lib/collect/lookups/answer", () => ({ refreshClaimReviewIfDue }));
 // In-memory tables: eq/in filter, order/limit kept simple. projects = media_production_projects rows of the test.
 const projects = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+const topics = vi.hoisted(() => [] as Array<Record<string, unknown>>);   // content_topics rows of the test
 const sb = vi.hoisted(() => ({
   from(table: string) {
-    let rows: Array<Record<string, unknown>> = table === "organizations" ? [{ slug: "acme" }] : table === "media_production_projects" ? [...projects] : [];
+    let rows: Array<Record<string, unknown>> = table === "organizations" ? [{ slug: "acme" }] : table === "media_production_projects" ? [...projects] : table === "content_topics" ? [...topics] : [];
     const q = {
       select: () => q,
       eq: (k: string, v: unknown) => { if (table !== "organizations") rows = rows.filter((r) => r[k] === v); return q; },
@@ -37,6 +38,10 @@ const advanceProject = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/video/project-advance", () => ({ advanceProject }));
 vi.mock("@/lib/content/video/project-advance-deps", () => ({ advanceDeps: (_sb: unknown, org: string, actor: string) => ({ org, actor }) }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => sb }));
+const advanceStartedTopics = vi.hoisted(() => vi.fn(async () => "video_started=1"));
+const topicDeps = vi.hoisted(() => vi.fn((_sb: unknown, org: string, actor: string, opts: object) => ({ org, actor, opts })));
+vi.mock("@/lib/content/topics/tick", async (orig) => ({ ...(await orig<typeof import("@/lib/content/topics/tick")>()), advanceStartedTopics }));
+vi.mock("@/lib/content/topics/make", () => ({ topicDeps }));
 // next/server's after() needs a request scope; collect the callbacks and run them on demand.
 const afterCallbacks = vi.hoisted(() => [] as Array<() => unknown>);
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => void afterCallbacks.push(fn) }));
@@ -74,6 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   afterCallbacks.length = 0;
   projects.length = 0;
+  topics.length = 0;
   advanceProject.mockImplementation(async (_deps: unknown, p: { id: string }) => ({ projectId: p.id, result: "waiting", note: "還沒有成片" }));
   process.env.SCHEDULE_INGEST_TOKEN = TOKEN;
   run.mockResolvedValue("written=3");
@@ -303,5 +309,16 @@ describe("POST /api/internal/schedules/run-due", () => {
     const res = await POST(req(`Bearer ${TOKEN}`));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toMatch(/relation does not exist/);
+  });
+
+  // K31: a topic a person started moves on every firing whether or not its brand's content pipeline schedule is on
+  it("started topics of a brand whose content pipeline is off are moved on; a brand whose pipeline is on is left to it", async () => {
+    topics.push({ organization_id: ORG_A, status: "waiting_video" }, { organization_id: ORG_B, status: "publishing" }, { organization_id: ORG_A, status: "reviewed" });
+    listEnabledSchedules.mockResolvedValue([{ ...dueSchedule(ORG_B, "content_pipeline"), frequency: "every_5m" }]);
+    const body = await (await sweep()).json();
+    expect(body.topicAdvance).toEqual({ organizations: [ORG_A] });
+    expect(advanceStartedTopics).toHaveBeenCalledTimes(1);
+    expect(topicDeps).toHaveBeenCalledWith(sb, ORG_A, "system:content_topic_advance", { capTwd: 20 });   // the brand's per-topic cap
+    expect(run).not.toHaveBeenCalled();   // nothing planned or started: the content_pipeline job itself is not run for ORG_A
   });
 });
