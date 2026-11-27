@@ -302,9 +302,15 @@ export const INIT: State = {
 export const SIZE_KEYS = [
   "positions", "headlineSize", "subtextSize", "typeAuto", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
   "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale",
+  // R3-C: 合成進場景 draws one picture per size at that size's ratio; a size without its own uses the main size's
+  "bgImage", "bgImageHasProduct",
 ] as const;
 export type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
 export const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
+/** The background fields a size may hold for itself (its own picture and where it sits). */
+const BG_SIZE_KEYS = ["bgImage", "bgImageHasProduct", "bgImgScale", "bgImgX", "bgImgY"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
+// pictures are multi-MB data URLs: compare by reference first, never stringify one that is the same
+const sameField = (a: unknown, b: unknown) => a === b || (typeof a !== "string" && typeof b !== "string" && JSON.stringify(a) === JSON.stringify(b));
 
 /** The main design (outside a size tweak). */
 export function mainOf(st: State): State {
@@ -329,8 +335,45 @@ export function leaveSize(st: State): State {
   const { key, main } = st.editingSize;
   const back: State = { ...st, ...main, editingSize: null };
   const base = variantOf(back, key, false);
-  const patch = Object.fromEntries(SIZE_KEYS.filter((f) => JSON.stringify(st[f]) !== JSON.stringify(base[f])).map((f) => [f, st[f]])) as SizePatch;
+  const patch = Object.fromEntries(SIZE_KEYS.filter((f) => !sameField(st[f], base[f])).map((f) => [f, st[f]])) as SizePatch;
   return { ...back, sizeOverrides: { ...st.sizeOverrides, [key]: patch } };
+}
+
+/** `fn` applied to the main design (any size tweak ended first, the same size reopened after). */
+function onMain(st: State, fn: (m: State) => State): State {
+  const editing = st.editingSize?.key;
+  const next = fn(leaveSize(st));
+  return editing ? enterSize(next, editing) : next;
+}
+/** R3-C: one background for every size (uploaded, generated, an AI 一鍵設計 scene picked): the main size gets it centred,
+ *  every size's own picture and placement go, so each size crops this one. */
+export function withSharedBackground(st: State, bg: Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct">): State {
+  return onMain(st, (m) => {
+    const sizeOverrides: State["sizeOverrides"] = {};
+    for (const [k, o] of Object.entries(m.sizeOverrides) as [PresetKey, SizePatch][]) {
+      const rest = { ...o };
+      for (const f of BG_SIZE_KEYS) delete rest[f];
+      sizeOverrides[k] = rest;
+    }
+    return { ...m, ...bg, ...BG_PLACE_RESET, sizeOverrides, saved: false };
+  });
+}
+/** R3-C: 合成進場景 per size -- each size that got a picture holds it (centred) as its own background; a size missing from
+ *  `pics` (its call failed) keeps what it had. The main size's picture is the main design's. */
+export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, string>>, hasProduct: boolean): State {
+  return onMain(st, (m) => {
+    const own = pics[m.preset];
+    const sizeOverrides = { ...m.sizeOverrides };
+    for (const [k, img] of Object.entries(pics) as [PresetKey, string][]) {
+      if (k !== m.preset) sizeOverrides[k] = { ...sizeOverrides[k], bgImage: img, bgImageHasProduct: hasProduct, ...BG_PLACE_RESET };
+    }
+    return { ...m, ...(own ? { bgImage: own, bgImageHasProduct: hasProduct, ...BG_PLACE_RESET } : {}), bgMode: "ai", sizeOverrides, saved: false };
+  });
+}
+/** R3-C: a product drawn over an AI design gets contact shadow, reflection and tone match on (their settings kept). */
+export function groundingOn(g: GroundingOpts): GroundingOpts {
+  const on = { enabled: true };
+  return { shadow: { ...INIT.grounding.shadow, ...g.shadow, ...on }, reflection: { ...INIT.grounding.reflection, ...g.reflection, ...on }, tone: { ...INIT.grounding.tone, ...g.tone, ...on } };
 }
 /** Drop size `k`'s tweaks; while `k` is being tweaked, its unsaved edits go too (it reopens as derived). */
 export function clearSizeTweak(st: State, k: PresetKey): State {
@@ -557,11 +600,17 @@ export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
   const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
   const imgKeys = new Set<keyof State>(["bgImage", "productImage", "productOrig", "aiBgRefImage"]);
+  const imgLen = (v: unknown) => (typeof v === "string" ? v.length : 0);
+  // a size's own background (R3-C) sits in sizeOverrides / editingSize.main: reduced the same way
+  const slimSize = <T extends SizePatch>(p: T | undefined) => (p && "bgImage" in p ? { ...p, bgImage: imgLen(p.bgImage) } : p);
   const obj: Record<string, unknown> = {};
   for (const k of Object.keys(st) as (keyof State)[]) {
     if (skip.has(k)) continue;
     const v = st[k];
-    obj[k] = imgKeys.has(k) ? (typeof v === "string" ? v.length : 0) : v;
+    obj[k] = imgKeys.has(k) ? imgLen(v)
+      : k === "sizeOverrides" ? Object.fromEntries(Object.entries(st.sizeOverrides).map(([sk, p]) => [sk, slimSize(p)]))
+      : k === "editingSize" && st.editingSize ? { ...st.editingSize, main: slimSize(st.editingSize.main) }
+      : v;
   }
   return JSON.stringify(obj);
 }
@@ -652,13 +701,20 @@ export async function extractPalette(src: string, n = 6): Promise<string[]> {
 }
 
 /** C12: the background as the AI and the contrast guard see it (free, before the call). A picture is drawn small the way
- *  the renderer places it, once per size made (each crops it differently); a colour / gradient is read from its settings. */
+ *  the renderer places it, once per size made (each crops it differently; R3-C: a size may have its own picture); a
+ *  colour / gradient is read from its settings. */
 export async function measureBackground(st: State, sizes: readonly PresetKey[]): Promise<BgInfo> {
-  if ((st.bgMode === "upload" || st.bgMode === "ai") && st.bgImage) {
-    const img = await loadImage(st.bgImage);
-    const colors = await extractPalette(st.bgImage, 6);
-    const infos = (sizes.length ? sizes : [st.preset]).map((k) => {
+  const list = sizes.length ? sizes : [st.preset];
+  if ((st.bgMode === "upload" || st.bgMode === "ai") && list.some((k) => variantOf(st, k).bgImage)) {
+    const read = new Map<string, Promise<[HTMLImageElement, string[]]>>();
+    const pic = (src: string) => {
+      if (!read.has(src)) read.set(src, Promise.all([loadImage(src), extractPalette(src, 6)]));
+      return read.get(src)!;
+    };
+    const infos = await Promise.all(list.map(async (k) => {
       const v = variantOf(st, k), ps = PRESETS[k];
+      if (!v.bgImage) return { ...bgStatsFromColors("color", v.bgColor), mode: st.bgMode };
+      const [img, colors] = await pic(v.bgImage);
       const w = 64, h = Math.max(8, Math.round((64 * ps.h) / ps.w));
       const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
       const ctx = cv.getContext("2d", { willReadFrequently: true });
@@ -668,7 +724,7 @@ export async function measureBackground(st: State, sizes: readonly PresetKey[]):
       const sw = img.width * sc, sh = img.height * sc;
       ctx.drawImage(img, (w - sw) / 2 + (v.bgImgX || 0) * w, (h - sh) / 2 + (v.bgImgY || 0) * h, sw, sh);
       return bgStatsFromPixels(ctx.getImageData(0, 0, w, h).data, w, h, colors, st.bgMode);
-    });
+    }));
     return mergeBgInfo(infos);
   }
   if (st.bgMode === "gradient") return bgStatsFromColors("gradient", st.gradFrom, st.gradTo);

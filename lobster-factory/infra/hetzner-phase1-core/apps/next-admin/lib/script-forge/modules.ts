@@ -342,7 +342,8 @@ export const FORGE_MODULES: ForgeModule[] = [
           `"textColor":"#rrggbb","accentColor":"#rrggbb","accentHighlight":false,` +
           `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
           bannerBgFields(f.bg) +
-          `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
+          `"aiBgSubject":"英文場景描述：頁面會依此生成背景場景照片供挑選，只寫環境與擺放商品的檯面，不含商品本身、不含任何文字",` +
+          `"aiBgVibe":"英文氛圍（光線、色調）"}\n\n` +
           `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。` + bannerColorPart(f.bg, f.palette, f.brandKit) +
           bannerElementsPart(f, !!bannerSizesPart(f.sizes)) + bannerSizesPart(f.sizes),
       },
