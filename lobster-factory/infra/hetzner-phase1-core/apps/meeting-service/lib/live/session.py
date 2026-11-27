@@ -29,7 +29,8 @@ class Segment:
     """One line of the meeting, in the one format the caption events, the snapshot and the saved
     session.json share. start / end: seconds into the recording (its sample position, not a clock);
     seg: the recording segment it was spoken in; who: "me" | "them"; lang: a lib/live/langs.py code
-    or "" (not known); text: what was said; tr: its translation ("" = none yet)."""
+    or "" (not known); text: what was said; tr: its translation ("" = none yet); guess: the speaker was
+    not heard but taken from the line before (a line too short to tell, lib/live/speakers.py)."""
     id: int
     start: float = 0.0
     end: float = 0.0
@@ -40,6 +41,7 @@ class Segment:
     text: str = ""
     tr: str = ""
     final: bool = False
+    guess: bool = False
 
 
 class Session:
@@ -70,6 +72,8 @@ class Session:
         self.on_translated: list = []
         # on_drop(id) when a line came to nothing, on_clear() when the captions were cleared.
         self.on_drop: list = []
+        # on_label(id, speaker, guess) when a line's speaker was decided (or changed by a regroup or a rename).
+        self.on_label: list = []
         self.on_clear: list = []
         # on_lost(seconds) for audio the speech service never got (it fell behind, or the line was down).
         self.on_lost: list = []
@@ -125,6 +129,15 @@ class Session:
         lines += [m for m in self.my_lines if keep(m.id)]
         lines.sort(key=lambda s: (s.id, s.who == "me"))
         return [("Me: " if s.who == "me" else "Them: ") + s.text for s in lines[max(len(lines) - n, 0):]]
+
+    def label(self, id: int, speaker: str, guess: bool) -> None:
+        """A line's speaker (lib/live/speakers.py); also for lines already scrolled out of memory."""
+        seg = self._find(id)
+        if seg is not None and (seg.speaker, seg.guess) != (speaker, guess):
+            seg.speaker, seg.guess = speaker, guess
+            self._send(seg)
+        for cb in self.on_label:
+            cb(id, speaker, guess)
 
     def lost(self, seconds: float) -> None:
         for cb in self.on_lost:

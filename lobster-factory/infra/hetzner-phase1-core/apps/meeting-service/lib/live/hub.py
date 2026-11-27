@@ -19,6 +19,8 @@ Commands from the page include {"type":"reply","zh":str} (works without listenin
 {"type":"start", "stt", "listen", "target" (lib/live/langs.py codes), ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true;
 "proto":2 with "stt_me" = two channels, `stt` being the 「對方」 one),
 {"type":"segment-next","name":str|null} and {"type":"segment-rename","name":str} (while saving).
+Live speakers (C18, "speakers":true at start): {"type":"speaker-rename","old","name"}, {"type":"voice-save","name"},
+{"type":"voice-delete","id"}; event {"type":"speakers","on":bool,"list":[{name,lines,voice}],"voices":[{id,name}]}.
 Keys never leave the server; they are read through lib/settings.py (settings panel, else environment)."""
 import asyncio
 import functools
@@ -30,7 +32,7 @@ from urllib.parse import urlsplit
 
 from lib import gpu_gate, ownvoice, settings
 
-from . import echo, gloss, idle, langs, script_store, stt_gemini, stt_local
+from . import echo, gloss, idle, langs, script_store, speakers, stt_gemini, stt_local
 from .archive import RATE, Archive, ArchiveError, align_stereo
 from .prompts import parse_glossary, summary_system, system_blocks
 from .session import Session
@@ -58,6 +60,7 @@ NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
 # proto 2: the first byte of every audio frame says which channel it is.
 SOURCES = {0: "me", 1: "them"}
 BUSY_TEXT = "顯卡正在跑會後整理，本機辨識要等它結束"
+NAME_MAX = 40
 
 
 def parse_frame(data: bytes, proto: int):
@@ -119,6 +122,7 @@ class Hub:
         self.stt = ""
         self.last_caption = time.monotonic()
         self.archive = None          # the Archive of the session being saved (until it is closed out)
+        self.tracker = None          # live speakers of the 對方 channel (lib/live/speakers.py), when on
         self.archive_task = None
         self.finalizing = None       # the task closing out the session that just ended
         self.summary = None
@@ -138,6 +142,7 @@ class Hub:
             s.on_drop.append(lambda id: self.archive and self.archive.drop_line(id))
             s.on_clear.append(self.summary.clear)
             s.on_lost.append(self._audio_lost)
+            s.on_label.append(self._line_label)
         return self.session
 
     def _audio_lost(self, seconds: float) -> None:
@@ -150,7 +155,29 @@ class Hub:
     def _line_final(self, line) -> None:
         if self.archive is not None:
             self.archive.line_final(line)
+        if self.tracker is not None:
+            self.tracker.line_final(line)
         self.summary.line_finished(line.id, line.text)
+
+    def _line_label(self, id: int, speaker: str, guess: bool) -> None:
+        if self.archive is not None:
+            self.archive.line_label(id, speaker, guess)
+        self.emit(self._speakers_view())
+
+    def _speakers_view(self) -> dict:
+        names = {}
+        if self.tracker is not None:
+            for name, _ in self.tracker.clusters.labels().values():
+                names[name] = names.get(name, 0) + 1
+            voices = {s["name"]: s["voice"] for s in self.tracker.clusters.speakers.values()}
+        else:
+            voices = {}
+        try:
+            saved = [{"id": v["id"], "name": v["name"]} for v in speakers.Voices().load()]
+        except ValueError:
+            saved = []
+        return {"type": "speakers", "on": self.tracker is not None,
+                "list": [{"name": n, "lines": c, "voice": voices.get(n)} for n, c in names.items()], "voices": saved}
 
     def _line_translated(self, id: int, tr: str, failed: bool) -> None:
         if self.archive is not None:
@@ -258,6 +285,7 @@ class Hub:
             "glossary": s.glossary,
             "segment": self._segment(),
             "summary": {k: v for k, v in self.summary.view().items() if k != "type"},
+            "speakers": {k: v for k, v in self._speakers_view().items() if k != "type"},
         }
 
     async def ask(self, system: str, user: str) -> str:
@@ -275,10 +303,11 @@ class Hub:
 
     async def start(self, owner, stt: str, listen: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN,
                     save: bool = False, summary: bool = False, summary_min: float = DEFAULT_EVERY_MIN,
-                    target: str = langs.MINE, stt_me: str = None) -> None:
+                    target: str = langs.MINE, stt_me: str = None, live_speakers: bool = False) -> None:
         """`save`: keep the recording and transcript in OwnVoice's folder format (archive.py);
         `summary`: the live summary (paid model call every `summary_min` minutes, summary.py). Both off unless asked.
-        `stt_me`: two channels (proto 2), the user's own microphone recognised by `stt_me`, the others by `stt`."""
+        `stt_me`: two channels (proto 2), the user's own microphone recognised by `stt_me`, the others by `stt`.
+        `live_speakers`: tell the others apart while listening (lib/live/speakers.py; free, needs the GPU)."""
         # No await between this check and `self.task = ...`: two pages pressing 聆聽 at once must not
         # both get through (the first task would be orphaned and keep a paid connection open).
         if self.listening:
@@ -294,10 +323,17 @@ class Hub:
         gemini_key = self._refresh_keys()
         if "gemini" in kinds.values() and not gemini_key:
             return self._refuse("還沒填 Gemini 金鑰：到「設定」面板填，或改用「本機（免費）」")
-        # The GPU rule, in one place: any local channel claims it once for the whole listening.
+        # The GPU rule, in one place: any local channel, or live speakers, claims it once for the whole listening.
+        # Speakers alone give way to a batch job holding the GPU (the captions still run).
+        note = ""
+        if live_speakers and not settings.key("hf_token"):
+            live_speakers, note = False, "還沒填 Hugging Face 金鑰（設定面板），這場不即時分講者，字幕照常"
         local = "local" in kinds.values()
-        if local and not gpu_gate.acquire_live():
-            return self._refuse(BUSY_TEXT)
+        gpu = local or live_speakers
+        if gpu and not gpu_gate.acquire_live():
+            if local:
+                return self._refuse(BUSY_TEXT)
+            live_speakers, gpu, note = False, False, "顯卡正在跑會後整理，這場不即時分講者，字幕照常"
         session.listen, session.target = listen, target
         self.archive = self._begin_archive(stt, listen, target, stt_me) if save else None
         if self.archive is not None:
@@ -325,8 +361,17 @@ class Hub:
                 pause = 0
             self.channels[who] = Channel(self, who, i, run, pause)
         session.echo = self._echo if stt_me is not None else None
+        try:
+            self.tracker = speakers.Tracker(session, self.channels["them"].ring, kinds["them"] == "gemini",
+                                            speakers.Voices(), speakers.Embedder(settings.key("hf_token"))) if live_speakers else None
+        except ValueError as e:      # the voices file would land in a forbidden folder
+            self.tracker, note = None, f"{e}，這場不即時分講者"
+        if note:
+            session.status(note)
+        if self.tracker is not None:
+            self.emit(self._speakers_view())
         self.ticker = asyncio.ensure_future(self._tick())
-        self.task = asyncio.ensure_future(self._listen(list(self.channels.values()), end_min, recognizer, local))
+        self.task = asyncio.ensure_future(self._listen(list(self.channels.values()), end_min, recognizer, self.tracker, gpu))
         # This listening's own archive and ticker: by the time the callback runs `self` may hold the next one's.
         self.task.add_done_callback(functools.partial(self._ended, archive=self.archive, archive_task=self.archive_task, ticker=self.ticker))
         self.emit({"type": "listening", "on": True, "stt": stt})
@@ -339,8 +384,9 @@ class Hub:
         a, b = int(start * RATE), int(end * RATE)
         return echo.is_echo(me.ring.slice(a, b), them.ring.slice(a, b))
 
-    async def _listen(self, channels: list, end_min: float, recognizer, gpu: bool) -> None:
-        """Every channel until it ends; then the shared local recognizer finishes and the GPU claim goes."""
+    async def _listen(self, channels: list, end_min: float, recognizer, tracker, gpu: bool) -> None:
+        """Every channel until it ends; then the shared local recognizer finishes, the live speakers are
+        grouped once more (written to the session before it is saved the last time), and the GPU claim goes."""
         try:
             ended = await asyncio.gather(*(c.supervise(idle.minutes(end_min)) for c in channels))
             if any(ended):
@@ -349,6 +395,8 @@ class Hub:
             try:
                 if recognizer is not None:
                     await recognizer.close()
+                if tracker is not None:
+                    await tracker.finish()
             finally:
                 if gpu:
                     gpu_gate.release_live()
@@ -436,7 +484,7 @@ class Hub:
             at, _ = align_stereo(self.positions, ch.index, len(pcm) // 2)
         else:
             at, self.positions[0] = self.positions[0], self.positions[0] + len(pcm) // 2
-        if self.proto == 2:
+        if self.proto == 2 or (self.tracker is not None and ch.who == "them"):
             ch.ring.add(at, pcm)
         if not ch.closed:
             self._put(ch.audio, (at, pcm))   # a channel whose recogniser gave up takes no more (not "lost" audio)
@@ -499,6 +547,37 @@ class Hub:
             return self._session().status(str(e))
         self._segment_changed(info)
 
+    def _speaker_command(self, kind: str, cmd: dict) -> None:
+        """Renames are for this listening (until it is saved the last time); saved voices outlive it."""
+        s, t = self._session(), self.tracker
+        if kind == "voice-delete":
+            try:
+                speakers.delete_voice(speakers.Voices(), t.clusters if t is not None else None, str(cmd.get("id", "")))
+            except (OSError, ValueError) as e:
+                return s.status(f"刪不掉這個聲音：{e}")
+            return self.emit(self._speakers_view())
+        if t is None or not (self.listening or self.finalizing is not None):
+            return s.status("要在開了「即時分講者」的聆聽中（或剛停止、還在存檔時）才能改名或記住聲音")
+        name = clean_text(str(cmd.get("name", ""))).strip()[:NAME_MAX].strip()
+        if not name:
+            return s.status("名字不能是空的")
+        if kind == "speaker-rename":
+            if t.clusters.rename(str(cmd.get("old", "")), name):
+                for line, (who, guess) in t.clusters.labels().items():
+                    if who == name:
+                        s.label(line, who, guess)
+            return self.emit(self._speakers_view())
+        centre = t.clusters.centre_of(name)
+        if centre is None:
+            return s.status(f"「{name}」還沒有足夠的聲音可以記住")
+        try:
+            item = speakers.Voices().save(name, centre)
+        except (OSError, ValueError) as e:
+            return s.status(f"記不住這個聲音：{e}")
+        t.clusters.remember(name, item)
+        s.status(f"記住了「{name}」的聲音（只存聲紋與名字，不存錄音）")
+        self.emit(self._speakers_view())
+
     async def _command(self, ws, text: str) -> None:
         try:
             cmd = json.loads(text)
@@ -511,11 +590,14 @@ class Hub:
                              cmd.get("save") is True, cmd.get("summary") is True,
                              min(max(_minutes(cmd.get("summary_min"), DEFAULT_EVERY_MIN), 1.0), 60.0),
                              str(cmd.get("target", langs.MINE))[:16],
-                             str(cmd.get("stt_me", ""))[:16] if cmd.get("proto") == 2 else None)
+                             str(cmd.get("stt_me", ""))[:16] if cmd.get("proto") == 2 else None,
+                             cmd.get("speakers") is True)
         elif kind == "stop":
             await self.stop()
         elif kind in ("segment-next", "segment-rename"):
             self._segment_command(kind, cmd.get("name"))
+        elif kind in ("speaker-rename", "voice-save", "voice-delete"):
+            self._speaker_command(kind, cmd)
         elif kind == "clear":
             self._session().clear()
         elif kind == "reply":
