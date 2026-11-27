@@ -623,8 +623,8 @@ export function openerPlaceholders(key: string, s: Pick<State, "headline" | "sub
   };
 }
 
-// History signature: excludes transient flags; reduces big image data-URLs to their length
-// (so comparing snapshots never stringifies multi-MB base64).
+// History signature: excludes transient flags; reduces big image data-URLs to imageSig (so comparing snapshots never
+// stringifies multi-MB base64).
 /** C13: nothing about the picture changed yet -- the blank design (the topic / tone typed in 開始 and the sizes picked are
  *  not the picture). Any other change (a background colour, a gradient, words, an image, a template…) shows the preview. */
 export function isUntouched(st: State): boolean {
@@ -668,18 +668,28 @@ export function pushHistory(hist: State[], idx: number, st: State, oneClick = fa
   return { hist: next, idx: next.length - 1 };
 }
 
+/** A picture in the history signature: its length + an FNV-1a hash of 512 evenly spaced characters. Length alone let two
+ *  different pictures of equal length count as one step (a paid picture then never reached history and redo lost it);
+ *  sampling keeps it cheap on multi-MB data-URLs. */
+export function imageSig(v: unknown): string | number {
+  if (typeof v !== "string") return 0;
+  const n = v.length, step = Math.max(1, Math.floor(n / 512));
+  let h = 0x811c9dc5;
+  for (let i = 0; i < n; i += step) { h ^= v.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return `${n}:${h.toString(36)}`;
+}
+
 export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
   const skip = new Set<keyof State>([...IN_FLIGHT, "saved", "error", "copyVariants"]);
   const imgKeys = new Set<keyof State>(["bgImage", "productImage", "productOrig", "aiBgRefImage"]);
-  const imgLen = (v: unknown) => (typeof v === "string" ? v.length : 0);
   // a size's own background (R3-C) sits in sizeOverrides / editingSize.main: reduced the same way
-  const slimSize = <T extends SizePatch>(p: T | undefined) => (p && "bgImage" in p ? { ...p, bgImage: imgLen(p.bgImage) } : p);
+  const slimSize = <T extends SizePatch>(p: T | undefined) => (p && "bgImage" in p ? { ...p, bgImage: imageSig(p.bgImage) } : p);
   const obj: Record<string, unknown> = {};
   for (const k of Object.keys(st) as (keyof State)[]) {
     if (skip.has(k)) continue;
     const v = st[k];
-    obj[k] = imgKeys.has(k) ? imgLen(v)
+    obj[k] = imgKeys.has(k) ? imageSig(v)
       : k === "sizeOverrides" ? Object.fromEntries(Object.entries(st.sizeOverrides).map(([sk, p]) => [sk, slimSize(p)]))
       : k === "editingSize" && st.editingSize ? { ...st.editingSize, main: slimSize(st.editingSize.main) }
       : v;

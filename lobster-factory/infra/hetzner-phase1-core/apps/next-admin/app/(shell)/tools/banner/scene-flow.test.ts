@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { INIT, IN_FLIGHT, restoreSnapshot, toggleSizePick, variantOf, type PresetKey, type State } from "./banner-state";
+import { INIT, IN_FLIGHT, designSig, pushHistory, restoreSnapshot, toggleSizePick, variantOf, type PresetKey, type State } from "./banner-state";
 import { EMPTY_VIEW, imageNtd, otherSizesLabel, otherSizesNtd, otherSizesOf, sceneFlow, type FlowView, type OkCell, type SceneSource } from "./scene-flow";
 
 const PRODUCT = "data:image/png;base64,PPPP", SCENE = "data:image/png;base64,SSSS";
@@ -213,5 +213,16 @@ describe("R4-D Codex 第五輪 復原不解開付費鎖", () => {
     const page = readFileSync(join(__dirname, "BannerStudio.tsx"), "utf8");
     expect(page.match(/setS\(\(prev\) => restoreSnapshot\(snap, prev\)\)/g)).toHaveLength(2);
     expect(page).not.toMatch(/setS\(historyRef\.current\[/);
+  });
+});
+
+describe("R4-D Codex 第六輪 等長的新圖也進復原紀錄", () => {
+  it("two different pictures of the same length are two history steps; the signature still never holds the data", () => {
+    const a = "data:image/png;base64," + "A".repeat(4000) + "xyz", b = "data:image/png;base64," + "A".repeat(2000) + "Q".repeat(16) + "A".repeat(1984) + "xyz"; // real pictures differ throughout
+    expect(a.length).toBe(b.length);
+    const onA: State = { ...design, bgImage: a }, onB: State = { ...design, bgImage: b };
+    expect(designSig(onA)).not.toBe(designSig(onB));
+    expect(pushHistory([onA], 0, onB).idx).toBe(1);
+    expect(designSig(onA)).not.toContain("AAAAAA");
   });
 });
