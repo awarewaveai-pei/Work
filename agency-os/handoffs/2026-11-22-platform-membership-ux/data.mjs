@@ -62,6 +62,7 @@ export const PROGRESS = {
   U24: 'done',
   U26: 'done',
   U18: 'done',
+  W6: 'doing',
 };
 export const COMMITS = {
   K1: 'd2201ecf7',
