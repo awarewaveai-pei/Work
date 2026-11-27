@@ -107,7 +107,7 @@
             if (mine !== round) return;
             say(places.length ? '' : L.none);
             places.forEach(function (p) {
-              var button = el('button', { type: 'button', text: p.label });
+              var button = el('button', { type: 'button', class: 'button wp-element-button', text: p.label });
               button.addEventListener('click', function () {
                 current = p;
                 picked = true;

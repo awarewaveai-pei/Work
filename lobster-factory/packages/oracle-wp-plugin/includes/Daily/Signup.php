@@ -66,6 +66,7 @@ final class Signup {
 			$deps[] = self::TURNSTILE_SCRIPT;
 		}
 		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/daily.js', $deps, AWORACLE_VERSION, true );
+		Renderer::enqueueFormStyle();
 		if ( self::$configured ) {
 			return;
 		}

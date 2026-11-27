@@ -90,7 +90,7 @@ final class Confirm {
 			);
 			$form = '<p>' . esc_html__( 'Press the button to start receiving the daily fortune letter.', 'aware-wave-oracle' ) . '</p>'
 				. '<p>' . esc_html__( 'Birth data and time zone you sent:', 'aware-wave-oracle' ) . ' <strong>' . esc_html( $what ) . '</strong></p>'
-				. '<form method="post" action="' . esc_url( add_query_arg( self::QUERY, $raw, home_url( '/' ) ) ) . '"><p><button type="submit" class="button">'
+				. '<form method="post" action="' . esc_url( add_query_arg( self::QUERY, $raw, home_url( '/' ) ) ) . '"><p><button type="submit" class="button wp-element-button">'
 				. esc_html__( 'Confirm', 'aware-wave-oracle' ) . '</button></p></form>';
 			wp_die( $form, esc_html( $title ), array( 'response' => 200 ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts
 		}

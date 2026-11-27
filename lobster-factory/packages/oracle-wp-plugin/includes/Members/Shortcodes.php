@@ -12,6 +12,7 @@
 namespace AwareWave\Oracle\Members;
 
 use AwareWave\Oracle\Admin\SettingsPage;
+use AwareWave\Oracle\Embed\Renderer;
 use AwareWave\Oracle\Places\Birthplace;
 use AwareWave\Oracle\Settings\Options;
 
@@ -54,6 +55,7 @@ final class Shortcodes {
 
 	private static function enqueue(): void {
 		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/members.js', array( Birthplace::enqueue() ), AWORACLE_VERSION, true );
+		Renderer::enqueueFormStyle();
 		if ( self::$configured ) {
 			return;
 		}

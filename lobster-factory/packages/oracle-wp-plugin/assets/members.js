@@ -106,6 +106,7 @@
           row.appendChild(
             el('button', {
               type: 'button',
+              className: 'button wp-element-button',
               text: L.edit,
               on: function () {
                 state.editing = item;
@@ -118,6 +119,7 @@
         row.appendChild(
           el('button', {
             type: 'button',
+            className: 'button wp-element-button',
             text: L['delete'],
             on: function () {
               if (!window.confirm(L.confirm)) return;
@@ -134,7 +136,7 @@
       box.appendChild(
         el('button', {
           type: 'button',
-          className: 'button',
+          className: 'button wp-element-button',
           text: L.add,
           on: function () {
             state.editing = { id: 0, name: '', birth: null };
@@ -190,11 +192,11 @@
         field(L.trueSolar, c.trueSolar, 'birth.trueSolar'),
         field(L.dayDivide, divide, 'birth.dayDivide'),
         el('p', null, [
-          el('button', { type: 'submit', className: 'button button-primary', text: L.save }),
+          el('button', { type: 'submit', className: 'button wp-element-button', text: L.save }),
           document.createTextNode(' '),
           el('button', {
             type: 'button',
-            className: 'button',
+            className: 'button wp-element-button',
             text: L.cancel,
             on: function () {
               state.editing = null;

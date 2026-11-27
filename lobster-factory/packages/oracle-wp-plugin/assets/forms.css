@@ -1,0 +1,8 @@
+/* The plugin's forms bring no colors or fonts of their own: everything is inherited from the theme. The one
+   thing browsers do not inherit is the color of a ticked radio or checkbox: take the theme's primary color
+   (Kadence palette, else the block theme's preset, else the browser default). */
+.aworacle-daily input,
+.aworacle-members input,
+.aworacle-ff-signup input {
+	accent-color: var(--global-palette1, var(--wp--preset--color--primary, auto));
+}

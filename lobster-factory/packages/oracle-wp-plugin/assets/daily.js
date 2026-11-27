@@ -100,7 +100,7 @@
       trap,
       list,
       msg, // next to the button: a refusal must be seen where it was pressed
-      el('p', null, [el('button', { type: 'submit', className: 'button button-primary', text: L.submit })])
+      el('p', null, [el('button', { type: 'submit', className: 'button wp-element-button', text: L.submit })])
     ]);
 
     var widget = null;

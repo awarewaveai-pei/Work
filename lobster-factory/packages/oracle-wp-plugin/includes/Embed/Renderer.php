@@ -47,6 +47,11 @@ final class Renderer {
 			. '</div>';
 	}
 
+	/** For the plugin's forms: theme-following color of ticked radios and checkboxes (assets/forms.css). */
+	public static function enqueueFormStyle(): void {
+		wp_enqueue_style( 'aworacle-forms', AWORACLE_URL . 'assets/forms.css', array(), AWORACLE_VERSION );
+	}
+
 	public static function locale(): string {
 		$s = Options::get();
 		return LocaleMap::resolve( determine_locale(), $s['locale_map'], $s['default_locale'] );

@@ -3,11 +3,12 @@
  * The signup form as Fluent Forms stores it (element shapes from fluentform 6.2.17
  * app/Services/FormBuilder/DefaultElements.php), built from this code:
  *  - `wp aworacle daily-form` creates it, or updates the one it made before (never a second one), publishes it
- *    and records its id in the setting fluentform_id.
+ *    and records its id in the setting fluentform_id. Fields are rewritten from this code; styling is written
+ *    only on creation (inherit the theme) and kept afterwards.
  *  - When it is shown, its words are replaced with the page's language (the stored ones are the site's).
  *  - Deactivating the plugin unpublishes it and every copy of it, so Fluent Forms never takes (and stores) a
  *    signup on its own.
- * No dropdowns: calendar and gender are button radios; the birthplace is the shared city search, written
+ * No dropdowns: calendar and gender are visible radios; the birthplace is the shared city search, written
  * into hidden fields by assets/ff-daily.js.
  *
  * @package AwareWave\Oracle\Daily
@@ -24,14 +25,65 @@ final class FluentFormsDefinition {
 	const SCRIPT = 'aworacle-ff-daily';
 	/** Form meta on the form this plugin made. */
 	const META = '_aworacle_daily_form';
+	/** Fluent Forms' "Inherit Theme Style" (meta _ff_selected_style): none of its default colors or button styles. */
+	const STYLE = 'ffs_inherit_theme';
+	/** What the operator may restyle on a field; kept when the command rewrites the fields. */
+	const LOOK_SETTINGS = array( 'container_class', 'label_placement', 'layout_class' );
 	/** Ids that deactivation unpublished, to publish again on activation. */
 	const UNPUBLISHED_OPTION = 'aworacle_ff_unpublished';
 
 	public function register(): void {
 		add_filter( 'fluentform/rendering_form', array( self::class, 'rendering' ) );
+		add_filter( 'fluentform/form_class', array( self::class, 'formClass' ), 10, 2 );
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'aworacle daily-form', array( self::class, 'command' ) );
 		}
+	}
+
+	/**
+	 * @param mixed $classes
+	 * @param mixed $form
+	 */
+	public static function formClass( $classes, $form ): string {
+		return (string) $classes . ( FluentFormsEntry::isSignupForm( $form ) ? ' aworacle-ff-signup' : '' );
+	}
+
+	/**
+	 * New fields, old looks: per field the styling settings and CSS class, and the whole submit button.
+	 *
+	 * @param array<string,mixed> $fields from fields()
+	 * @param mixed               $old    the stored form_fields, decoded
+	 * @return array<string,mixed>
+	 */
+	public static function keepLooks( array $fields, $old ): array {
+		if ( ! is_array( $old ) ) {
+			return $fields;
+		}
+		$byName = array();
+		foreach ( (array) ( $old['fields'] ?? array() ) as $field ) {
+			$name = (string) ( $field['attributes']['name'] ?? '' );
+			if ( $name !== '' ) {
+				$byName[ $name ] = $field;
+			}
+		}
+		foreach ( $fields['fields'] as $i => $field ) {
+			$was = $byName[ (string) ( $field['attributes']['name'] ?? '' ) ] ?? null;
+			if ( $was === null ) {
+				continue;
+			}
+			foreach ( self::LOOK_SETTINGS as $key ) {
+				if ( isset( $was['settings'][ $key ] ) ) {
+					$fields['fields'][ $i ]['settings'][ $key ] = $was['settings'][ $key ];
+				}
+			}
+			if ( isset( $was['attributes']['class'] ) ) {
+				$fields['fields'][ $i ]['attributes']['class'] = $was['attributes']['class'];
+			}
+		}
+		if ( ! empty( $old['submitButton'] ) ) {
+			$fields['submitButton'] = $old['submitButton'];
+		}
+		return $fields;
 	}
 
 	/** @return array<string,string> field name => its label in the current language */
@@ -99,7 +151,8 @@ final class FluentFormsDefinition {
 				array(
 					'label'            => $type === 'checkbox' ? '' : $labels[ $name ],
 					'advanced_options' => $options,
-					'layout_class'     => $type === 'radio' ? 'ff_list_buttons' : '',
+					// Not ff_list_buttons: Fluent Forms' always-loaded CSS paints it its own blue whatever the theme.
+					'layout_class'     => $type === 'radio' ? 'ff_list_inline' : '',
 					'validation_rules' => $type === 'radio' ? array( 'required' => self::required() ) : array(),
 				),
 				'inputCheckable'
@@ -154,7 +207,7 @@ final class FluentFormsDefinition {
 			'submitButton' => array(
 				'uniqElKey'      => 'el_aworacle_submit',
 				'element'        => 'button',
-				'attributes'     => array( 'type' => 'submit', 'class' => '' ),
+				'attributes'     => array( 'type' => 'submit', 'class' => 'button wp-element-button' ),
 				'settings'       => array(
 					'align'           => 'left',
 					'button_style'    => 'default',
@@ -225,10 +278,10 @@ final class FluentFormsDefinition {
 		}
 		$form = self::existing();
 		$now  = current_time( 'mysql' );
-		$data = array(
-			'title'       => __( 'Daily fortune by e-mail', 'aware-wave-oracle' ),
+		$fields = $form ? self::keepLooks( self::fields(), json_decode( (string) $form->form_fields, true ) ) : self::fields();
+		$data   = array(
 			'status'      => 'published',
-			'form_fields' => wp_json_encode( self::fields(), JSON_UNESCAPED_UNICODE ),
+			'form_fields' => wp_json_encode( $fields, JSON_UNESCAPED_UNICODE ),
 			'type'        => 'form',
 			'has_payment' => 0,
 			'updated_at'  => $now,
@@ -236,13 +289,25 @@ final class FluentFormsDefinition {
 		if ( $form ) {
 			\FluentForm\App\Models\Form::where( 'id', $form->id )->update( $data );
 			$id = (int) $form->id;
+			$settings = \FluentForm\App\Models\FormMeta::retrieve( 'formSettings', $id );
 		} else {
-			$id = (int) \FluentForm\App\Models\Form::insertGetId( $data + array( 'created_by' => get_current_user_id(), 'created_at' => $now ) );
+			$id = (int) \FluentForm\App\Models\Form::insertGetId(
+				$data + array(
+					'title'      => __( 'Daily fortune by e-mail', 'aware-wave-oracle' ),
+					'created_by' => get_current_user_id(),
+					'created_at' => $now,
+				)
+			);
+			// Looks: written once, then the operator's.
+			\FluentForm\App\Models\FormMeta::persist( $id, '_ff_selected_style', self::STYLE );
+			$settings = null;
 		}
-		$settings                                  = \FluentForm\App\Models\Form::getFormsDefaultSettings( $id );
-		$settings['layout']['labelPlacement']      = 'top';
-		$settings['layout']['errorMessagePlacement'] = 'inline';
-		// Backstop only: nothing is inserted in the first place (FluentFormsEntry).
+		if ( ! is_array( $settings ) ) {
+			$settings                                    = \FluentForm\App\Models\Form::getFormsDefaultSettings( $id );
+			$settings['layout']['labelPlacement']        = 'top';
+			$settings['layout']['errorMessagePlacement'] = 'inline';
+		}
+		// Backstop only, every time: nothing is inserted in the first place (FluentFormsEntry).
 		$settings['delete_entry_on_submission'] = 'yes';
 		\FluentForm\App\Models\FormMeta::persist( $id, 'formSettings', $settings );
 		\FluentForm\App\Models\FormMeta::persist( $id, self::META, '1' );
@@ -299,6 +364,7 @@ final class FluentFormsDefinition {
 	}
 
 	private static function enqueue(): void {
+		Renderer::enqueueFormStyle();
 		$turnstile = Turnstile::siteKey();
 		$deps      = array( 'jquery', Birthplace::enqueue() );
 		if ( $turnstile !== '' ) {
