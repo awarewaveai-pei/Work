@@ -12,7 +12,7 @@ import time
 
 import numpy as np
 
-from lib import gpu_gate, transcribe
+from lib import transcribe
 from lib.live import langs
 from lib.live.vad import END, DISCARD, START, Segmenter
 
@@ -21,7 +21,6 @@ SILENCE_AFTER = 0.25
 TICK = 0.1
 CHUNK_SAMPLES = RATE // 10
 MODEL_NAME = "large-v3"
-BUSY_TEXT = "顯卡正在跑會後整理，本機辨識要等它結束"
 
 _model = None
 _model_lock = threading.Lock()
@@ -90,90 +89,105 @@ class _Positions:
             del self.marks[0]
 
 
-async def _worker(session, usage, jobs, model_provider, language):
-    while True:
-        job = await jobs.get()
-        if job is None:
-            return
-        line, utterance, end = job
+class Recognizer:
+    """The one resident model and its recognition worker, shared by every local channel of a listening
+    (two local channels = one model, one worker; lib/live/hub.py holds the GPU claim for it). The model
+    loads in the background while the channels already cut utterances: those wait in the job queue, so
+    nothing said during the 13-24 s load is lost."""
+
+    def __init__(self, session, usage, model_provider=None):
+        self.session, self.usage = session, usage
+        self.provider = model_provider or default_model
+        self.failed = False
+        self.jobs = asyncio.Queue()
+        self.task = asyncio.ensure_future(self._work())
+
+    def put(self, line: int, utterance, end: float, language) -> None:
+        self.jobs.put_nowait((line, utterance, end, language))
+
+    async def _work(self) -> None:
+        self.session.status("正在載入本機辨識模型（第一次要等一下）…")
         try:
-            text, detected = await asyncio.to_thread(_recognize, model_provider, utterance, language)
-        except asyncio.CancelledError:
-            session.drop(line)
-            raise
+            await asyncio.to_thread(self.provider)
         except Exception as e:
-            msg = f"辨識失敗：{type(e).__name__}: {e}"
-            session.fail(line, msg)
-            session.status(msg)
+            self.failed = True
+            self.session.status(f"本機辨識模型載入失敗：{type(e).__name__}: {e}")
         else:
-            usage.add_audio("local-whisper", len(utterance) / RATE)
-            session.finish(line, text, end, detected)
-
-
-async def run(session, usage, language: str, audio: asyncio.Queue, model_provider=None):
-    if not gpu_gate.acquire_live():
-        session.status(BUSY_TEXT)
-        return
-    worker = jobs = None
-    try:
-        provider = model_provider or default_model
-        # The first use loads a 3 GB model; say so instead of looking deaf. Audio waits in the queue.
-        session.status("正在載入本機辨識模型（第一次要等一下）…")
-        try:
-            await asyncio.to_thread(provider)
-        except Exception as e:
-            session.status(f"本機辨識模型載入失敗：{type(e).__name__}: {e}")
-            return
-        session.status("聆聽中（本機辨識）")
-        lang = (langs.find(language).whisper if langs.find(language) else "") or None
-        jobs = asyncio.Queue()
-        worker = asyncio.ensure_future(_worker(session, usage, jobs, provider, lang))
-        seg = Segmenter(RATE)
-        where = _Positions()
-        current = None
-        last_audio = time.monotonic()
-        silence = bytes(CHUNK_SAMPLES * 2)
+            self.session.status("聆聽中（本機辨識）")
         while True:
+            job = await self.jobs.get()
+            if job is None:
+                return
+            line, utterance, end, language = job
+            if self.failed:
+                self.session.drop(line)
+                continue
             try:
-                item = await asyncio.wait_for(audio.get(), TICK)
-            except asyncio.TimeoutError:
-                # Loopback delivers nothing while nothing plays: feed silence so a sentence can end.
-                if time.monotonic() - last_audio > SILENCE_AFTER and seg.in_speech():
-                    events = seg.push(silence)
-                else:
-                    continue
+                text, detected = await asyncio.to_thread(_recognize, self.provider, utterance, language)
+            except asyncio.CancelledError:
+                self.session.drop(line)
+                raise
+            except Exception as e:
+                msg = f"辨識失敗：{type(e).__name__}: {e}"
+                self.session.fail(line, msg)
+                self.session.status(msg)
             else:
-                if item is None:
-                    break
-                at, pcm = item
-                last_audio = time.monotonic()
-                where.mark(seg.pushed, at)
-                events = seg.push(pcm)
-            for ev in events:
-                if ev.kind == START:
-                    current = session.open(where.seconds(ev.start))
-                elif ev.kind == END:
-                    if current is not None:
-                        jobs.put_nowait((current, ev.audio, where.seconds(ev.end)))
-                        current = None
-                elif ev.kind == DISCARD:
-                    if current is not None:
-                        session.drop(current)
-                        current = None
-            where.forget_before(seg.onset if seg.in_speech() else seg.done)
-        if current is not None:
-            session.drop(current)
-        jobs.put_nowait(None)
-        await worker
-    finally:
-        if worker is not None and not worker.done():
-            worker.cancel()
-        # Sentences cut but not recognized: take their "…" lines off the screen.
-        while jobs is not None and not jobs.empty():
-            job = jobs.get_nowait()
-            if job is not None:
-                session.drop(job[0])
+                self.usage.add_audio("local-whisper", len(utterance) / RATE)
+                self.session.finish(line, text, end, detected)
+
+    async def close(self) -> None:
+        """No more utterances: recognize the queued ones, then drop the resident model (while the GPU
+        claim is free, no live model sits on the GPU)."""
         try:
-            await asyncio.shield(asyncio.to_thread(_unload))
+            self.jobs.put_nowait(None)
+            await self.task
         finally:
-            gpu_gate.release_live()
+            if not self.task.done():
+                self.task.cancel()
+            # Sentences cut but not recognized: take their "…" lines off the screen.
+            while not self.jobs.empty():
+                job = self.jobs.get_nowait()
+                if job is not None:
+                    self.session.drop(job[0])
+            await asyncio.shield(asyncio.to_thread(_unload))
+
+
+async def run(session, recognizer: Recognizer, language: str, audio: asyncio.Queue, who: str = "them"):
+    """One channel: cut its audio into utterances from the first chunk on and hand them to the shared
+    recognizer. Ends at None, or when the model could not be loaded."""
+    lang = (langs.find(language).whisper if langs.find(language) else "") or None
+    seg = Segmenter(RATE)
+    where = _Positions()
+    current = None
+    last_audio = time.monotonic()
+    silence = bytes(CHUNK_SAMPLES * 2)
+    while not recognizer.failed:
+        try:
+            item = await asyncio.wait_for(audio.get(), TICK)
+        except asyncio.TimeoutError:
+            # Loopback delivers nothing while nothing plays: feed silence so a sentence can end.
+            if time.monotonic() - last_audio > SILENCE_AFTER and seg.in_speech():
+                events = seg.push(silence)
+            else:
+                continue
+        else:
+            if item is None:
+                break
+            at, pcm = item
+            last_audio = time.monotonic()
+            where.mark(seg.pushed, at)
+            events = seg.push(pcm)
+        for ev in events:
+            if ev.kind == START:
+                current = session.open(where.seconds(ev.start), who)
+            elif ev.kind == END:
+                if current is not None:
+                    recognizer.put(current, ev.audio, where.seconds(ev.end), lang)
+                    current = None
+            elif ev.kind == DISCARD:
+                if current is not None:
+                    session.drop(current)
+                    current = None
+        where.forget_before(seg.onset if seg.in_speech() else seg.done)
+    if current is not None:
+        session.drop(current)

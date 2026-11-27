@@ -120,20 +120,34 @@ class Options:
     target: str = "zh-TW"
 
 
+def _channels(media_path: str) -> int:
+    """錄音的聲道數：兩路聆聽存成雙聲道（左我、右對方）；讀不出來（上傳的影片等）＝1。"""
+    try:
+        with wave.open(media_path, "rb") as w:
+            return w.getnchannels()
+    except (wave.Error, EOFError, OSError):
+        return 1
+
+
 def _reanchor(result: dict, media_path: str, log) -> None:
-    """Gemini 聆聽逐字稿的句子時間是文字到達的時間：用錄音的發聲區段對回發聲位置（lib/live/vad.reanchor）。"""
+    """Gemini 聆聽逐字稿的句子時間是文字到達的時間：用錄音的發聲區段對回發聲位置（lib/live/vad.reanchor）。
+    只動 arrival 的句子；雙聲道錄音每一路用自己那一聲道（左我、右對方）。"""
     with wave.open(media_path, "rb") as w:
-        if w.getnchannels() != 1 or w.getsampwidth() != 2:
-            log("[對齊] 錄音不是單聲道 16 位元，句子時間維持文字到達的時間")
+        nch = w.getnchannels()
+        if nch > 2 or w.getsampwidth() != 2:
+            log("[對齊] 錄音不是 16 位元單／雙聲道，句子時間維持文字到達的時間")
             return
         rate = w.getframerate()
-        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
-    regions = vad.speech_regions(pcm, rate)
-    segs = result["segments"]
-    for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
-        s["start"], s["end"] = start, end
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").reshape(-1, nch)
+    for who in ("me", "them"):
+        segs = [s for s in result["segments"] if s.get("arrival") and s.get("who", "them") == who]
+        if not segs:
+            continue
+        regions = vad.speech_regions(pcm[:, (0 if who == "me" else 1) if nch == 2 else 0], rate)
+        for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
+            s["start"], s["end"], s["arrival"] = start, end, False
+        log(f"[對齊] {'我' if who == 'me' else '對方'} {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
     result["times"] = postmeeting.SPEECH
-    log(f"[對齊] {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
 
 
 def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = "") -> None:
@@ -212,7 +226,9 @@ def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = 
             write_status(job_dir, stage="diarize", steps=steps)
             try:
                 spans_cache = os.path.join(job_dir, "diarize_spans.json")
-                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log)
+                # 雙聲道（兩路聆聽）只分對方那一聲道；「我」的句子已經標好。
+                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log,
+                                     channel=1 if _channels(media_path) == 2 else None)
                 turns = dr["turns"]
                 product = {"speakers": dr["speakers"], "overlap_sec": dr["overlap_sec"], "source": "pyannote"}
                 postmeeting.write_json(speakers_path, product)

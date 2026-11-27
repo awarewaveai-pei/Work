@@ -17,17 +17,19 @@ DROPPED_MAX_SEC = 5.0
 OPERATOR_LANG = langs.MINE   # 「我的語言」：不翻譯時會議記錄用它寫
 
 
-def segments(lines: list) -> list:
+def segments(lines: list, arrival_from=()) -> list:
     """session.json 的 lines → transcript.json 的 segments。辨識分數聆聽時拿不到，填中性值；
-    翻譯另放 tr（會議記錄輸入用括號附上），不進 text（語速與幻覺偵測只看原文）。"""
+    翻譯另放 tr（會議記錄輸入用括號附上），不進 text（語速與幻覺偵測只看原文）。
+    who＝哪一路（我／對方）；arrival＝這句的時間是文字到達的時間（來自 arrival_from 裡那幾路的 Gemini）。"""
     out = []
     for line in lines:
         text = str(line.get("text") or "").strip()
         if not text:
             continue
         start = float(line.get("start") or 0.0)
+        who = "me" if line.get("who") == "me" else "them"
         seg = {"id": len(out), "start": start, "end": max(float(line.get("end") or 0.0), start), "text": text,
-               "avg_logprob": 0.0, "no_speech_prob": 0.0}
+               "avg_logprob": 0.0, "no_speech_prob": 0.0, "who": who, "arrival": who in arrival_from}
         tr = str(line.get("tr") or "").strip()
         if tr:
             seg["tr"] = tr
@@ -39,13 +41,17 @@ def segments(lines: list) -> list:
 
 def transcript(sidecar: dict, audio_duration_sec) -> dict:
     """transcript.json 的內容。audio_duration_sec＝ownvoice.join_wavs 的回傳值；沒有錄音（None）＝最後一句的結束。"""
-    segs = segments(sidecar.get("lines") or [])
+    # 兩路（C17）：stt＝對方那一路，stt_me＝我那一路。
+    kinds = {"them": sidecar.get("stt"), "me": sidecar.get("stt_me")}
+    segs = segments(sidecar.get("lines") or [], {who for who, kind in kinds.items() if kind == "gemini"})
     if audio_duration_sec is None:
         audio_duration_sec = segs[-1]["end"] if segs else 0.0
-    stt = sidecar.get("stt")
-    return {"media": None, "model": "live", "backend": BACKENDS.get(stt, "聆聽"), "language": str(sidecar.get("listen") or ""),
+    stt = kinds["them"]
+    backend = BACKENDS.get(stt, "聆聽") if kinds["me"] is None else \
+        f"聆聽 我＝{BACKENDS.get(kinds['me'], '?')[3:]}、對方＝{BACKENDS.get(stt, '?')[3:]}"
+    return {"media": None, "model": "live", "backend": backend, "language": str(sidecar.get("listen") or ""),
             "audio_duration_sec": round(float(audio_duration_sec), 2), "transcribe_sec": 0, "realtime_factor": None,
-            "times": ARRIVAL if stt == "gemini" else SPEECH, "segments": segs,
+            "times": ARRIVAL if any(s["arrival"] for s in segs) else SPEECH, "segments": segs,
             "full_text": joined_text(s["text"] for s in segs)}
 
 

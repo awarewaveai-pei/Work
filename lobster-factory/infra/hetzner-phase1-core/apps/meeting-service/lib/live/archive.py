@@ -1,6 +1,7 @@
 # Ported from OwnVoice Meet src-tauri/src/archive.rs and recorder.rs (Apache-2.0, https://github.com/Zaious/ownvoice-meet, 08e3ab3).
 """Saving a listening session in the folder format lib/ownvoice.py reads (and OwnVoice Meet writes):
-  <base>/<YYYY-MM-DD HHMM[-N]>/NN-<segment>.wav  16 kHz mono PCM16, one file per segment
+  <base>/<YYYY-MM-DD HHMM[-N]>/NN-<segment>.wav  16 kHz PCM16, one file per segment: mono, or stereo
+                                                 with two channels (left 我, right 對方, aligned by position)
                                NN-<segment>.md   that segment's transcript
                                transcript.md     the whole session, segment by segment
                                session.json      the same lines for programs (lib/ownvoice.py session_lines)
@@ -21,6 +22,8 @@ import unicodedata
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Callable, Optional
+
+import numpy as np
 
 from lib.ownvoice import SIDECAR
 
@@ -140,35 +143,36 @@ def write_atomic(path: str, text: str) -> None:
 
 # ---- the recording (recorder.rs) ----
 
-def wav_header(rate: int, data_bytes: int) -> bytes:
-    """The canonical 44-byte header for 16-bit mono PCM."""
-    return (b"RIFF" + struct.pack("<I", min(36 + data_bytes, U32_MAX)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, rate, rate * 2, 2, 16)
+def wav_header(rate: int, data_bytes: int, channels: int = 1) -> bytes:
+    """The canonical 44-byte header for 16-bit PCM."""
+    return (b"RIFF" + struct.pack("<I", min(36 + data_bytes, U32_MAX)) + b"WAVEfmt "
+            + struct.pack("<IHHIIHH", 16, 1, channels, rate, rate * 2 * channels, 2 * channels, 16)
             + b"data" + struct.pack("<I", data_bytes))
 
 
 class Wav:
     """A WAV file being written: the 44-byte header holds the sizes, rewritten as the data grows."""
 
-    def __init__(self, path: str, rate: int, clock: Callable[[], float]):
+    def __init__(self, path: str, rate: int, clock: Callable[[], float], channels: int = 1):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         self.out = open(path, "wb")
-        self.out.write(wav_header(rate, 0))
-        self.path, self.rate, self.clock = path, rate, clock
+        self.out.write(wav_header(rate, 0, channels))
+        self.path, self.rate, self.clock, self.frame = path, rate, clock, 2 * channels
         self.opened = self.last_header = clock()
         self.data_bytes = 0
 
     def fill_gap(self, incoming: int) -> int:
         """Silence for a real break in the audio (the page reconnected), leaving room for `incoming`
-        samples about to be written: the file then covers the time since it was opened. Returns the
-        samples of silence written.
+        samples (frames) about to be written: the file then covers the time since it was opened. Returns the
+        samples (frames) of silence written.
         Unlike recorder.rs (0.3 s slack, a local device clock) only a lag of more than GAP_FILL_AFTER
         counts: this audio comes from a browser over a WebSocket and arrives with jitter, which must
         not be stretched into silence in the middle of speech."""
         due = int((self.clock() - self.opened) * self.rate)
-        have = self.data_bytes // 2 + incoming
+        have = self.data_bytes // self.frame + incoming
         if due <= have + int(GAP_FILL_AFTER * self.rate):
             return 0
-        self.write(bytes((due - have) * 2))
+        self.write(bytes((due - have) * self.frame))
         return due - have
 
     def write(self, pcm: bytes) -> None:
@@ -201,7 +205,8 @@ class Archive:
                  now: Callable[[], datetime] = datetime.now, on_problem: Callable[[str], None] = None,
                  on_segment: Callable[[dict], None] = None):
         """Opens the folder and the first recording file; raises ArchiveError (nothing is left behind).
-        `meta` = {listen, target, stt, channels}, written into session.json as is.
+        `meta` = {listen, target, stt, channels[, stt_me]}, written into session.json as is; channels 2 = a
+        stereo recording fed per channel (feed(pcm, 0) 我 = left, feed(pcm, 1) 對方 = right).
         `on_segment(info)` is called when a segment starts by itself (a recording reaching the WAV size limit)."""
         self.meta = dict(meta)
         self.clock, self.on_problem = clock, on_problem or (lambda msg: None)
@@ -222,7 +227,9 @@ class Archive:
         self.lines: list = []
         self.by_id: dict = {}
         self.failed: dict = {}         # id -> the error shown in place of the line's translation
-        self.samples = 0               # the length of the recording so far: where the next chunk starts
+        self.channels = int(meta.get("channels", 1))
+        self.pos = [0] * self.channels         # per channel: where its next chunk starts in the recording
+        self.pending = [bytearray() for _ in range(self.channels)]    # stereo: received, not yet paired
         self.dropped_sec = 0.0         # audio the speech service never got (lib/live/hub.py counts it)
         self.written: dict = {}        # segment index -> the per-segment transcript file written last time
         self.wav: Optional[Wav] = None
@@ -236,7 +243,7 @@ class Archive:
             raise ArchiveError(f"無法建立存檔資料夾 {self.dir}：{e}") from None
         try:
             path = os.path.join(self.dir, f"{stem(1, self.segments[0].name)}.wav")
-            self.wav = Wav(path, RATE, clock)
+            self.wav = Wav(path, RATE, clock, self.channels)
             self.segments[0].wav = path
         except OSError as e:
             shutil.rmtree(self.dir, ignore_errors=True)
@@ -254,21 +261,56 @@ class Archive:
 
     # ---- audio ----
 
-    def feed(self, pcm: bytes) -> int:
-        """One chunk of 16 kHz mono PCM16 from the page (also while the speech service is paused).
-        Returns where it starts in the recording, in samples (counted on after the recording is lost)."""
+    def feed(self, pcm: bytes, ch: int = 0) -> int:
+        """One chunk of 16 kHz mono PCM16 of channel `ch` from the page (also while the speech service is
+        paused). Returns where it starts in the recording, in samples (counted on after the recording is lost)."""
         n = len(pcm) // 2
+        if self.channels == 2:
+            return self._feed_stereo(pcm[: n * 2], ch)
         if self.wav is not None:
             try:
-                self.samples += self.wav.fill_gap(n)
+                self.pos[0] += self.wav.fill_gap(n)
                 if self.wav.data_bytes + n * 2 > WAV_MAX_BYTES:
                     self.on_segment(self.next_segment())
                 if self.wav is not None:
                     self.wav.write(pcm[: n * 2])
             except OSError as e:
                 self._lose_audio(e)
-        at, self.samples = self.samples, self.samples + n
+        at, self.pos[0] = self.pos[0], self.pos[0] + n
         return at
+
+    def _feed_stereo(self, pcm: bytes, ch: int) -> int:
+        """The two channels arrive separately: what both have is written as stereo frames, the rest waits.
+        A channel that sent nothing for GAP_FILL_AFTER while the other did is filled with silence, so they
+        stay aligned (computer sound shared and then stopped, a stalled device)."""
+        at = self.pos[ch]
+        self.pos[ch] += len(pcm) // 2
+        self.pending[ch].extend(pcm)
+        other = 1 - ch
+        ahead = len(self.pending[ch]) - len(self.pending[other])
+        if ahead > GAP_FILL_AFTER * RATE * 2:
+            self.pending[other].extend(bytes(ahead))
+            self.pos[other] += ahead // 2
+        self._write_frames(min(len(p) for p in self.pending) // 2)
+        return at
+
+    def _write_frames(self, k: int) -> None:
+        if not k:
+            return
+        frames = np.empty((k, 2), dtype="<i2")
+        for c, p in enumerate(self.pending):
+            frames[:, c] = np.frombuffer(bytes(p[: k * 2]), dtype="<i2")
+            del p[: k * 2]
+        if self.wav is None:
+            return
+        data = frames.tobytes()
+        try:
+            if self.wav.data_bytes + len(data) > WAV_MAX_BYTES:
+                self.on_segment(self.next_segment())
+            if self.wav is not None:
+                self.wav.write(data)
+        except OSError as e:
+            self._lose_audio(e)
 
     def _lose_audio(self, e: Exception) -> None:
         wav, self.wav = self.wav, None
@@ -284,11 +326,16 @@ class Archive:
 
     def close_audio(self) -> None:
         """No more chunks will come: close the current recording under its segment's name."""
+        if self.channels == 2:
+            longest = max(len(p) for p in self.pending)
+            for p in self.pending:
+                p.extend(bytes(longest - len(p)))
+            self._write_frames(longest // 2)
         if self.wav is None:
             return
         wav, self.wav = self.wav, None
         try:
-            self.samples += wav.fill_gap(0)
+            self.pos[0] += wav.fill_gap(0) if self.channels == 1 else 0
             wav.finish(self._closing_path(len(self.segments) - 1))
         except OSError as e:
             self._problem("wav", f"錄音檔收尾失敗（{e}）")
@@ -312,14 +359,14 @@ class Archive:
             nxt = os.path.join(self.dir, f"{stem(i + 1, name)}.wav")
             wav, self.wav = self.wav, None
             try:
-                self.samples += wav.fill_gap(0)
+                self.pos[0] += wav.fill_gap(0) if self.channels == 1 else 0
                 wav.finish(self._closing_path(i - 1))
             except OSError as e:
                 self._problem("wav", f"錄音檔收尾失敗（{e}）")
-        seg = Segment(name, self.samples / RATE, self.now())
+        seg = Segment(name, max(self.pos) / RATE, self.now())
         if nxt is not None:
             try:
-                self.wav = Wav(nxt, RATE, self.clock)
+                self.wav = Wav(nxt, RATE, self.clock, self.channels)
                 seg.wav = nxt
             except OSError as e:
                 self._problem("wav", f"無法開新的錄音檔（{e}），這場之後不再錄音，逐字稿照常存")

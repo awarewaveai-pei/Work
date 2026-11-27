@@ -31,11 +31,13 @@ def spk_name(n: int) -> str:
     return s
 
 
-def _load_audio(path: str):
+def _load_audio(path: str, channel: int = None):
+    """Mono float audio; channel 0/1 = only that channel of a stereo file (a two-channel live session:
+    1 = 對方), else everything mixed to mono."""
     import av
     import numpy as np
     c = av.open(path)
-    rs = av.AudioResampler(format="s16", layout="mono", rate=SR)
+    rs = av.AudioResampler(format="s16", layout="mono" if channel is None else "stereo", rate=SR)
     out = []
     for frame in c.decode(audio=0):
         for rf in rs.resample(frame):
@@ -43,7 +45,10 @@ def _load_audio(path: str):
     for rf in rs.resample(None):
         out.append(rf.to_ndarray().reshape(-1))
     c.close()
-    return np.concatenate(out).astype(np.float32) / 32768.0
+    pcm = np.concatenate(out)
+    if channel is not None:
+        pcm = pcm.reshape(-1, 2)[:, channel]
+    return pcm.astype(np.float32) / 32768.0
 
 
 def _join(a: str, b: str) -> str:
@@ -66,14 +71,14 @@ def _hf_token() -> str:
     return mod.key("hf_token")
 
 
-def _run_pyannote(media_path: str, log=print):
+def _run_pyannote(media_path: str, log=print, channel: int = None):
     import torch
     hf = _hf_token()
     if not hf:
         raise RuntimeError("還沒填 Hugging Face 金鑰（到「設定」面板填）")
 
     log("[1/4] 載入音檔 ...")
-    wav = _load_audio(media_path)
+    wav = _load_audio(media_path, channel)
     dur = len(wav) / SR
     log(f"      {dur:.1f}s")
 
@@ -130,8 +135,9 @@ def _run_pyannote(media_path: str, log=print):
     }
 
 
-def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=print) -> dict:
-    """執行（或載入快取的）講者分離，並把標籤貼回 segments。
+def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=print, channel: int = None) -> dict:
+    """執行（或載入快取的）講者分離，並把標籤貼回 segments。channel：只分這一聲道（兩路錄音的對方＝1）。
+    已經有講者的 segment（兩路錄音的「我」）保留原標籤。
 
     回傳 {"speakers": [...], "overlap_sec": float, "turns": [...]}。
     segments 會被原地加上 "speaker" / "speaker_inferred" 欄位。
@@ -143,7 +149,7 @@ def diarize(media_path: str, segments: list, spans_cache_path: str = None, log=p
         log(f"[1-3/4] 從快取載入 spans（excl {len(spans['exclusive'])} / full {len(spans['full'])}）")
 
     if spans is None:
-        spans = _run_pyannote(media_path, log)
+        spans = _run_pyannote(media_path, log, channel)
         if spans_cache_path:
             import json
             json.dump(spans, open(spans_cache_path, "w", encoding="utf-8"))
@@ -176,7 +182,11 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
     excl, full = spans["exclusive"], spans["full"]
 
     n_excl = n_full = n_near = n_unk = 0
+    kept = []
     for s in segments:
+        if s.get("speaker") and "speaker_inferred" not in s and s["speaker"] not in spans["speakers"]:
+            kept.append(s["speaker"])        # labelled by its source (the 「我」 channel): not pyannote's to change
+            continue
         s.pop("speaker_inferred", None)
         bl = _match(s, excl)
         if bl:
@@ -196,7 +206,7 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
     short = sum(1 for t in out if t["end"] - t["start"] < 1.5)
     log(f"      {len(out)} 輪次 / 極短(<1.5s) {short} ({short/max(len(out),1)*100:.1f}%)")
 
-    return {"speakers": spans["speakers"], "overlap_sec": spans["overlap_sec"], "turns": out}
+    return {"speakers": spans["speakers"] + sorted(set(kept)), "overlap_sec": spans["overlap_sec"], "turns": out}
 
 
 def turns(segments: list) -> list:

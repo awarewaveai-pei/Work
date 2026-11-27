@@ -56,9 +56,10 @@ class Live:
     pauses would grow one line for minutes. The turn is cut into sentences as they settle
     (sentences.py), so each sentence gets its own line, translation and transcript entry."""
 
-    def __init__(self, session, clock=time.monotonic):
+    def __init__(self, session, clock=time.monotonic, who: str = "them"):
         self.session = session
         self.clock = clock
+        self.who = who   # the channel whose lines these are (lib/live/session.py Segment.who)
         self.current = None
         self.spacing = Respace()
         self.tracker = Tracker()
@@ -115,10 +116,10 @@ class Live:
         for kind, text in events:
             if kind == INTERIM:
                 if self.current is None:
-                    self.current = self.session.open(self._now())
+                    self.current = self.session.open(self._now(), self.who)
                 self.session.interim(self.current, text)
             elif kind == FINAL:
-                line = self.current if self.current is not None else self.session.open(self._now())
+                line = self.current if self.current is not None else self.session.open(self._now(), self.who)
                 self.current = None
                 self.session.finish(line, text, self._now())
             elif kind == DROP and self.current is not None:
@@ -299,9 +300,9 @@ def _drain(audio: asyncio.Queue, session) -> bool:
             session.lost(samples / RATE)
 
 
-async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
-    """Run until `audio` yields None (listening stopped), reconnecting as needed."""
-    live = Live(session)
+async def run(session, usage, key: str, language: str, audio: asyncio.Queue, who: str = "them"):
+    """Run until `audio` yields None (listening stopped), reconnecting as needed. `who`: the channel."""
+    live = Live(session, who=who)
     backoff = 1
     while True:
         try:

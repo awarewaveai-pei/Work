@@ -276,7 +276,8 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
                   mock.patch.object(arc, "MIN_FREE_BYTES", 0),
                   mock.patch.object(hub_mod.script_store, "load", lambda: {"script": "", "glossary": ""}),
                   mock.patch.object(hub_mod.settings, "get_api_key", lambda: ""),
-                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt)):
+                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt),
+                  mock.patch.object(hub_mod.stt_local, "Recognizer", self.NoModel)):
             p.start()
             self.addCleanup(p.stop)
         self.hub = hub_mod.Hub(Usage(os.path.join(self._tmp.name, "usage.json")))
@@ -289,8 +290,18 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
         async def __call__(self, system, user, on_delta, stop, early, target="zh-TW"):
             return "譯文"
 
+    class NoModel:
+        """The shared local recognizer without a model (the fake run never hands it an utterance)."""
+        failed = False
+
+        def __init__(self, session, usage):
+            pass
+
+        async def close(self):
+            pass
+
     @staticmethod
-    async def idle_stt(session, usage, language, audio):
+    async def idle_stt(session, recognizer, language, audio, who="them"):
         while await audio.get() is not None:
             pass
 

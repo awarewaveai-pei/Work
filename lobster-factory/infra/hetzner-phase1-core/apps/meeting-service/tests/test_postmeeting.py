@@ -39,7 +39,7 @@ class Fakes:
         return {"segments": [{"id": 0, "start": 0.0, "end": 1.0, "text": "你好", "avg_logprob": -0.2, "no_speech_prob": 0.0}],
                 "audio_duration_sec": 1.0, "realtime_factor": 2.0, "backend": "cpu", "language": "zh", "model": "large-v3"}
 
-    def diarize(self, media_path, segments, spans_cache_path=None, log=print):
+    def diarize(self, media_path, segments, spans_cache_path=None, log=print, channel=None):
         self.diarized += 1
         for s in segments:
             s["speaker"] = "A"
