@@ -52,7 +52,7 @@
 | 認證 | 無 | 至少要有簡單 token-based 認證（每個客戶一組上傳 token），**不可裸奔** |
 | 併發 | 單一背景 thread，若同時兩人上傳會搶同一張 GPU 卡，記憶體可能爆 | 改成真正的 job 佇列（單一 worker process 依序處理，不是每個上傳各開一個 thread） |
 | 儲存 | `jobs/<job_id>/` 永久留在本機磁碟，無清理機制 | 加保留期限（例如完成後 N 天自動刪除音檔+逐字稿），因為現在音檔在別人的伺服器上，長期留著是額外的資料外洩風險面 |
-| API key | `lib/settings.py` 單一全域 key，存 `.settings.json` | 若多客戶共用一台伺服器，key 要嘛每客戶自己填（沿用現有設計，`GET/POST /api/settings` 加 tenant 維度）、要嘛操作者統一用一把 key 但要有用量上限（避免某個客戶把你的額度用爆） |
+| API key | `lib/settings.py` 單一全域 key，存 `.settings.json` | 若多客戶共用一台伺服器，key 要嘛每客戶自己填（沿用現有設計，`GET/PUT /api/settings` 加 tenant 維度）、要嘛操作者統一用一把 key 但要有用量上限（避免某個客戶把你的額度用爆） |
 | Google Drive 同步 | `MEETING_DRIVE_BASE` 單一路徑（`lib/archive.py`） | 多租戶情境下要嘛關掉這功能、要嘛每租戶自己的目的地路徑，不能繼續寫死單一路徑 |
 | `lib/` 底下的核心邏輯 | — | **幾乎不用動**——`transcribe.py`/`diarize.py`/`summarize.py`/`deck.py`/`excel.py`/`speaker_notes.py`/`word.py` 是純函式庫，跟本機/網路無關，原封不動搬過去（README 已預留這個假設，見 `README.md:16`） |
 
