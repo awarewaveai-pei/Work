@@ -86,6 +86,9 @@
   .cap-list .text { color: var(--ink); }
   .cap-list .interim .text { color: var(--muted); }
   .cap-list .tr { color: var(--accent-hover); min-height: 1em; }
+  .cap-list .who { font-size: 0.7em; font-weight: 600; color: var(--muted); }
+  .cap-list .seg.me .who, .cap-list .seg.me .text { color: var(--green); }
+  .cap-stt-me[hidden], .cap-stt-who[hidden] { display: none; }
   .cap-list.tr-only .text { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
@@ -217,9 +220,15 @@ window.Workspace = (function () {
         <button type="button" class="tbtn" data-src="mic" aria-pressed="true">麥克風</button>
         <button type="button" class="tbtn" data-src="tab" aria-pressed="false">電腦聲音</button>
       </span>
-      <span class="cap-group" title="誰來聽寫">
+      <span class="cap-group" title="誰來聽寫（兩個都開時：電腦聲音＝對方）">
+        <span class="cap-lbl cap-stt-who" hidden>對方</span>
         <button type="button" class="tbtn" data-stt="gemini" aria-pressed="true">Gemini（計費）</button>
         <button type="button" class="tbtn" data-stt="local" aria-pressed="false">本機（免費）</button>
+      </span>
+      <span class="cap-group cap-stt-me" title="麥克風＝我，誰來聽寫（兩個都開才有）" hidden>
+        <span class="cap-lbl">我</span>
+        <button type="button" class="tbtn" data-stt-me="gemini" aria-pressed="false">Gemini（計費）</button>
+        <button type="button" class="tbtn" data-stt-me="local" aria-pressed="true">本機（免費）</button>
       </span>
       <button type="button" class="tbtn" data-act="save" aria-pressed="true" title="把錄音和逐字稿存到「文件 › OwnVoice Meet」，停止後在「會後整理」面板直接整理（不用重新辨識）。聆聽中不能改">存檔</button>
       <span class="cap-seg" hidden>
@@ -254,10 +263,11 @@ window.Workspace = (function () {
 (function () {
   const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
   const EMPTY = "按「聆聽」開始。對方說的話會出現在這裡，翻譯跟在下面。";
-  // mic／tab／trOnly 只存在這個瀏覽器；其餘是伺服器設定（兩頁共用，見 templates/_settings.html）。
+  // mic／tab／trOnly／sttMe 只存在這個瀏覽器；其餘是伺服器設定（兩頁共用，見 templates/_settings.html）。
+  // 麥克風和電腦聲音都開＝兩路（我／對方）各自辨識，預設我＝本機（免費）、對方＝stt（操作者 2026-11-25 的省錢組合）。
   const store = window.Settings.prefs("ws-captions",
     { stt: "stt", pauseMin: "pause_min", endMin: "end_min", size: "caption_size", save: "save", listen: "listen", target: "target" },
-    { mic: true, tab: false, stt: "gemini", trOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true, listen: "en-US", target: "zh-TW" }, () => paintBar());
+    { mic: true, tab: false, stt: "gemini", sttMe: "local", trOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true, listen: "en-US", target: "zh-TW" }, () => paintBar());
   store.rename("zhOnly", "trOnly");      // 「只看中文」改成「只看翻譯」之前存的鍵
   const prefs = store.values;
   // segment：伺服器正在存的段落（index 0 = 沒在存）；dividers：新段落的分隔線，after = 開新段時最後一句字幕的代號
@@ -287,9 +297,10 @@ window.Workspace = (function () {
       if (!ev.listening) stopAudio();
       paintAll();
     } else if (ev.type === "caption") {
+      const first = ev.who === "me" && ![...state.segs.values()].some(x => x.who === "me");
       state.segs.set(ev.id, ev);
       if (state.segs.size > MAX_ROWS) state.segs.delete(state.segs.keys().next().value);
-      paintRow(ev);
+      if (first) paintAll(); else paintRow(ev);      // the first 「我」 line: label every row
     } else if (ev.type === "caption-remove") {
       state.segs.delete(ev.id);
       const row = root && root.querySelector('[data-seg="' + ev.id + '"]');
@@ -333,29 +344,45 @@ window.Workspace = (function () {
         s.getVideoTracks().forEach(t => { t.enabled = false; });
       }
       if (prefs.mic) {
-        streams.push(await navigator.mediaDevices.getUserMedia({
+        streams.mic = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        }));
+        });
+        streams.push(streams.mic);
       }
       const ctx = new AudioContext({ sampleRate: RATE });
       await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" })));
-      const node = new AudioWorkletNode(ctx, "pcm");
-      streams.forEach(s => ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(node));
-      const buf = new Int16Array(CHUNK);
-      let n = 0, sum = 0;
-      node.port.onmessage = e => {
-        for (const v of e.data) {
-          const x = Math.max(-1, Math.min(1, v));
-          buf[n++] = x * 32767;
-          sum += x * x;
-          if (n === CHUNK) {
-            live.sendBinary(buf.slice().buffer);
-            state.level = sum / CHUNK;
-            paintLevel();
-            n = 0; sum = 0;
+      // 一個來源＝和以前一樣，整包就是聲音。兩個來源＝各一個 worklet、不混音，每包第 1 byte 是來源
+      // （0 我＝麥克風、1 對方＝電腦聲音，lib/live/hub.py parse_frame）。
+      const two = streams.length === 2;
+      const levels = [0, 0];
+      streams.forEach((s, i) => {
+        const node = new AudioWorkletNode(ctx, "pcm");
+        ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(node);
+        const source = s === streams.mic ? 0 : 1;
+        const buf = new Int16Array(CHUNK);
+        let n = 0, sum = 0;
+        node.port.onmessage = e => {
+          for (const v of e.data) {
+            const x = Math.max(-1, Math.min(1, v));
+            buf[n++] = x * 32767;
+            sum += x * x;
+            if (n === CHUNK) {
+              if (two) {
+                const out = new Uint8Array(1 + CHUNK * 2);
+                out[0] = source;
+                out.set(new Uint8Array(buf.buffer), 1);
+                live.sendBinary(out.buffer);
+              } else {
+                live.sendBinary(buf.slice().buffer);
+              }
+              levels[i] = sum / CHUNK;
+              state.level = Math.max(...levels);
+              paintLevel();
+              n = 0; sum = 0;
+            }
           }
-        }
-      };
+        };
+      });
       audio = { ctx, streams };
       // 使用者在瀏覽器的分享列按了「停止分享」：整個停止。
       streams.forEach(s => s.getTracks().forEach(t => t.addEventListener("ended", () => { if (audio) listen(false); })));
@@ -384,6 +411,7 @@ window.Workspace = (function () {
     if (!live.ready()) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
     if (await startAudio()) {
       send(Object.assign({ type: "start", stt: prefs.stt, listen: prefs.listen, target: prefs.target, pause_min: prefs.pauseMin, end_min: prefs.endMin, save: prefs.save },
+        prefs.mic && prefs.tab ? { proto: 2, stt_me: prefs.sttMe } : {},
         ...window.Workspace.startExtras.map(f => f())));
     }
   }
@@ -442,14 +470,17 @@ window.Workspace = (function () {
     if (!row) {
       row = document.createElement("div");
       row.dataset.seg = seg.id;
+      const who = document.createElement("div"); who.className = "who";
       const text = document.createElement("div"); text.className = "text";
       const tr = document.createElement("div"); tr.className = "tr";
-      row.append(text, tr);
+      row.append(who, text, tr);
       el.append(row);
       while (el.querySelectorAll("[data-seg]").length > MAX_ROWS) el.querySelector("[data-seg]").remove();
     }
-    row.className = "seg" + (seg.final ? "" : " interim");
-    row.querySelector(".text").textContent = seg.text;
+    row.className = "seg" + (seg.final ? "" : " interim") + (seg.who === "me" ? " me" : "");
+    // 「我／對方」只在兩路的時候標（看到過「我」的句子就是兩路）；一路時和以前一樣不標。
+    const two = [...state.segs.values()].some(x => x.who === "me");
+    row.querySelector(".who").textContent = two ? (seg.who === "me" ? "我" : "對方") : "";
     row.querySelector(".tr").textContent = seg.tr || (seg.final ? "…" : "");
     settle();
   }
@@ -484,6 +515,8 @@ window.Workspace = (function () {
     b.textContent = state.listening ? "■ 停止" : "▶ 聆聽";
     root.querySelectorAll("[data-src]").forEach(x => { x.setAttribute("aria-pressed", String(prefs[x.dataset.src])); x.disabled = state.listening; });
     root.querySelectorAll("[data-stt]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.stt === x.dataset.stt)); x.disabled = state.listening; });
+    root.querySelectorAll("[data-stt-me]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.sttMe === x.dataset.sttMe)); x.disabled = state.listening; });
+    root.querySelector(".cap-stt-me").hidden = root.querySelector(".cap-stt-who").hidden = !(prefs.mic && prefs.tab);
     root.querySelector('[data-act="tr-only"]').setAttribute("aria-pressed", String(prefs.trOnly));
     paintLangs();
     root.querySelectorAll("[data-idle]").forEach(x => { if (document.activeElement !== x) x.value = prefs[x.dataset.idle]; x.disabled = state.listening; });
@@ -529,6 +562,7 @@ window.Workspace = (function () {
       if (!b || b.disabled) return;
       if (b.dataset.src) setPref(b.dataset.src, !prefs[b.dataset.src]);
       else if (b.dataset.stt) setPref("stt", b.dataset.stt);
+      else if (b.dataset.sttMe) setPref("sttMe", b.dataset.sttMe);
       else if (b.dataset.act === "listen") return void listen(!state.listening);
       else if (b.dataset.act === "tr-only") setPref("trOnly", !prefs.trOnly);
       else if (b.dataset.act === "smaller") setPref("size", Math.max(12, prefs.size - 2));
