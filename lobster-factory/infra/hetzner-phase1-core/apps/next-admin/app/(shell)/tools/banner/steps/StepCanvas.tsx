@@ -236,7 +236,100 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
 
   return (
     <StepCard title={slot.title} step={slot.no} icon="🎆" summary={`${BG_MODE_LABEL[s.bgMode]}${s.productImage ? " · 產品圖" : ""}`}>
-      <SubHead first={true}>背景</SubHead>
+      <SubHead first={true}>產品圖</SubHead>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+        <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
+            {s.productImage ? "換圖" : "上傳產品圖"}
+          </button>
+          {s.productOrig && (
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
+              {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : `一鍵去背（${ntdLabel(removeBgNtd())}）`}
+            </button>
+          )}
+          {s.productImage && canvasHref && (
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} data-testid="banner-product-canvas"
+              onClick={() => void openInCanvas(s.productImage!, `banner-${s.preset}-商品圖`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "product", label: "Banner 商品圖" })}>
+              ✏️ 在畫布編輯
+            </button>
+          )}
+          {s.productImage && (
+            <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--badge-red-text)" }}
+              onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
+              移除
+            </button>
+          )}
+        </div>
+        {s.productImage && (
+          <>
+            <div className="form-row">
+              <label className="form-label">位置</label>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {(["center", "left", "right", "bottom-right"] as ProductPos[]).map((pos) => (
+                  <button key={pos}
+                    className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                    style={{ fontSize: 11, padding: "3px 8px" }}
+                    data-testid={`banner-product-pos-${pos}`}
+                    onClick={() => setS((prev) => ({ ...applyLayout(prev, { productPos: pos }), saved: false, error: null }))}>
+                    {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="form-label">大小</label>
+              <input type="range" {...FIELD_RANGES.productScale} value={s.productScale}
+                onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
+                {Math.round(s.productScale * 100)}%
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+      {s.productImage && (() => {
+        const g = s.grounding;
+        const setG = <K extends keyof GroundingOpts>(k: K, v: NonNullable<GroundingOpts[K]>) => set("grounding", { ...g, [k]: v });
+        const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, unit = "%", id = "") => (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ minWidth: 48 }}>{label}</span>
+            <input type="range" min={min} max={max} step={step} value={value} data-testid={id || undefined}
+              onChange={(e) => on(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+            <span style={{ opacity: 0.7, minWidth: 40, textAlign: "right" }}>{unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`}</span>
+          </label>
+        );
+        const sh = g.shadow ?? { enabled: false }, rf = g.reflection ?? { enabled: false }, tn = g.tone ?? { enabled: false };
+        return (
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>商品擬真</div>
+            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="checkbox" checked={!!sh.enabled} data-testid="banner-ground-shadow" onChange={(e) => setG("shadow", { ...sh, enabled: e.target.checked })} />
+              接觸陰影（商品放在桌面上的影子）
+            </label>
+            {sh.enabled && (<>
+              {slider("濃度", sh.opacity ?? 0.5, 0, 1, 0.05, (v) => setG("shadow", { ...sh, opacity: v }))}
+              {slider("柔和", sh.softness ?? 0.35, 0, 1, 0.05, (v) => setG("shadow", { ...sh, softness: v }))}
+              {slider("下移", sh.distance ?? 0, -40, 80, 1, (v) => setG("shadow", { ...sh, distance: v }), "px")}
+            </>)}
+            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="checkbox" checked={!!rf.enabled} data-testid="banner-ground-reflection" onChange={(e) => setG("reflection", { ...rf, enabled: e.target.checked })} />
+              倒影（光滑桌面）
+            </label>
+            {rf.enabled && (<>
+              {slider("長度", rf.height ?? 0.35, 0, 1, 0.05, (v) => setG("reflection", { ...rf, height: v }))}
+              {slider("濃度", rf.fade ?? 0.3, 0, 1, 0.05, (v) => setG("reflection", { ...rf, fade: v }))}
+              {slider("間距", rf.gap ?? 0, 0, 60, 1, (v) => setG("reflection", { ...rf, gap: v }), "px")}
+            </>)}
+            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="checkbox" checked={!!tn.enabled} data-testid="banner-ground-tone" onChange={(e) => setG("tone", { ...tn, enabled: e.target.checked })} />
+              色調匹配（商品顏色往背景靠一點，最多 ±12%）
+            </label>
+            {tn.enabled && slider("強度", tn.strength ?? 0.4, 0, 1, 0.05, (v) => setG("tone", { ...tn, strength: v }))}
+          </div>
+        );
+      })()}
+      <SubHead first={false}>背景</SubHead>
       <div className="form-row" style={{ marginTop: 4 }}>
         <label className="form-label">類型</label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -542,99 +635,6 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
           ))}
         </div>
       )}
-      <SubHead first={false}>產品圖</SubHead>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-        <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
-            {s.productImage ? "換圖" : "上傳產品圖"}
-          </button>
-          {s.productOrig && (
-            <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
-              {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : `一鍵去背（${ntdLabel(removeBgNtd())}）`}
-            </button>
-          )}
-          {s.productImage && canvasHref && (
-            <button className="btn btn-ghost" style={{ fontSize: 12 }} data-testid="banner-product-canvas"
-              onClick={() => void openInCanvas(s.productImage!, `banner-${s.preset}-商品圖`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "product", label: "Banner 商品圖" })}>
-              ✏️ 在畫布編輯
-            </button>
-          )}
-          {s.productImage && (
-            <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--badge-red-text)" }}
-              onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
-              移除
-            </button>
-          )}
-        </div>
-        {s.productImage && (
-          <>
-            <div className="form-row">
-              <label className="form-label">位置</label>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                {(["center", "left", "right", "bottom-right"] as ProductPos[]).map((pos) => (
-                  <button key={pos}
-                    className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
-                    style={{ fontSize: 11, padding: "3px 8px" }}
-                    data-testid={`banner-product-pos-${pos}`}
-                    onClick={() => setS((prev) => ({ ...applyLayout(prev, { productPos: pos }), saved: false, error: null }))}>
-                    {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="form-row">
-              <label className="form-label">大小</label>
-              <input type="range" {...FIELD_RANGES.productScale} value={s.productScale}
-                onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
-                {Math.round(s.productScale * 100)}%
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-      {s.productImage && (() => {
-        const g = s.grounding;
-        const setG = <K extends keyof GroundingOpts>(k: K, v: NonNullable<GroundingOpts[K]>) => set("grounding", { ...g, [k]: v });
-        const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, unit = "%", id = "") => (
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ minWidth: 48 }}>{label}</span>
-            <input type="range" min={min} max={max} step={step} value={value} data-testid={id || undefined}
-              onChange={(e) => on(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-            <span style={{ opacity: 0.7, minWidth: 40, textAlign: "right" }}>{unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`}</span>
-          </label>
-        );
-        const sh = g.shadow ?? { enabled: false }, rf = g.reflection ?? { enabled: false }, tn = g.tone ?? { enabled: false };
-        return (
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>商品擬真</div>
-            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={!!sh.enabled} data-testid="banner-ground-shadow" onChange={(e) => setG("shadow", { ...sh, enabled: e.target.checked })} />
-              接觸陰影（商品放在桌面上的影子）
-            </label>
-            {sh.enabled && (<>
-              {slider("濃度", sh.opacity ?? 0.5, 0, 1, 0.05, (v) => setG("shadow", { ...sh, opacity: v }))}
-              {slider("柔和", sh.softness ?? 0.35, 0, 1, 0.05, (v) => setG("shadow", { ...sh, softness: v }))}
-              {slider("下移", sh.distance ?? 0, -40, 80, 1, (v) => setG("shadow", { ...sh, distance: v }), "px")}
-            </>)}
-            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={!!rf.enabled} data-testid="banner-ground-reflection" onChange={(e) => setG("reflection", { ...rf, enabled: e.target.checked })} />
-              倒影（光滑桌面）
-            </label>
-            {rf.enabled && (<>
-              {slider("長度", rf.height ?? 0.35, 0, 1, 0.05, (v) => setG("reflection", { ...rf, height: v }))}
-              {slider("濃度", rf.fade ?? 0.3, 0, 1, 0.05, (v) => setG("reflection", { ...rf, fade: v }))}
-              {slider("間距", rf.gap ?? 0, 0, 60, 1, (v) => setG("reflection", { ...rf, gap: v }), "px")}
-            </>)}
-            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={!!tn.enabled} data-testid="banner-ground-tone" onChange={(e) => setG("tone", { ...tn, enabled: e.target.checked })} />
-              色調匹配（商品顏色往背景靠一點，最多 ±12%）
-            </label>
-            {tn.enabled && slider("強度", tn.strength ?? 0.4, 0, 1, 0.05, (v) => setG("tone", { ...tn, strength: v }))}
-          </div>
-        );
-      })()}
     </StepCard>
   );
 }
