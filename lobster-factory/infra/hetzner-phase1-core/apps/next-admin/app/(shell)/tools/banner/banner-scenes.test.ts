@@ -9,18 +9,19 @@ import {
 } from "./banner-state";
 
 const A = "data:image/png;base64,AAAA", B = "data:image/png;base64,BBBBBB", C = "data:image/png;base64,CCCCCCCC";
+const pic = (image: string) => ({ image, area: null });
 const base: State = { ...INIT, preset: "r4x5", multiSizes: ["r9x16", "r16x9"], bgMode: "ai", bgImage: A };
 
 describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   it("a size without its own picture uses the main size's; one with its own keeps it", () => {
-    const st = withSizeBackgrounds(base, { r9x16: B }, true);
+    const st = withSizeBackgrounds(base, { r9x16: pic(B) });
     expect(variantOf(st, "r9x16")).toMatchObject({ bgImage: B, bgImageHasProduct: true });
     expect(variantOf(st, "r16x9")).toMatchObject({ bgImage: A, bgImageHasProduct: false });
     expect(st).toMatchObject({ bgImage: A, bgMode: "ai" });
   });
 
   it("composite per size: the main size's picture is the main design's, each other size holds its own", () => {
-    const st = withSizeBackgrounds(base, { r4x5: C, r9x16: B, r16x9: A }, true);
+    const st = withSizeBackgrounds(base, { r4x5: pic(C), r9x16: pic(B), r16x9: pic(A) });
     expect(st).toMatchObject({ bgImage: C, bgImageHasProduct: true });
     expect(st.sizeOverrides.r4x5).toBeUndefined();
     expect(variantOf(st, "r9x16").bgImage).toBe(B);
@@ -28,7 +29,7 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   });
 
   it("a shared background (upload / scene picked) replaces every size's own picture and placement", () => {
-    const own = withSizeBackgrounds(base, { r9x16: B }, true);
+    const own = withSizeBackgrounds(base, { r9x16: pic(B) });
     const moved: State = { ...own, sizeOverrides: { ...own.sizeOverrides, r9x16: { ...own.sizeOverrides.r9x16, bgImgX: 0.2, headlineSize: 90 } } };
     const st = withSharedBackground(moved, { bgImage: C, bgMode: "ai", bgImageHasProduct: false });
     for (const k of ["r4x5", "r9x16", "r16x9"] as const) expect(variantOf(st, k)).toMatchObject({ bgImage: C, bgImageHasProduct: false, bgImgX: 0 });
@@ -37,7 +38,7 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
 
   it("while a size is tweaked, a new picture lands in its override and the size stays open", () => {
     const editing = enterSize(base, "r9x16");
-    const st = withSizeBackgrounds(editing, { r9x16: B }, true);
+    const st = withSizeBackgrounds(editing, { r9x16: pic(B) });
     expect(st.editingSize?.key).toBe("r9x16");
     expect(st.bgImage).toBe(B);                           // the live state is that size
     expect(leaveSize(st).sizeOverrides.r9x16?.bgImage).toBe(B);
@@ -45,7 +46,7 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   });
 
   it("history signature counts a size's picture by length, never its data", () => {
-    const sig = designSig(withSizeBackgrounds(base, { r9x16: B }, true));
+    const sig = designSig(withSizeBackgrounds(base, { r9x16: pic(B) }));
     expect(sig).not.toContain("BBBBBB");
     expect(sig).not.toContain(B);
   });
@@ -53,10 +54,11 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
 
 describe("(F1) 選候選圖：只有含目前這張商品圖才算商品已烤進", () => {
   it("baked only when drawn with the current product picture; else a plain scene with the product drawn over it", () => {
-    expect(sceneBackground(A, "P1", "P1")).toEqual({ bgImage: A, bgMode: "ai", bgImageHasProduct: true });
-    expect(sceneBackground(A, "P1", "P2").bgImageHasProduct).toBe(false);   // product replaced since
-    expect(sceneBackground(A, "P1", null).bgImageHasProduct).toBe(false);   // product removed since
-    expect(sceneBackground(A, null, "P2").bgImageHasProduct).toBe(false);   // drawn as a plain scene, product added since
+    const area = { x0: 0.6, y0: 0.3, x1: 0.9, y1: 0.8 };
+    expect(sceneBackground(A, "P1", "P1", area)).toEqual({ bgImage: A, bgMode: "ai", bgImageHasProduct: true, bgProductArea: area });
+    expect(sceneBackground(A, "P1", "P2", area)).toMatchObject({ bgImageHasProduct: false, bgProductArea: null }); // product replaced since
+    expect(sceneBackground(A, "P1", null, area).bgImageHasProduct).toBe(false);   // product removed since
+    expect(sceneBackground(A, null, "P2", null).bgImageHasProduct).toBe(false);   // drawn as a plain scene, product added since
   });
 });
 

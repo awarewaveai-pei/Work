@@ -4,7 +4,7 @@ import { useState, type MutableRefObject } from "react";
 import {
   BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, DEFAULT_SCENE_COUNT, SCENE_COUNTS, aiFormatError, askJsonWithRetry,
   bannerCallNtd, compositePrompt, copyWords, designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, scenePrompt, showsCopy,
-  type BannerAiModel, type DesignCopy, type SizeSpec,
+  type BannerAiModel, type DesignCopy, type PicArea, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
 import { guardLane, sameDrawInputs } from "../contrast-run";
@@ -24,7 +24,7 @@ import { StepCard, type StepCtx } from "./ui";
 
 /** One AI 一鍵設計 scene cell: drawing, drawn (the picture and the product picture composited into it, null = plain
  *  scene), or failed (the message, billed amount at most one picture). */
-type SceneCell = { state: "wait" } | { state: "ok"; image: string; product: string | null } | { state: "err"; error: string };
+type SceneCell = { state: "wait" } | { state: "ok"; image: string; product: string | null; area: PicArea | null } | { state: "err"; error: string };
 /** The scene description every picture of one design shares (the AI's subject and vibe). */
 const sceneOf = (st: State): string => [st.aiBgSubject.trim(), st.aiBgVibe.trim()].filter(Boolean).join(", ");
 
@@ -158,7 +158,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
         ? compositePrompt({ scene: sceneOf(m), productArea: areas.product!, textArea: areas.text })
         : scenePrompt({ subject: m.aiBgSubject, vibe: m.aiBgVibe, textArea: areas.text, productArea: null });
       await Promise.all(Array.from({ length: n }, async (_, i) => {
-        try { cell(i, { state: "ok", product, image: await generateBgPicture({ model, prompt, aspect: PRESETS[k].aspect, refs: product ? [product] : [] }) }); }
+        try { cell(i, { state: "ok", product, area: product ? areas.product : null, image: await generateBgPicture({ model, prompt, aspect: PRESETS[k].aspect, refs: product ? [product] : [] }) }); }
         catch (err) { cell(i, { state: "err", error: `${errText(err)}（最多已計費${ntdLabel(imageNtd(model))}）` }); }
       }));
     } catch (err) {
@@ -171,10 +171,10 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   // other sizes crop this one.
   // One pick = one claim on the scene lane: a newer pick supersedes it, so an older pick's late size pictures are dropped
   // and its next paid step is not sent; a pick whose main picture was not applied (check failed / superseded) stops.
-  async function pickScene(i: number, cell: { image: string; product: string | null }) {
+  async function pickScene(i: number, cell: { image: string; product: string | null; area: PicArea | null }) {
     const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
     const m = mainOf(sRef.current);
-    const bg = sceneBackground(cell.image, cell.product, m.productImage);
+    const bg = sceneBackground(cell.image, cell.product, m.productImage, cell.area);
     const token = sceneLane.claim();
     setScenePicked(i);
     setSizeJobs({});
@@ -191,7 +191,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
     if (!sceneLane.isLatest(token)) return; // a newer pick owns the sizes now
     setSizeJobs(errs);
     if (Object.keys(pics).length) {
-      await sceneLane.runAs(token, (prev) => withSizeBackgrounds(prev, pics, true), check, (built, g) => ({ ...built, ...g.patch }), failed);
+      await sceneLane.runAs(token, (prev) => withSizeBackgrounds(prev, pics), check, (built, g) => ({ ...built, ...g.patch }), failed);
     }
   }
   const scenesBusy = scenes.some((c) => c.state === "wait") || Object.values(sizeJobs).includes("生成中…");

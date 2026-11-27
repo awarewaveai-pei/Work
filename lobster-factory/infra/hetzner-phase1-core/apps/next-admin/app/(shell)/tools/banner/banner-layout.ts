@@ -133,6 +133,19 @@ type StackKey = (typeof STACK_KEYS)[number];
  *  bgImageHasProduct set at generation time, not the live toggle, so flipping it can't double-draw the product). */
 export const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
 
+/** R3-E: a baked-in product's box on the canvas -- `area` (shares of the background picture, natural size `pic`) through
+ *  the background's cover fit and its bgImgScale / X / Y, as renderBannerLayers draws it; clipped to the canvas (null =
+ *  dragged out of view). */
+export function areaOnCanvas(area: { x0: number; y0: number; x1: number; y1: number }, pic: { w: number; h: number },
+  f: Pick<BannerFields, "bgImgScale" | "bgImgX" | "bgImgY">, W: number, H: number): ElemBox | null {
+  const scale = Math.max(W / pic.w, H / pic.h) * (f.bgImgScale || 1);
+  const sw = pic.w * scale, sh = pic.h * scale;
+  const left = (W - sw) / 2 + (f.bgImgX || 0) * W, top = (H - sh) / 2 + (f.bgImgY || 0) * H;
+  const x0 = Math.max(0, left + area.x0 * sw), x1 = Math.min(W, left + area.x1 * sw);
+  const y0 = Math.max(0, top + area.y0 * sh), y1 = Math.min(H, top + area.y1 * sh);
+  return x1 - x0 > 1 && y1 - y0 > 1 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
 /** The areas a generated picture is asked to keep: the text stack's box and the product's (canvas px; null = none).
  *  Scene / 合成進場景 prompts and the reservation the layout keeps after baking are this one box (R3-D 三3). */
 export function reservedAreas(L: BannerLayout): { text: ElemBox | null; product: ElemBox | null } {
@@ -274,9 +287,12 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   };
 
   // product: its size and, beside the text, its place; centred, it shares the column with the stack (placed below).
-  // Reserved whether drawn or baked into the background -- the generation put it in this same area.
-  const nat = f.productImage ? picture(measure, f.productImage) : null;
+  // Reserved whether drawn or baked into the background. Baked with its area known (R3-E): the box is where the product
+  // is in the picture as drawn now (`baked`, null = out of view) -- not productPos; older pictures fall back to productPos.
   const drawn = productDrawn(f);
+  const bgNat = !drawn && f.productImage && f.bgProductArea && f.bgImage ? picture(measure, f.bgImage) : null;
+  const baked = bgNat ? areaOnCanvas(f.bgProductArea!, bgNat, f, W, H) : undefined;
+  const nat = f.productImage && baked === undefined ? picture(measure, f.productImage) : null;
   const g = f.grounding?.reflection;
   const refl = g?.enabled && (g.fade ?? 0.3) > 0 ? Math.max(0, Math.min(1, g.height ?? 0.35)) : 0;
   const reflGap = refl ? Math.max(0, g?.gap ?? 0) : 0;
@@ -308,7 +324,15 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
 
   // the text column: the margins, minus a product beside the text
   let cx0 = padX, cx1 = W - padX;
-  if (product && !pos.product && !pBelow) {
+  if (baked) {
+    // the text takes the larger free room: beside the product (a narrower column, full height) or above / below it
+    product = { box: baked, reflection: null, drawn: false };
+    const left = baked.x - gapX - padX, right = W - padX - (baked.x + baked.w + gapX);
+    const above = baked.y - gapY - padY, below = H - padY - (baked.y + baked.h + gapY);
+    if (Math.max(left, right) * (H - 2 * padY) >= (W - 2 * padX) * Math.max(above, below)) {
+      if (left >= right) cx1 = Math.min(cx1, baked.x - gapX); else cx0 = Math.max(cx0, baked.x + baked.w + gapX);
+    } else obstacles.push(baked);
+  } else if (product && !pos.product && !pBelow) {
     const pb = groupBox(product);
     if (f.productPos === "left") cx0 = Math.max(cx0, pb.x + pb.w + gapX); else cx1 = Math.min(cx1, pb.x - gapX);
   }

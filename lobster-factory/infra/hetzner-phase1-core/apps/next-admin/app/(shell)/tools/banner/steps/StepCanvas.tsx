@@ -14,7 +14,7 @@ import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
 import {
   BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
-  type BgMode, type PresetKey, type ProductPos, type State,
+  type BakedPicture, type BgMode, type PresetKey, type ProductPos, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
 import { AccordionSection, PresetChips, StepCard, SubHead, type StepCtx } from "./ui";
@@ -103,20 +103,20 @@ export async function drawnAreas(v: State, k: PresetKey): Promise<{ text: PicAre
 /** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside
  *  the product area the layout engine reserves there. A failed size = its message with the at-most-billed amount. */
 export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: { model: StudioModel; scene: string; refs: string[] }):
-  Promise<{ pics: Partial<Record<PresetKey, string>>; errs: Partial<Record<PresetKey, string>> }> {
+  Promise<{ pics: Partial<Record<PresetKey, BakedPicture>>; errs: Partial<Record<PresetKey, string>> }> {
   const got = await Promise.all(sizes.map(async (k) => {
     try {
       const areas = await drawnAreas(variantOf(st, k), k);
       if (!areas.product) throw new Error("no_product_area");
       const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text });
-      return [k, await generateBgPicture({ model: o.model, prompt, aspect: PRESETS[k].aspect, refs: o.refs })] as const;
+      return [k, { image: await generateBgPicture({ model: o.model, prompt, aspect: PRESETS[k].aspect, refs: o.refs }), area: areas.product }] as const;
     } catch (err) {
       return [k, err instanceof Error ? err : new Error(String(err))] as const;
     }
   }));
-  const pics: Partial<Record<PresetKey, string>> = {}, errs: Partial<Record<PresetKey, string>> = {};
+  const pics: Partial<Record<PresetKey, BakedPicture>> = {}, errs: Partial<Record<PresetKey, string>> = {};
   for (const [k, v] of got) {
-    if (typeof v === "string") pics[k] = v;
+    if (!(v instanceof Error)) pics[k] = v;
     else errs[k] = `${v.message}（最多已計費${ntdLabel(imageNtd(o.model))}）`;
   }
   return { pics, errs };
@@ -219,7 +219,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     const { pics, errs } = await compositeSizes(s, picked, { model: s.aiBgModel, scene: effectiveBgPrompt, refs: trimmedRefs });
     setSizeErrors(errs);
     setS((prev) => ({
-      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics, true) : prev), generating: false,
+      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics) : prev), generating: false,
       error: Object.keys(errs).length ? `${Object.keys(errs).length} 個尺寸合成失敗，那幾個尺寸沿用原本的背景。` : null,
     }));
   }
