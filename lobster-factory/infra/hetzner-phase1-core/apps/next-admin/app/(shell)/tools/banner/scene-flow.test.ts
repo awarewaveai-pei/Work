@@ -158,3 +158,26 @@ describe("R4-D Codex 複審 付費進行中不能再付費", () => {
     expect(view.sizeJobs).toEqual({});
   });
 });
+
+describe("R4-D Codex 第三輪 付費進行中 AI 一鍵設計不能清掉已付費的圖", () => {
+  it("reset() is refused while paid pictures are being checked; they still land; AI 一鍵設計 waits on generating", async () => {
+    let st: State = design, view: FlowView = EMPTY_VIEW, checking: (() => void) | null = null, checks = 0;
+    const flow = sceneFlow({
+      current: () => st, apply: (fn) => { st = fn(st); }, view: (fn) => { view = fn(view); }, generate: vi.fn(async () => SCENE), areas,
+      check: () => { checks++; return checks === 1 ? Promise.resolve({ patch: {}, unmet: [] } as never)
+        : new Promise((r) => { checking = () => r({ patch: {}, unmet: [] } as never); }); },
+    });
+    await flow.pick(0, cell);
+    const run = flow.drawOthers(cell, src, "extend");
+    for (let i = 0; i < 20 && !checking; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(flow.reset()).toBe(false);
+    checking!(); expect(await run).toBe(true);
+    expect(variantOf(st, "r9x16").bgProductArea).toEqual(areaOf.r9x16);
+    expect(view.picked).toBe(0);
+    expect(flow.reset()).toBe(true);
+    expect(view).toEqual(EMPTY_VIEW);
+    const ai = readFileSync(join(__dirname, "steps/StepAi.tsx"), "utf8");
+    expect(ai).toContain("if (s.generating || !flow.reset()) return;");
+    expect(ai).toMatch(/disabled=\{\(s\.designing \|\| s\.generating \|\| flow\.busy/);
+  });
+});

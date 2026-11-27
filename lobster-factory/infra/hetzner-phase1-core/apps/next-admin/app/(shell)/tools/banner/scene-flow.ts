@@ -139,9 +139,9 @@ export function sceneFlow(deps: {
   const failed = (what: string) => (prev: State, err: unknown): State => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：${what}` });
   let drawId = 0, paidRuns = 0;
   // Invariant: one paid run at a time, held from the click until its pictures are applied (contrast check included).
-  // It holds `generating` (save / export / 清除設計 / sizes / the other entry's buttons wait); meanwhile a pick and any
-  // other paid run are refused HERE, not only by disabled buttons, so nothing can supersede pictures already paid for
-  // or pay twice.
+  // It holds `generating` (save / export / 清除設計 / sizes / AI 一鍵設計 / the other entry's buttons wait). Every entry
+  // that claims the lane -- draw, drawOthers, pick, reset -- is refused HERE while it runs, not only by disabled
+  // buttons, so nothing can supersede pictures already paid for or pay twice.
   const paid = async (job: () => Promise<void>): Promise<boolean> => {
     if (paidRuns) return false;
     paidRuns++; deps.apply((prev) => ({ ...prev, generating: true }));
@@ -216,6 +216,13 @@ export function sceneFlow(deps: {
     }, deps.check, (built, g) => ({ ...built, ...g.patch }), failed("其他尺寸的圖沒有套用，請再按一次。"));
   }
 
-  return { draw, pick, drawOthers, reset: () => { drawId++; lane.claim(); deps.view(() => EMPTY_VIEW); } };
+  /** Clear the candidates (a new AI design starts). false = refused: a paid run is in progress and owns the lane. */
+  function reset(): boolean {
+    if (paidRuns) return false;
+    drawId++; lane.claim(); deps.view(() => EMPTY_VIEW);
+    return true;
+  }
+
+  return { draw, pick, drawOthers, reset };
 }
 export type SceneFlow = ReturnType<typeof sceneFlow>;

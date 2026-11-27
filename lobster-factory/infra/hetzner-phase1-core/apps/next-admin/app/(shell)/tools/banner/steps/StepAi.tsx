@@ -48,9 +48,10 @@ export default function StepAi({ slot, s, set, setS, flow, sRef, staff, brand, s
   async function generateFullDesign() {
     // the brand colours must be the picked client's: never design while its kit is still loading
     if (!s.copyBrief.trim() || !staff || brand.status === "loading") return;
+    // a paid scene run still owns the candidates (scene-flow.ts paid()): the design call would be billed and its scenes refused
+    if (s.generating || !flow.reset()) return;
     setS((prev) => ({ ...prev, designing: true, error: null }));
     const scenesWanted = drawsScenes ? flow.count : 0;
-    flow.reset();
     try {
       // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
       const m = mainOf(s);
@@ -199,7 +200,7 @@ export default function StepAi({ slot, s, set, setS, flow, sRef, staff, brand, s
             onClick={generateCopy} data-testid="banner-ai-copy">
             {aiRetrying === "copy" ? "重試中…" : s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
           </button>
-          <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || flow.busy || s.copyGenerating || !s.copyBrief.trim() || brand.status === "loading") || !canUse("video.script")}
+          <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.generating || flow.busy || s.copyGenerating || !s.copyBrief.trim() || brand.status === "loading") || !canUse("video.script")}
             onClick={generateFullDesign} data-testid="banner-ai-design">
             {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : flow.busy ? "場景生成中…" : brand.status === "loading" ? "正在載入品牌色…"
               : `✨ AI 一鍵設計整張（${drawsScenes ? `設計 ${ntdLabel(bannerCallNtd(designModel, "design", picked.length))} ＋ 場景候選 ${flow.count} 張，每張 ${ntdLabel(sceneNtd)}` : ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
