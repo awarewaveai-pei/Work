@@ -4,8 +4,9 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, STAFF_ROUTE_GROUPS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
-import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS } from "../products";
-import { CATEGORIES, CONTEXTS, ICONS, TASKS } from "../catalog-vocab";
+import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS, featureCatalog } from "../products";
+import { CATEGORIES, COGNITIVE_GROUPS, COGNITIVE_PREFIXES, CONTEXTS, ICONS, TASKS, cognitivePrefix } from "../catalog-vocab";
+import cognitiveInventory from "../cognitive-features.json";
 import { APP_DIR, doorPageUrls, pageUrls } from "./app-pages";
 
 // The registry is the one list of products (ADR 012 §5).
@@ -46,6 +47,34 @@ describe("product registry", () => {
       if (c.featured !== undefined) featured.push(c.featured);
     }
     expect(new Set(featured).size).toBe(featured.length);
+  });
+
+  // U25: the feature layer is what search and category pages list once a product has many features.
+  it("every feature's effective catalog values come from catalog-vocab", () => {
+    for (const p of PRODUCTS) for (const f of p.features) {
+      const c = featureCatalog(p, f);
+      expect(c.tasks.length, f.feature_key).toBeGreaterThan(0);
+      for (const t of c.tasks) expect(Object.keys(TASKS), `${f.feature_key}: ${t}`).toContain(t);
+      expect(new Set(c.tasks).size, f.feature_key).toBe(c.tasks.length);
+      expect([...c.blurb].length, f.feature_key).toBeLessThanOrEqual(28);
+      expect(ICONS, f.feature_key).toContain(c.icon);
+      expect(c.addedAt, f.feature_key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it("featureCatalog inherits each missing field from the product and never lets a feature override category", () => {
+    const product = { catalog: { category: "content", tasks: ["write-seo-article"], blurb: "產品一句話", icon: "article", addedAt: "2026-01-01", keywords: ["k"], contexts: ["studio"] } } as const;
+    expect(featureCatalog(product, {})).toEqual({ category: "content", tasks: ["write-seo-article"], blurb: "產品一句話", icon: "article", addedAt: "2026-01-01", keywords: ["k"], contexts: ["studio"] });
+    const own = { catalog: { tasks: ["fix-seo"], blurb: "功能一句話", icon: "search", addedAt: "2026-11-27", keywords: ["x"], category: "video", contexts: ["general"] } } as unknown as Parameters<typeof featureCatalog>[1];
+    expect(featureCatalog(product, own)).toEqual({ category: "content", tasks: ["fix-seo"], blurb: "功能一句話", icon: "search", addedAt: "2026-11-27", keywords: ["x"], contexts: ["studio"] });
+  });
+
+  it("every cognitive method's prefix maps to a group whose tasks are in the vocabulary", () => {
+    for (const tasks of Object.values(COGNITIVE_GROUPS)) for (const t of tasks) expect(Object.keys(TASKS), t).toContain(t);
+    const prefixes = new Set(cognitiveInventory.map((f) => cognitivePrefix(f.id)));
+    for (const prefix of prefixes) expect(Object.keys(COGNITIVE_PREFIXES), `cognitive prefix ${prefix} has no group`).toContain(prefix);
+    const cognitive = PRODUCTS.find((p) => p.key === "cognitive")!;
+    for (const f of cognitive.features) expect(f.catalog?.tasks, f.feature_key).toEqual(COGNITIVE_GROUPS[COGNITIVE_PREFIXES[cognitivePrefix(f.feature_key)]]);
   });
 
   // ADR 018 §5: a product that leaves a delivery field out fails here, so it cannot ship without its door.

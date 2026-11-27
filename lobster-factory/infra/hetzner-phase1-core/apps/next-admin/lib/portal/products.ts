@@ -1,6 +1,6 @@
 // Product/feature delivery registry (ADR 012/017/018). New rows: scripts/new-product.mjs.
 import cognitiveInventory from "./cognitive-features.json";
-import type { CatalogCategory, CatalogContext, CatalogIcon } from "./catalog-vocab";
+import { COGNITIVE_GROUPS, COGNITIVE_PREFIXES, cognitivePrefix, type CatalogCategory, type CatalogContext, type CatalogIcon } from "./catalog-vocab";
 export type LoginSource = "local" | "awarewave-wp" | "customer-wp";
 export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "customer-wp"];
 // anonymous: path prefixes served with no login, on this product's own door only (pages and GET/HEAD routes;
@@ -20,7 +20,11 @@ export interface ProductFeature {
   limitKind: "QUOTA" | "RATE_LIMIT" | "SAFETY_GATE";
   buyout: boolean;
   billing: "contract" | "credits";
+  // Feature-layer catalog (U25, blueprint §4.3): a field left out inherits the product's; category always does.
+  // Read it only through featureCatalog() below, never merge by hand.
+  catalog?: FeatureCatalogOverride;
 }
+export type FeatureCatalogOverride = Partial<Pick<CatalogMeta, "tasks" | "blurb" | "keywords" | "icon" | "addedAt">>;
 // Catalog entry (blueprint §4.3), product layer. Values come from catalog-vocab.ts (products.test.ts enforces it). No price here:
 // prices live only in WooCommerce (ADR 017 §2). "New" is derived from addedAt, never stored.
 export interface CatalogMeta {
@@ -51,9 +55,16 @@ interface ProductDefinition {
   modules: { dependsOn: readonly string[]; optional?: readonly string[]; manifest: string };
   staffPaths: readonly string[];
 }
-const quota = (feature_key: string, name: string, billing: ProductFeature["billing"] = "credits"): ProductFeature =>
-  ({ feature_key, name, limitKind: "QUOTA", buyout: true, billing });
-const cognitiveFeatures = cognitiveInventory.map((f) => quota(f.id, f.name, f.billing as ProductFeature["billing"]));
+// tasks: the feature's TASKS keys; undefined = inherit the product's.
+const quota = (feature_key: string, name: string, tasks: readonly string[] | undefined, billing: ProductFeature["billing"] = "credits"): ProductFeature =>
+  ({ feature_key, name, limitKind: "QUOTA", buyout: true, billing, ...(tasks ? { catalog: { tasks } } : {}) });
+// The 300 methods' tasks come from their prefix's group (catalog-vocab.ts COGNITIVE_PREFIXES); an unlisted prefix
+// inherits the product's tasks here and fails products.test.ts.
+const cognitiveTasks = (id: string): readonly string[] | undefined => {
+  const group = COGNITIVE_PREFIXES[cognitivePrefix(id)];
+  return group ? COGNITIVE_GROUPS[group] : undefined;
+};
+const cognitiveFeatures = cognitiveInventory.map((f) => quota(f.id, f.name, cognitiveTasks(f.id), f.billing as ProductFeature["billing"]));
 const PRODUCT_DEFINITIONS = [
   { key: "cognitive", catalog: { category: "insight", tasks: ["decide-with-methods", "find-root-cause", "plan-projects"], blurb: "組合認知方法做研究與決策", icon: "compass", addedAt: "2026-01-01" }, name: "AI LEGO Cognitive Engineering OS", description: "組合認知方法、研究資料與專案。", subdomain: "cognitive", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon",
@@ -63,23 +74,23 @@ const PRODUCT_DEFINITIONS = [
     features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },
   { key: "social", catalog: { category: "social", tasks: ["schedule-social-posts", "rewrite-per-platform", "auto-reply"], blurb: "改寫貼文、排程並派送到各社群", icon: "share", addedAt: "2026-01-01" }, name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"], anonymous: ["/smartlink"] },
     loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon",
-    features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract"), quota("social.auto-reply", "Meta 自動回覆", "contract"), quota("social.ads", "Meta 廣告管理", "contract"), quota("social.meta", "Meta 資產設定", "contract")], accessChannels: ["ui"],
+    features: [quota("social.rewrite", "AI 多平台改寫", ["rewrite-per-platform"]), quota("social.dispatch", "貼文派送", ["schedule-social-posts"], "contract"), quota("social.auto-reply", "Meta 自動回覆", ["auto-reply"], "contract"), quota("social.ads", "Meta 廣告管理", ["manage-ads"], "contract"), quota("social.meta", "Meta 資產設定", ["connect-social-accounts"], "contract")], accessChannels: ["ui"],
     modules: { dependsOn: [], optional: ["content"], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
   { key: "video", catalog: { category: "video", tasks: ["make-short-video", "write-script", "add-voiceover"], blurb: "寫腳本、做場景與動態、配旁白", icon: "film", addedAt: "2026-01-01" }, name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", api: ["/api/video", "/api/tools/script-forge"],
       nav: [{ path: "", name: "影片工作台", staff: "tools/video" }, { path: "works", name: "我的作品", staff: "tools/designs" }], uiService: "video-workbench" },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白"), quota("video.transcribe", "語音轉字幕"), quota("video.bg-remove", "去背"), quota("video.3d", "圖片轉 3D"), quota("video.enhance", "AI 畫質增強"), quota("video.music", "音樂生成"), quota("video.audio-tools", "音軌分離與重配音效")],
+    features: [quota("video.script", "腳本生成", ["write-script"]), quota("video.image", "場景圖生成", ["make-scene-images"]), quota("video.motion", "影片動態", ["animate-video", "make-short-video"]), quota("video.tts", "付費旁白", ["add-voiceover"]), quota("video.transcribe", "語音轉字幕", ["make-subtitles"]), quota("video.bg-remove", "去背", ["retouch-images"]), quota("video.3d", "圖片轉 3D", ["make-3d-model"]), quota("video.enhance", "AI 畫質增強", ["enhance-quality"]), quota("video.music", "音樂生成", ["make-music"]), quota("video.audio-tools", "音軌分離與重配音效", ["edit-audio"])],
     accessChannels: ["ui"], modules: { dependsOn: ["content"], optional: ["social"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video", "tools/script-forge"] },
   { key: "tarot", catalog: { category: "design", tasks: ["make-tarot-cards"], blurb: "生成塔羅牌圖片與提示詞", icon: "cards", addedAt: "2026-01-01" }, name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"],
       nav: [{ path: "", name: "塔羅工作台", staff: "tools/tarot" }, { path: "works", name: "我的作品", staff: "tools/designs" }] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議")],
+    features: [quota("tarot.image", "塔羅圖生成", ["make-tarot-cards"]), quota("tarot.prompt", "提示詞建議", ["write-image-prompts", "make-tarot-cards"])],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },
   // tools/publish (POD listing to our own Woo store) is studio's and staff-only: no door page (step-8 card §6 D1).
   { key: "studio", catalog: { category: "design", tasks: ["make-product-images", "write-product-copy", "retouch-images"], blurb: "做商品圖、寫商品文案、修圖", icon: "image", addedAt: "2026-01-01" }, name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", api: ["/api/tools/studio"],
       nav: [{ path: "", name: "設計工作台", staff: "tools/studio" }, { path: "works", name: "我的作品", staff: "tools/designs" }] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
+    features: [quota("studio.image", "圖片生成", ["make-product-images"]), quota("studio.product-copy", "商品文案", ["write-product-copy"]), quota("studio.edit-prompt", "修圖提示詞", ["write-image-prompts", "retouch-images"]), quota("studio.remove-bg", "去背", ["retouch-images"]), quota("studio.inpaint", "局部重繪", ["retouch-images"]), quota("studio.fill", "生成填補", ["retouch-images"]), quota("studio.upscale", "圖片放大", ["enhance-quality", "retouch-images"])],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio", "tools/publish"] },
   { key: "design", catalog: { category: "design", tasks: ["edit-design", "make-banner", "make-mockup"], blurb: "畫布、橫幅、模型圖與向量設計", icon: "palette", addedAt: "2026-01-01" }, name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", api: ["/api/tools/presets", "/api/tools/printful/catalog"],
       nav: [{ path: "", name: "我的設計", staff: "tools/designs" }, { path: "canvas", name: "修圖（專業版）", staff: "tools/photo-pro" },
@@ -87,7 +98,7 @@ const PRODUCT_DEFINITIONS = [
         { path: "pro", name: "向量（專業版）", staff: "tools/vector-pro" }] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
-    features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
+    features: [quota("design.edit", "畫布與向量編輯", ["edit-design", "make-banner", "make-mockup"], "contract")], accessChannels: ["ui"],
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-pro", "tools/photo-pro"] },
   { key: "content", catalog: { category: "content", tasks: ["write-seo-article", "plan-monthly-topics", "publish-to-site"], blurb: "寫 SEO 文章、排題目、發布到你的網站", icon: "article", addedAt: "2026-01-01" }, name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       // blueprint §15A: 寫文章 / 改寫 / 草稿 were tabs of one page; each is a menu page now.
@@ -99,28 +110,43 @@ const PRODUCT_DEFINITIONS = [
         { path: "topics/steps", name: "五步驟", staff: "tools/content/topics/steps", under: "topics" },
         { path: "sites", name: "我的網站", staff: "tools/content/sites" }, { path: "events", name: "節日行事曆", staff: "tools/events" }] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.plan", "每月題目規劃"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
+    features: [quota("content.article", "文章生成", ["write-seo-article"]), quota("content.humanize", "文章人性化", ["humanize-text"]), quota("content.seo-fix", "SEO 修正", ["fix-seo"]), quota("content.brand-voice", "品牌語氣擷取", ["extract-brand-voice"]), quota("content.outline", "大綱生成", ["outline-article"]), quota("content.title", "標題建議", ["suggest-titles"]), quota("content.keywords", "關鍵字建議", ["find-keywords"]), quota("content.hook-brief", "Hook 草稿", ["write-hook"]), quota("content.syndicate", "多平台內容改寫", ["rewrite-per-platform"]), quota("content.market-analysis", "市場分析", ["analyze-competitors"]), quota("content.plan", "每月題目規劃", ["plan-monthly-topics"]), quota("content.trending", "趨勢分析", ["find-trending-topics"]), quota("content.image", "內容配圖", ["make-article-images"])],
     accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/events"] },
   // cs and collect also use /api/ops/clients/[slug]/{cs-*,collection-sources}: not a prefix a door can own; ADR 017 step 8 decides.
   { key: "cs", catalog: { category: "service", tasks: ["answer-customer-questions", "hand-off-to-human"], blurb: "依知識庫回答客人並轉交真人", icon: "chat", addedAt: "2026-01-01" }, name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/ops/cs"] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("cs.intent", "意圖分類"), quota("cs.answer", "客服回答與工具呼叫"), quota("cs.eval", "回答評測"), quota("cs.exam", "客服模擬考"), quota("cs.translate", "訊息翻譯")],
+    features: [quota("cs.intent", "意圖分類", ["classify-messages"]), quota("cs.answer", "客服回答與工具呼叫", ["answer-customer-questions"]), quota("cs.eval", "回答評測", ["evaluate-answers"]), quota("cs.exam", "客服模擬考", ["practice-support"]), quota("cs.translate", "訊息翻譯", ["translate-messages"])],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cs/MODULE_MANIFEST.json" }, staffPaths: ["ops/cs", "ops/knowledge", "cs-widget"] },
   { key: "collect", catalog: { category: "research", tasks: ["collect-web-data"], blurb: "蒐集外部網站與研究資料", icon: "search", addedAt: "2026-01-01" }, name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: [] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("collect.fetch", "資料蒐集")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
+    features: [quota("collect.fetch", "資料蒐集", ["collect-web-data"])], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
   { key: "outreach", catalog: { category: "sales", tasks: ["write-outreach-emails", "find-leads", "track-replies"], blurb: "寫開發信、管名單與追蹤回信", icon: "mail", addedAt: "2026-01-01" }, name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", api: ["/api/outreach"],
       nav: [{ path: "", name: "名單", staff: "tools/outreach/leads" }, { path: "inbox", name: "匯入名單", staff: "tools/outreach/inbox" },
         { path: "review", name: "審核信件", staff: "tools/outreach/review" }, { path: "followups", name: "追蹤", staff: "tools/outreach/followups" }, { path: "replies", name: "回信", staff: "tools/outreach/replies" },
         { path: "connectors", name: "信箱與連線", staff: "tools/outreach/connectors" },
         { path: "profiles", name: "服務設定", staff: "tools/outreach/settings/service-profiles" }, { path: "suppression", name: "拒收名單", staff: "tools/outreach/settings/suppression" }] },
     loginSources: ["local", "awarewave-wp"], standalone: false, status: "coming_soon",
-    features: [quota("outreach.draft", "AI 開發信"), quota("outreach.qa", "事實核對"), quota("outreach.research", "客戶研究"), quota("outreach.discover", "找名單"), quota("outreach.classify", "回信分類"), quota("outreach.verify", "信箱驗證")], accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
+    features: [quota("outreach.draft", "AI 開發信", ["write-outreach-emails"]), quota("outreach.qa", "事實核對", ["fact-check"]), quota("outreach.research", "客戶研究", ["research-prospects"]), quota("outreach.discover", "找名單", ["find-leads"]), quota("outreach.classify", "回信分類", ["track-replies"]), quota("outreach.verify", "信箱驗證", ["verify-emails"])], accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
   // NEW_PRODUCT_ROWS: scripts/new-product.mjs inserts before this marker.
 ] as const satisfies readonly ProductDefinition[];
 export type ProductKey = (typeof PRODUCT_DEFINITIONS)[number]["key"];
 export type PortalProduct = Omit<ProductDefinition, "key"> & { key: ProductKey };
 export const PRODUCTS: readonly PortalProduct[] = PRODUCT_DEFINITIONS;
+// A feature's effective catalog entry: its own fields where set, the product's otherwise. category and contexts are the
+// product's only (blueprint §4.3); built field by field so an extra key on feature.catalog can never override them.
+export type FeatureCatalog = Pick<CatalogMeta, "category" | "tasks" | "blurb" | "icon" | "addedAt" | "keywords" | "contexts">;
+export function featureCatalog(product: Pick<PortalProduct, "catalog">, feature: Pick<ProductFeature, "catalog">): FeatureCatalog {
+  const p = product.catalog, f = feature.catalog ?? {};
+  return {
+    category: p.category,
+    tasks: f.tasks ?? p.tasks,
+    blurb: f.blurb ?? p.blurb,
+    icon: f.icon ?? p.icon,
+    addedAt: f.addedAt ?? p.addedAt,
+    keywords: f.keywords ?? p.keywords,
+    contexts: p.contexts,
+  };
+}
 // Staff-only pages that are not products. name: the cell on the staff permission page (lib/portal/staff-tools.ts);
 // tool: grant it with another page's cell instead of a cell of its own (a redirect or a variant of that page).
 export interface StaffPage { name: string; why: string; tool?: string }
