@@ -176,11 +176,13 @@ export class Grant {
   get maxSpend() { return this.info.maxSpend; }
   /** Usage metering (ADR 017 §4): every paid seam calls this when the grant reaches paid work; only the first call per
    *  grant records (one entitlement.usage row), so a request's libraries and a job's polls sharing a grant count once.
-   *  Never debits and never rejects: the price is charged by the cost logger once the call delivered (report). */
+   *  Never debits and never rejects: the price is charged by the cost logger once the call delivered (report).
+   *  `use: true` marks this row as THE use (the charge rows of report / settlePaid carry none): the launcher's 最近使用
+   *  counts one use per call from it (app/portal/launcher/RecentSection.tsx). */
   async recordUse(meta: Record<string, JsonValue> = {}): Promise<void> {
     if (USED.has(this)) return;
     USED.add(this);
-    await this.report({ meta });
+    await this.report({ meta: { ...meta, use: true } });
   }
   /** `units` = what work already delivered costs (lib/ai/log-ai-call.ts). Credits are debited from the billing account
    *  (on_behalf_of); the audit row always names the actor. A debit needs the caller's idempotencyKey: a retry with a fresh

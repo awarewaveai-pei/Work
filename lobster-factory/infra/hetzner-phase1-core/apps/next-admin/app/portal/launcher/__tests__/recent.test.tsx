@@ -49,7 +49,10 @@ const names = (html: string, kind: "recent" | "frequent") =>
 
 const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 const use = (feature_key: string, daysAgo: number, actor = "client:org-1:u-1", org = "org-1"): Row =>
-  ({ organization_id: org, event_type: "entitlement.usage", created_at: day(daysAgo), payload: { feature_key, actor } });
+  ({ organization_id: org, event_type: "entitlement.usage", created_at: day(daysAgo), payload: { feature_key, actor, use: "true" } });
+// the charge row the same call writes after delivery (report / settlePaid): no use mark
+const charge = (feature_key: string, daysAgo: number): Row =>
+  ({ organization_id: "org-1", event_type: "entitlement.usage", created_at: day(daysAgo), payload: { feature_key, actor: "client:org-1:u-1", units: 3 } });
 
 describe("launcher 最近使用／常用", () => {
   beforeEach(() => {
@@ -88,6 +91,14 @@ describe("launcher 最近使用／常用", () => {
     expect(names(html, "recent")).toEqual(["文章生成", "圖片生成", "AI 多平台改寫", "腳本生成", "文章人性化"]);
     expect(names(html, "frequent")).toEqual(["文章生成", "圖片生成", "AI 多平台改寫"]);
     expect(section(html)).toContain("30 天內 3 次");
+  });
+
+  it("one call's use row and charge row count once", async () => {
+    state.rows = [use("content.article", 1), charge("content.article", 1), use("studio.image", 2), charge("studio.image", 2), charge("studio.image", 3)];
+    const html = renderToStaticMarkup(await page());
+    expect(names(html, "frequent")).toEqual(["文章生成", "圖片生成"]);
+    expect(section(html)).toContain("30 天內 1 次");
+    expect(section(html)).not.toContain("30 天內 2 次");
   });
 
   it("no use: the section is not drawn", async () => {

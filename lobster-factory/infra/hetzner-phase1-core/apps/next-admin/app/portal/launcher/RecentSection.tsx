@@ -4,6 +4,7 @@
 // Privacy: the rows matched are exactly payload.actor = `client:<org>:<uid>` of THIS session (requireClientOrg's org +
 // middleware's x-ops-user-id), so a colleague's or a staff member's use of the same unit never shows -- a manager sees
 // only their own too. Only features behind can() are counted; a page without can() (題目) records nothing.
+// One call writes a use row (recordUse, payload.use = true) AND a charge row (report / settlePaid): only the use row counts.
 import { getSupabaseReadClient, getSupabaseWriteClient } from "@/lib/supabase-server";
 import { PRODUCTS } from "@/lib/portal/products";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
@@ -56,6 +57,7 @@ export async function loadRecent(orgId: string, userId: string, held: ReadonlySe
       .eq("organization_id", orgId)
       .eq("event_type", "entitlement.usage")
       .eq("payload->>actor", `client:${orgId}:${userId}`)
+      .eq("payload->>use", "true")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(ROWS);
