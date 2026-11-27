@@ -20,6 +20,17 @@
 - 接受不改：自動模式純漢字日文當中文；`DROPPED_MAX_SEC` 5 秒無實測依據；自動模式中文偶有半形逗號
 - 剩餘風險：Gemini 場次對齊後的講者準度只在單人錄音驗過（多人要 C18 的 3 人錄音）；日文、韓文語音沒測（本機沒有日文語音合成）；本機辨識載入模型期間丟聲音 → C17
 - rollback：`git revert a4648fa96 412811545 c30f85f8c 0180877b8`；新欄位舊程式忽略，`jobs/sessions.json` 可刪
+## 2026-11-27（續4）— oracle WP：首頁改成像樣的版面（操作者：「這啥小?」）
+
+- [根因] GO-3 把首頁換成 WordPress，但首頁內容是 2026-11-25 監工用 wp-cli 建的佔位版：一段文字＋十二項條列。監工在 GO-3 驗收時看過截圖卻判為「畫面正常」，只驗了功能沒驗設計；原本引擎首頁是有設計的版面，等於上線後變難看。
+- [步驟] `home.php`（`wp eval-file`）重寫首頁（post 18）`post_content`，全用核心區塊（後台可直接編輯）：主視覺（h1、說明、兩顆按鈕）→「選一個工具開始」十二張卡片（grid，最小欄寬 17rem，內容寬 1140px）→ 訂閱每日運勢信區塊；顏色用佈景色盤 slug，不寫色碼。Kadence 頁面設定：`_kad_post_title=hide`、`_kad_post_layout=fullwidth`、`_kad_post_content_style=unboxed`、`_kad_post_vertical_padding=hide`。三輪：第一版卡片滿版貼邊 → 加內容寬與左右留白；最後一張卡高 160 其餘 128（佈景給區塊 32px 下外距、末項沒有）→ 卡片外距歸零。TranslatePress 字典補三句英文。
+- [驗證] 瀏覽器（操作者的 Chrome）實看 `/` 與 `/english/`：主視覺、4 欄卡片、訂閱區塊；JS 量十二張卡片高度皆 128；英文首頁主內容無中文字；`curl /` 200。舊內容在文章修訂版本（3 筆）。
+- [未做] 手機寬度未實看（grid 會自動變 1–2 欄，未驗）；十二個工具頁、我的命盤、訂閱頁仍是「標題帶＋一句說明＋工具」的基本版；文案是監工寫的，未經操作者或 GPT 潤稿；沒有圖片。
+- [rollback] 後台首頁 → 修訂版本還原到最舊一筆；或 `wp post meta delete 18 _kad_post_title` 等四個 meta。
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh wp eval-file home.php；瀏覽器截圖 / 與 /english/；JS 量卡片高度 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 無 repo 程式改動（站台頁面內容）
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-27（續3）— meeting-service 段 4 批 1：C12 每句格式＋場次旁檔、C13 統一設定＋跨站守衛（上線 8420）
 
 - 根因：兩個工具接不起來（存檔只有 markdown、時間用伺服器時鐘）；設定散在 6 處、只有 WebSocket 擋跨站。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
@@ -39,6 +50,36 @@
 - 接受不改：舊瀏覽器兩個標頭都不帶時守衛放行（`MS/app.py:52-56`）；`MS/lib/diarize.py` 用路徑載入 settings（外部專案單獨載入 diarize）；Anthropic 金鑰不讀環境變數（過期 CLI key）
 - 剩餘風險：真實麥克風／系統聲音仍未實測；字級、摘要開關從設定面板改值後重新整理未逐一點過
 - rollback：`git revert 4c41dc268 ce19c86a1`（再 revert 兩張卡的 commit）；設定檔新欄位舊程式忽略
+## 2026-11-27（續2）— 平台第 12 批（U16、U17、U19、U28）上線
+
+- [根因] P2 第一批：內容門首頁「概覽」、工作台「繼續上次」、客戶管理會員自己授權同事（ADR 021 G4）、付款後立即失效功能清單／門快取。
+- [步驟]
+  - 派工單錯誤（監工）：portal 網域客戶只能打 `/portal/*`（`middleware.ts:231-233`）→ U17 改伺服器端讀、U19 API 放 `app/portal/api/people`。
+  - 退回裁決：U16 借 `staff: "tools/events"` → `DoorNavItem.staff` 選填；`/content?draft=` 轉 `/write`；Codex C：草稿數只按 site 篩 → 一律帶 org；context 非 ok 不讀；改 org 層。U19：稽核記成員工 `viewer` → 0185 加 `client`；管理會員判斷單一模組 `lib/entitlements/account-manager.ts` 登記 `DOOR_OWN_ORG_READS`。U17：草稿查詢抽 `lib/content/drafts-list.ts`，不放寬 door `next`。
+  - 保留：稽核寫失敗不擋請求（`ops-audit.ts:25` 既定）；actor_user_id 放 payload（`staff-accounts.ts:159` 慣例）；middleware edge 門快取付款後最多 10 秒；題目 >1000／月少算。
+  - 0185 套用（操作者「可以」）→ push `152cabe4f`、`e9ae14716`；部署隨 `e3ec3c494`（banner 線 2026-11-26 16:52Z sg-deploy）上線。
+- [驗證]
+  - 整合樹 `npx tsc --noEmit` 0；`npx vitest run` 726 files／5992 passed／0 failed；down 副本 2/2。
+  - psql：兩個 actor_role check 含 'client'。
+  - curl：`portal.aware-wave.com/people`、`/launcher` 307 登入；`/api/people` GET／POST 401；`content.aware-wave.com/`、`/write`、`/?draft=x` 307 登入。
+  - CI `cce5df72d` tsc 失敗＝runner heap OOM（非型別錯誤，banner 線提交），已 `gh run rerun --failed`。
+- [未做／剩餘風險] 登入後畫面（概覽三數字、繼續上次、成員頁）要測試客戶帳號，併 W7 走查。
+- [rollback] revert U16（c424a9c49..e9ae14716）、U19（aefc58539、152cabe4f；再跑 0185 down，有 client 列則拒絕）、U17（66f375638）、U28（6ff8a6ebc）並部署。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl portal/content 路由；psql 0185 constraint；npx vitest run | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/6m/0n
+  - external oracle = Codex CLI（2026-11-26-partialreview-eba71952.md、-4185a87c.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=callerManagesUnit | hits=9
+## 2026-11-26（續41）— oracle WP：裝 Kadence Blocks Pro 2.8.17（操作者要求）
+
+- [根因] 操作者「Kadence Blocks Pro 裝」；同日已裝 Kadence Pro 1.1.16，Blocks Pro 當時未裝。
+- [步驟] 本機 `D:\Work\_paid-plugins\kadence-blocks-pro.zip`（檔頭 Version 2.8.17）→ scp 主機 `/tmp` → `docker cp` → `wp plugin install --activate` → 兩處暫存檔刪除。
+- [驗證] `wp plugin list`：`kadence-blocks-pro active 2.8.17`、`kadence-blocks active 3.9.1.2`、`kadence-pro active 1.1.16`；外部 `/`、`/tools/ziwei/`、`/english/`、`/daily-letter/`、`/wp-json/` 皆 200、無 fatal 字樣；容器 log 近 2 分鐘無 PHP Fatal／Warning。
+- [未做] 授權碼未輸入（Kadence Pro 與 Blocks Pro 皆同：可用，不自動更新）。
+- [rollback] `wp plugin deactivate kadence-blocks-pro && wp plugin delete kadence-blocks-pro`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install /tmp/kbp.zip --activate；curl 五個網址 | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- 無 repo 程式改動（站台外掛安裝）
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-27（續1）— 橫幅 R2：操作者十點回饋全部上線（排版引擎、九步流程、AI 文案五組、品牌 logo）
 - 計畫／根因 file:line：`agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md`；監工台 artifact 5gGjausYwzjkPtc8UkTkKS（data.mjs RISKS 逐條處置）。
 - 根因：AI／拖曳的絕對座標靜默蓋掉位置按鈕（banner-layers.ts:342 place()）；自動排版不預留徽章／logo／商品；字級固定 64px；AI 只出一版且不帶 logo。

@@ -36,6 +36,9 @@ def samples(path) -> list:
     return list(struct.unpack(f"<{(len(b) - 44) // 2}h", b[44:]))
 
 
+META = {"listen": "en-US", "target": "zh-TW", "stt": "local", "channels": 1}
+
+
 def chunk(value: int, n: int = 1600) -> bytes:
     return struct.pack("<h", value) * n
 
@@ -74,9 +77,9 @@ class ArchiveRsPorts(TempDir):
         wall = datetime(2026, 11, 24, 10, 3)
         segments = [arc.Segment("Keynote", 0, wall), arc.Segment("Q&A", 65, wall)]
         lines = [
-            arc.Line(12, 0, "Welcome to the conference.", "歡迎來到研討會。"),
-            arc.Line(30, 0, "  ", ""),
-            arc.Line(3725, 1, "Any questions?", "", "講者 2"),
+            arc.Line(1, start=12, seg=0, text="Welcome to the conference.", tr="歡迎來到研討會。"),
+            arc.Line(2, start=30, seg=0, text="  "),
+            arc.Line(3, start=3725, seg=1, text="Any questions?", speaker="講者 2"),
         ]
         everything = arc.render("- 開始：x\n", segments, lines)
         self.assertTrue(everything.startswith("# 逐字稿\n\n- 開始：x\n"))
@@ -152,7 +155,7 @@ class RecorderRsPorts(TempDir):
 
     def test_a_recording_that_reaches_the_size_limit_continues_in_the_next_segment(self):
         clock, started = Clock(), []
-        a = arc.Archive(self.base, [], clock=clock, now=lambda: datetime(2026, 11, 24, 10, 3), on_segment=started.append)
+        a = arc.Archive(self.base, [], META, clock=clock, now=lambda: datetime(2026, 11, 24, 10, 3), on_segment=started.append)
         self.addCleanup(a.end)
         with mock.patch.object(arc, "WAV_MAX_BYTES", 6400):
             for _ in range(3):
@@ -176,7 +179,7 @@ class RecorderRsPorts(TempDir):
 
 class FolderCompatibility(TempDir):
     def meeting(self, clock: Clock) -> arc.Archive:
-        return arc.Archive(self.base, ["收音：測試"], clock=clock, now=lambda: datetime(2026, 11, 24, 10, 3))
+        return arc.Archive(self.base, ["收音：測試"], META, clock=clock, now=lambda: datetime(2026, 11, 24, 10, 3))
 
     @staticmethod
     def speak(a: arc.Archive, clock: Clock, seconds: int) -> None:
@@ -188,18 +191,14 @@ class FolderCompatibility(TempDir):
         clock = Clock()
         a = self.meeting(clock)
         self.speak(a, clock, 2)
-        a.open_line(1)
-        a.set_en(1, "Hello everyone.")
-        a.set_zh(1, "大家好。")
-        a.open_line(2)
-        a.set_en(2, "Never meant to be kept.")
+        a.line_final(arc.Line(1, text="Hello everyone.", final=True))
+        a.line_translated(1, "大家好。", False)
+        a.line_final(arc.Line(2, text="Never meant to be kept.", final=True))
         a.drop_line(2)
-        a.open_line(9)
         a.drop_line(9)
         a.next_segment("Q&A")
         self.speak(a, clock, 1)
-        a.open_line(3)
-        a.set_en(3, "Any questions?")
+        a.line_final(arc.Line(3, seg=1, text="Any questions?", final=True))
         a.end()
 
         self.assertEqual(ownvoice.sessions(), [{"id": "2026-11-24 1003", "wavs": 2, "transcript": True, "summary": False}])
@@ -236,12 +235,34 @@ class FolderCompatibility(TempDir):
         clock = Clock()
         a = self.meeting(clock)
         self.speak(a, clock, 1)
-        a.open_line(1)
-        a.set_en(1, "Hi.")
+        a.line_final(arc.Line(1, text="Hi.", final=True))
         a.rename_segment("開場\n致詞")
         self.assertEqual(a.info()["name"], "開場 致詞")
         a.end()
-        self.assertEqual(sorted(f for f in os.listdir(a.dir) if f != "transcript.md"), ["01-開場 致詞.md", "01-開場 致詞.wav"])
+        self.assertEqual(sorted(f for f in os.listdir(a.dir) if f not in ("transcript.md", "session.json")),
+                         ["01-開場 致詞.md", "01-開場 致詞.wav"])
+
+    def test_session_json_is_written_with_the_transcript_and_read_back(self):
+        clock = Clock()
+        a = self.meeting(clock)
+        self.speak(a, clock, 2)
+        a.line_final(arc.Line(1, start=0.25, end=1.5, text="Hello everyone.", tr="早期譯文", final=True))
+        a.line_translated(1, "大家好。", False)
+        a.line_final(arc.Line(2, start=1.6, end=1.9, text="Gone.", final=True))
+        a.drop_line(2)
+        a.line_final(arc.Line(3, start=1.7, end=1.95, text="Thanks.", final=True))
+        a.line_translated(3, "〔翻譯失敗：逾時〕", True)
+        a.dropped_sec = 0.4
+        a.end()
+        line = {"start": 0.0, "end": 0.0, "seg": 0, "who": "them", "speaker": None, "lang": "", "final": True}
+        self.assertEqual(ownvoice.session_lines("latest"), {
+            "version": 1, **META,
+            "lines": [{**line, "id": 1, "start": 0.25, "end": 1.5, "text": "Hello everyone.", "tr": "大家好。"},
+                      {**line, "id": 3, "start": 1.7, "end": 1.95, "text": "Thanks.", "tr": ""}],
+            "dropped_sec": 0.4,
+            "failed_lines": [{"id": 3, "error": "〔翻譯失敗：逾時〕"}],
+        })
+        self.assertIn("Thanks.\n　〔翻譯失敗：逾時〕\n", ownvoice.read_text("latest", "transcript.md"), "transcript.md shows the error as before")
 
 
 class SaveSwitch(unittest.IsolatedAsyncioTestCase):
@@ -265,7 +286,7 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
         def set_keys(self, anthropic_key, gemini_key):
             pass
 
-        async def __call__(self, system, user, on_delta, stop, early):
+        async def __call__(self, system, user, on_delta, stop, early, target="zh-TW"):
             return "譯文"
 
     @staticmethod
@@ -280,7 +301,7 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
             hub.feed(owner, chunk(200))
         s = hub.session
         for text in ("one two three.", "four five six."):
-            s.finish(s.open(), text)
+            s.finish(s.open(0.0), text, 0.0)
         await s.drain()
         await hub.stop()
         if hub.finalizing is not None:

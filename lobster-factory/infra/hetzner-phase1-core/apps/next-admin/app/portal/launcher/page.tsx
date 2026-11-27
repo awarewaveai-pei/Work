@@ -13,6 +13,7 @@ import { heldRightInput } from "@/lib/entitlements/product-right";
 import type { NextAdminProduct } from "@/lib/portal/doors";
 import { CreditsLine } from "./CreditsLine";
 import { DoorForm, ResumeSection, loadResume } from "./ResumeSection";
+import { RecentSection, loadRecent } from "./RecentSection";
 
 export const dynamic = "force-dynamic";
 
@@ -78,8 +79,9 @@ const H2 = { fontSize: 15, fontWeight: 700, margin: "0 0 12px" } as const;
 
 export default async function PortalLauncherPage({ searchParams }: { searchParams: Promise<{ door?: string }> }) {
   let orgId: string;
+  const h = await headers();
   try {
-    ({ orgId } = requireClientOrg({ headers: await headers() }));
+    ({ orgId } = requireClientOrg({ headers: h }));
   } catch (e) {
     if (e instanceof PortalAccessError) return <AccessDenied />;
     throw e;
@@ -93,6 +95,8 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
   const heldProducts = servedNextAdminProducts().filter((p) => held.has(p.key));
   const rights = failed ? new Map<string, RightLabel>() : await getRights(orgId, heldProducts);
   const resume = failed ? [] : await loadResume(orgId, held);
+  // the person's own use only: the user id is middleware's header (stripped from requests, middleware.ts), never a request value
+  const recent = failed ? { recent: [], frequent: [] } : await loadRecent(orgId, h.get("x-ops-user-id")?.trim() ?? "", held);
   const label = ({ key, name }: (typeof PRODUCTS)[number]): RightLabel => {
     const known = rights.get(key);
     if (known) return quiet(known);
@@ -113,6 +117,8 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
       <CreditsLine />
       {/* the unit's newest works and drafts; orgId is requireClientOrg's, never a request value (card U17) */}
       {!failed && <ResumeSection items={resume} />}
+      {/* 最近使用／常用: this person's own entitlement.usage rows, never a colleague's (card U24) */}
+      {!failed && <RecentSection data={recent} />}
       {failed && (
         <div style={{ margin: "0 0 24px" }}>
           <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", margin: "0 0 8px" }}>讀取產品清單時發生錯誤，請重新整理頁面再試一次。</p>

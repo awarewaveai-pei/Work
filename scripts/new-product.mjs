@@ -91,6 +91,16 @@ export async function createProduct(options) {
   assert(tasks.length > 0 && tasks.every((t) => Object.hasOwn(vocab.TASKS, t)), `--tasks must be one or more of: ${Object.keys(vocab.TASKS).join(', ')}`);
   assert(blurb && [...blurb].length <= 28, '--blurb is required, one line of at most 28 characters');
   assert(vocab.ICONS.includes(options.icon), `--icon must be one of: ${vocab.ICONS.join(', ')}`);
+  // Feature-layer tasks (U25): "demo.run=t1,t2;demo.x=t3". A feature left out inherits the product's tasks.
+  for (const item of (options['feature-tasks'] ?? '').split(';').map((x) => x.trim()).filter(Boolean)) {
+    const [featureKey, list = ''] = item.split('=');
+    const feature = features.find((f) => f.feature_key === featureKey.trim());
+    assert(feature, `--feature-tasks names an unknown feature: ${featureKey}`);
+    assert(!feature.catalog, `--feature-tasks names ${featureKey} twice`);
+    const own = list.split(',').map((t) => t.trim()).filter(Boolean);
+    assert(own.length > 0 && own.every((t) => Object.hasOwn(vocab.TASKS, t)), `--feature-tasks ${featureKey} must be one or more of: ${Object.keys(vocab.TASKS).join(', ')}`);
+    feature.catalog = { tasks: [...new Set(own)] };
+  }
   for (const p of PRODUCTS) {
     assert(p.key !== key, `duplicate key: ${key}`);
     assert(p.subdomain !== options.subdomain, `duplicate subdomain: ${options.subdomain}`);
@@ -173,7 +183,7 @@ export async function createProduct(options) {
 }
 
 async function main() {
-  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'category', 'tasks', 'blurb', 'icon', 'app', 'registry', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
+  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'category', 'tasks', 'blurb', 'icon', 'feature-tasks', 'app', 'registry', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
   // A noninteractive invocation never hangs asking for missing inputs.
   if (process.stdin.isTTY) {
     const foundry = values['from-foundry'] ? readFoundry(path.resolve(values['from-foundry'])) : null;
@@ -182,6 +192,14 @@ async function main() {
       for (const [key, question] of (foundry ? [['subdomain', '子網域'], ['features', '收費功能（demo.run:QUOTA）']] : [
         ['key', '產品 key'], ['name', '產品名稱'], ['subdomain', '1. 子網域'], ['page', '2. 頁面前綴（/demo）'], ['login', '3. 登入來源（逗號分隔，必含 local）'], ['standalone', '4. 可否單獨安裝（yes/no）'], ['config', '5. 客戶 API key 設定位置'], ['features', '收費功能（demo.run:QUOTA）'],
       ]).concat([['category', '分類（catalog-vocab.ts CATEGORIES）'], ['tasks', '任務 key（逗號分隔，catalog-vocab.ts TASKS）'], ['blurb', '一句話（≤ 28 字）'], ['icon', '圖示（catalog-vocab.ts ICONS）']])) if (values[key] === undefined) values[key] = await prompt.question(question + ': ');
+      if (values['feature-tasks'] === undefined) {
+        const answers = [];
+        for (const featureKey of (values.features ?? '').split(',').map((f) => f.trim().split(':')[0]).filter(Boolean)) {
+          const own = (await prompt.question(`功能 ${featureKey} 的任務 key（逗號分隔；直接 Enter＝沿用產品）: `)).trim();
+          if (own) answers.push(`${featureKey}=${own}`);
+        }
+        values['feature-tasks'] = answers.join(';');
+      }
     } finally { prompt.close(); }
   }
   const files = await createProduct(values);

@@ -3,20 +3,19 @@ import { useRef, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
-import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
-import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type ModelAspectRatio, type StudioModel } from "@/lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../../tarot/tarotStyles";
 import { BANNER_RETURN_TOOL } from "../banner-canvas-return";
-import { boxOnPicture, compositePrompt, ntdLabel, removeBgNtd, type PicArea } from "../banner-design";
-import { bannerLayout } from "../banner-layers";
-import { reservedAreas } from "../banner-layout";
+import { ntdLabel, removeBgNtd } from "../banner-design";
 import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
 import {
-  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, narrowedSizes, pictureAspect, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
-  type BakedPicture, type BgMode, type PresetKey, type ProductPos, type State,
+  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, narrowedSizes, selectedSizes, withSharedBackground,
+  type BgMode, type ProductPos, type State,
 } from "../banner-state";
+import { generateBgPicture, imageNtd } from "../scene-flow";
 import type { StepSlot } from "./order";
+import { SceneCountRow, ScenePicker, type SceneFlowHandle } from "./SceneFlow";
 import { AccordionSection, PresetChips, StepCard, SubHead, type StepCtx } from "./ui";
 
 // Marketing art-direction presets for the AI background (Tier 3 — commercial moods, not fine-art)
@@ -77,58 +76,7 @@ const STYLE_GROUPS_ALL = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
 
 const BG_MODE_LABEL: Record<BgMode, string> = { color: "純色", gradient: "漸層", upload: "上傳圖", ai: "AI 生成" };
 
-/** NT$ of one picture from `model` (the 圖片模型 button's price). */
-export const imageNtd = (model: StudioModel): number => STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.costNt ?? 0;
-
-/** One picture from the studio route (also AI 一鍵設計's scenes). Throws the route's message on failure. */
-export async function generateBgPicture(o: { model: StudioModel; prompt: string; aspect: ModelAspectRatio; refs?: string[] }): Promise<string> {
-  const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-    body:    JSON.stringify({ model: o.model, prompt: o.prompt, referenceImages: o.refs ?? [], aspectRatio: o.aspect }),
-  });
-  const data = await res.json() as { ok: boolean; image?: string; error?: string };
-  if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
-  return data.image;
-}
-
-/** The layout engine's reserved areas (reservedAreas) on size `k` of the design, as shares of the picture `model` draws
- *  for that size, and that picture's ratio (pictureAspect). Invariant: the prompt's areas and the generated ratio come
- *  from this one call, so a 3:1 drawn at 21:9 is told 21:9 coordinates. The product area is the one the layout keeps
- *  clear once the product is baked in (null = none). */
-export async function drawnAreas(v: State, k: PresetKey, model: StudioModel):
-  Promise<{ text: PicArea | null; product: PicArea | null; aspect: ModelAspectRatio; visible: PicArea }> {
-  const ps = PRESETS[k], aspect = pictureAspect(k, model);
-  const { text, product } = reservedAreas(await bannerLayout(v, ps));
-  return { text: text ? boxOnPicture(text, ps, aspect) : null, product: product ? boxOnPicture(product, ps, aspect) : null, aspect,
-    visible: boxOnPicture({ x: 0, y: 0, w: ps.w, h: ps.h }, ps, aspect) };
-}
-
-/** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside
- *  the product area the layout engine reserves there. A failed size = its message with the at-most-billed amount. */
-export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: { model: StudioModel; scene: string; refs: string[] }):
-  Promise<{ pics: Partial<Record<PresetKey, BakedPicture>>; errs: Partial<Record<PresetKey, string>> }> {
-  const got = await Promise.all(sizes.map(async (k) => {
-    try {
-      const areas = await drawnAreas(variantOf(st, k), k, o.model);
-      if (!areas.product) throw new Error("no_product_area");
-      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text, visible: areas.visible });
-      return [k, { image: await generateBgPicture({ model: o.model, prompt, aspect: areas.aspect, refs: o.refs }), area: areas.product }] as const;
-    } catch (err) {
-      return [k, err instanceof Error ? err : new Error(String(err))] as const;
-    }
-  }));
-  const pics: Partial<Record<PresetKey, BakedPicture>> = {}, errs: Partial<Record<PresetKey, string>> = {};
-  for (const [k, v] of got) {
-    if (!(v instanceof Error)) pics[k] = v;
-    else errs[k] = `${v.message}（最多已計費${ntdLabel(imageNtd(o.model))}）`;
-  }
-  return { pics, errs };
-}
-/** The model a product composite runs on: the picked one when it places a product as an object, else Nano Banana 2. */
-export const compositeModel = (m: StudioModel): StudioModel => (modelCompositesProduct(m) ? m : "nano-banana-2");
-
-export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: StepSlot }) {
+export default function StepCanvas({ slot, s, set, setS, flow }: StepCtx & { slot: StepSlot; flow: SceneFlowHandle }) {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const bgFileRef         = useRef<HTMLInputElement>(null);
   const productFileRef    = useRef<HTMLInputElement>(null);
@@ -190,42 +138,33 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     }
   }
 
-  // R3-C: 合成進場景 draws one picture per picked size at that size's ratio, the product inside the area the layout engine
-  // reserves for it there; a plain background is one picture every size crops
+  // R4-D: 合成進場景 runs the shared scene flow (scene-flow.ts): priced candidates at the main size, a free preview on
+  // click, the other sizes on their own priced button; a plain background is one picture every size crops
   const picked = selectedSizes(s);
   const compositing = s.aiBgCompositeProduct && !!s.productImage;
-  const calls = compositing ? picked.length : 1;
-  const [sizeErrors, setSizeErrors] = useState<Partial<Record<PresetKey, string>>>({});
+
+  /** Product ref first; a style ref only if the model has spare ref slots. */
+  const styleRefs = (): string[] => (s.aiBgRefMode === "ref" && s.aiBgRefImage ? [s.aiBgRefImage] : []);
 
   async function generateAiBg() {
     if (!effectiveBgPrompt.trim() && !compositing) return;
-    setS((prev) => ({ ...prev, generating: true, error: null }));
-    setSizeErrors({});
-    const maxRefs = STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.maxRefs ?? 0;
-    // Product ref takes priority; a style ref is appended only if the model has spare ref slots.
-    const refs: string[] = [];
-    if (compositing && s.productImage) refs.push(s.productImage);
-    if (s.aiBgRefMode === "ref" && s.aiBgRefImage && refs.length < maxRefs) refs.push(s.aiBgRefImage);
-    const trimmedRefs = refs.slice(0, maxRefs);
-    if (!compositing) {
-      try {
-        const image = await generateBgPicture({ model: s.aiBgModel, prompt: effectiveBgPrompt, aspect: p.aspect, refs: trimmedRefs });
-        // the product is drawn over this background (事後疊加): contact shadow, reflection, tone match on
-        setS((prev) => ({
-          ...withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }), generating: false,
-          ...(prev.productImage ? { grounding: groundingOn(prev.grounding) } : {}),
-        }));
-      } catch (err) {
-        setS((prev) => ({ ...prev, generating: false, error: String(err) }));
-      }
+    if (compositing) {
+      setS((prev) => ({ ...prev, error: null }));
+      void flow.draw(s, flow.count, { scene: effectiveBgPrompt, product: s.productImage, model: s.aiBgModel, styleRefs: styleRefs() });
       return;
     }
-    const { pics, errs } = await compositeSizes(s, picked, { model: s.aiBgModel, scene: effectiveBgPrompt, refs: trimmedRefs });
-    setSizeErrors(errs);
-    setS((prev) => ({
-      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics, picked) : prev), generating: false,
-      error: Object.keys(errs).length ? `${Object.keys(errs).length} 個尺寸合成失敗，那幾個尺寸沿用原本的背景。` : null,
-    }));
+    setS((prev) => ({ ...prev, generating: true, error: null }));
+    const maxRefs = STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.maxRefs ?? 0;
+    try {
+      const image = await generateBgPicture({ model: s.aiBgModel, prompt: effectiveBgPrompt, aspect: p.aspect, refs: styleRefs().slice(0, maxRefs) });
+      // the product is drawn over this background (事後疊加): contact shadow, reflection, tone match on
+      setS((prev) => ({
+        ...withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }), generating: false,
+        ...(prev.productImage ? { grounding: groundingOn(prev.grounding) } : {}),
+      }));
+    } catch (err) {
+      setS((prev) => ({ ...prev, generating: false, error: String(err) }));
+    }
   }
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
@@ -618,32 +557,26 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
             )}
           </div>
 
+          {compositing && <SceneCountRow flow={flow} eachNtd={imageNtd(s.aiBgModel)} />}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
             <button
               className="btn btn-primary"
-              disabled={s.generating || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelCompositesProduct(s.aiBgModel))}
+              disabled={s.generating || flow.busy || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelCompositesProduct(s.aiBgModel))}
               onClick={generateAiBg} data-testid="banner-ai-bg-generate">
-              {s.generating
+              {s.generating || flow.busy
                 ? "生成中…"
-                : `${compositing
-                  ? `${s.bgImage && s.bgMode === "ai" ? "重新合成" : "合成產品到場景"}：${calls} 個尺寸各一張`
-                  : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}（${calls > 1 ? `${calls} × ` : ""}${ntdLabel(imageNtd(s.aiBgModel))}${calls > 1 ? ` = ${ntdLabel(calls * imageNtd(s.aiBgModel))}` : ""}）`}
+                : compositing
+                  ? `合成產品到場景：候選 ${flow.count} 張（${ntdLabel(flow.count * imageNtd(s.aiBgModel))}）`
+                  : `${s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景"}（${ntdLabel(imageNtd(s.aiBgModel))}）`}
             </button>
             {s.bgImage && s.bgMode === "ai" && (
               <span className="form-hint" style={{ color: "var(--badge-green-text)" }}>
-                {s.aiBgCompositeProduct && s.productImage ? "✓ 已合成" : "✓ 背景已生成"}
+                {s.bgImageHasProduct ? "✓ 已合成" : "✓ 背景已生成"}
               </span>
             )}
             {s.bgMode === "ai" && bgCanvasButton}
           </div>
-          {compositing && picked.length > 1 && (
-            <p className="form-hint" style={{ margin: 0 }}>每個已選尺寸依自己的比例各生成一張，商品放在該尺寸預留的商品區，不被文字蓋到。</p>
-          )}
-          {Object.entries(sizeErrors).map(([k, e]) => (
-            <p key={k} className="form-hint" data-testid={`banner-composite-error-${k}`} style={{ margin: 0, color: "var(--badge-red-text)" }}>
-              {presetLabel(k as PresetKey)}：{e}
-            </p>
-          ))}
+          {compositing && <ScenePicker flow={flow} s={s} />}
         </div>
       )}
     </StepCard>

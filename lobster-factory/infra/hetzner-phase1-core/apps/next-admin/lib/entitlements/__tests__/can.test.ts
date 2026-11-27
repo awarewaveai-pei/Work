@@ -85,6 +85,17 @@ describe("can() — enforce", () => {
     expect(audit).toHaveBeenCalledWith(expect.objectContaining({ event: "entitlement.usage", actor: ACTOR, subject: CUSTOMER }));
   });
 
+  it("the recordUse row is marked use: true; the charge rows of report and a settled hold are not", async () => {
+    const { deps, audit } = gateFixture({ credits: true, balance: 50 });
+    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
+    await grant.recordUse({ provider: "anthropic" });
+    await grant.report({ units: 2, idempotencyKey: "idem-key-0101" });
+    await (await grant.hold(1, "hold-0101"))!.settle(1);
+    const rows = audit.mock.calls.map(([e]) => e).filter((e) => e.event === "entitlement.usage");
+    expect(rows.map((e) => e.payload.use ?? null)).toEqual([true, null, null]);
+    expect(rows[0].payload).toMatchObject({ provider: "anthropic" });
+  });
+
   it("a grant cannot be edited into an allowed one at runtime, nor retargeted to another org", async () => {
     const denied = await can(CUSTOMER, "social.dispatch", ACTOR, gateFixture({ entitlement: null }).deps);
     expect(() => { (denied as never as { info: { allowed: boolean } }).info.allowed = true; }).toThrow(TypeError);

@@ -227,7 +227,7 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         async def __call__(self, system, user, on_delta, stop, early):
             return "譯文"
 
-        async def complete(self, system, user):
+        async def complete(self, system, user, target="zh-TW"):
             self.completes.append(user)
             return "- 重點"
 
@@ -241,7 +241,7 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         await hub.start(owner, "local", "en-US", **flags)
         s = hub.session
         for text in ("one two three.", "four five six.", "seven eight nine."):
-            s.finish(s.open(), text)
+            s.finish(s.open(0.0), text, 0.0)
         await s.drain()
         hub.summary.last -= 3600       # the interval is over
         hub.summary.tick()

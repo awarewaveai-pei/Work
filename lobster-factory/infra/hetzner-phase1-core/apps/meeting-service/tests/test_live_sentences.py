@@ -120,5 +120,11 @@ class SentenceTests(unittest.TestCase):
         self.assertEqual(t.open, "可以請你")
 
 
+
+def test_spaces_between_chinese_characters_are_dropped_but_not_around_latin_words():
+    # 2026-11-27: Gemini's interim Chinese came out as 「今天我 們討 論新 產品」 on screen and in the transcript.
+    from lib.live.sentences import clean
+    assert clean("今天我 們討 論新 產品 用 AI 工具") == "今天我們討論新產品用 AI 工具"
+
 if __name__ == "__main__":
     unittest.main()

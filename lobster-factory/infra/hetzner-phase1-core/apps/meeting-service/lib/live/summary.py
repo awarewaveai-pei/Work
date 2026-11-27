@@ -25,9 +25,9 @@ DEFAULT_EVERY_MIN = 5.0
 class FinishedLine:
     id: int
     at: datetime
-    en: str
+    text: str
     # The final translation; empty while it is still on its way.
-    zh: str = ""
+    tr: str = ""
 
 
 def due(pending: int, since_last: float, every: Optional[float]) -> bool:
@@ -36,12 +36,12 @@ def due(pending: int, since_last: float, every: Optional[float]) -> bool:
 
 
 def transcript(lines: list) -> str:
-    """The batch as the model reads it: time, English, then the Chinese."""
+    """The batch as the model reads it: time, what was said, then its translation."""
     rows = []
     for l in lines:
-        if not l.en.strip():
+        if not l.text.strip():
             continue
-        rows.append(f"[{l.at.strftime('%H:%M')}] {l.en.strip()}" + (f"\n  （{l.zh.strip()}）" if l.zh.strip() else ""))
+        rows.append(f"[{l.at.strftime('%H:%M')}] {l.text.strip()}" + (f"\n  （{l.tr.strip()}）" if l.tr.strip() else ""))
     return "\n".join(rows)
 
 
@@ -50,6 +50,8 @@ class Summary:
                  clock: Callable[[], float] = time.monotonic, now: Callable[[], datetime] = datetime.now):
         """`await complete(system_blocks, user) -> text`; `system()` gives the system blocks at call time."""
         self.complete, self.system, self.emit, self.clock, self.now = complete, system, emit, clock, now
+        # () -> (the others' language, mine) for the request text (langs.py codes); () = the defaults.
+        self.languages: Callable[[], tuple] = tuple
         # Called with (text, updated) after every successful update; set per listening by the hub.
         self.on_update: Optional[Callable[[str, str], None]] = None
         self.enabled = False
@@ -91,19 +93,19 @@ class Summary:
 
     # ---- lines (batch.rs) ----
 
-    def line_finished(self, id: int, en: str) -> None:
+    def line_finished(self, id: int, text: str) -> None:
         if not self.enabled:
             return
         for l in self.pending:
             if l.id == id:
-                l.en = en
+                l.text = text
                 return
-        self.pending.append(FinishedLine(id, self.now(), en))
+        self.pending.append(FinishedLine(id, self.now(), text))
 
-    def line_translated(self, id: int, zh: str) -> None:
+    def line_translated(self, id: int, tr: str) -> None:
         for l in self.pending:
             if l.id == id:
-                l.zh = zh
+                l.tr = tr
                 return
 
     def requeue(self, lines: list) -> None:
@@ -152,7 +154,7 @@ class Summary:
     async def _run(self, lines: list, generation: int, on_update) -> None:
         text, error = "", ""
         try:
-            text = (await self.complete(self.system(), summary_user(self.text, transcript(lines)))).strip()
+            text = (await self.complete(self.system(), summary_user(self.text, transcript(lines), *self.languages()))).strip()
             if not text:
                 error = "摘要失敗：模型沒有回傳內容"
         except TranslateError as e:

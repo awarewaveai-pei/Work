@@ -6,7 +6,9 @@
   serverContent.inputTranscription.text         finalized text at a pause
 A session streams for up to 10 minutes, so it is replaced before that, at a pause when possible.
 
-`audio` carries bytes (16 kHz mono PCM16 little-endian) or None (= stop). The key lives only in the
+`audio` carries (start in the recording in samples, bytes of 16 kHz mono PCM16 little-endian) or None
+(= stop). Gemini says nothing about when words were spoken: a line starts and ends where the recording
+had been sent up to when its text arrived (late by Gemini's delay). The key lives only in the
 connection URL; every message shown to the user or raised has it scrubbed."""
 import asyncio
 import base64
@@ -61,6 +63,7 @@ class Live:
         self.spacing = Respace()
         self.tracker = Tracker()
         self.text = ""   # the turn's hypothesis so far
+        self.sent = 0    # the recording position (samples) streamed so far
 
     def handle(self, v: dict) -> None:
         sc = v.get("serverContent")
@@ -96,7 +99,7 @@ class Live:
         if self.current is not None:
             # Nothing final came of the rest of the hypothesis: the gray line is dropped.
             line, self.current = self.current, None
-            self.session.finish(line, "")
+            self.session.finish(line, "", self._now())
         self.tracker = Tracker()
         self.text = ""
 
@@ -105,19 +108,22 @@ class Live:
         if self.text:
             self.finish(self.text)
 
+    def _now(self) -> float:
+        return self.sent / RATE
+
     def _apply(self, events) -> None:
         for kind, text in events:
             if kind == INTERIM:
                 if self.current is None:
-                    self.current = self.session.open()
+                    self.current = self.session.open(self._now())
                 self.session.interim(self.current, text)
             elif kind == FINAL:
-                line = self.current if self.current is not None else self.session.open()
+                line = self.current if self.current is not None else self.session.open(self._now())
                 self.current = None
-                self.session.finish(line, text)
+                self.session.finish(line, text, self._now())
             elif kind == DROP and self.current is not None:
                 line, self.current = self.current, None
-                self.session.finish(line, "")
+                self.session.finish(line, "", self._now())
 
 
 def _parse(raw):
@@ -175,7 +181,8 @@ async def _connect(key: str, language: str):
         raise (_Fatal if code in (401, 403, 404) else _Retry)(msg)
     except Exception as e:
         raise _Retry(f"{type(e).__name__}: {e}")
-    languages = [language.strip()] if language.strip() else []
+    # langs.py code; auto = no hint (Gemini decides; the line's language then comes from its script).
+    languages = [] if language in ("", "auto") else [language]
     setup = {
         "setup": {
             "model": f"models/{MODEL}",
@@ -239,10 +246,10 @@ async def _session(session, usage, key: str, language: str, audio: asyncio.Queue
             if reader.done():
                 return _after_reader(reader, started, clock)
             try:
-                chunk = await asyncio.wait_for(audio.get(), TICK)
+                item = await asyncio.wait_for(audio.get(), TICK)
             except asyncio.TimeoutError:
-                chunk = b""
-            if chunk is None:
+                item = ()
+            if item is None:
                 # Listening stopped: end the stream and give the last words a moment to arrive.
                 try:
                     await ws.send(json.dumps({"realtimeInput": {"audioStreamEnd": True}}))
@@ -250,9 +257,11 @@ async def _session(session, usage, key: str, language: str, audio: asyncio.Queue
                 except ConnectionClosed:
                     pass
                 return _AUDIO_CLOSED
-            if chunk:
+            if item:
+                at, chunk = item
                 last_audio = clock()
                 await ws.send(audio_message(chunk))
+                live.sent = at + len(chunk) // 2
                 # Gemini bills every second streamed, silence included.
                 usage.add_audio("gemini-live", len(chunk) / 2 / RATE)
             now = clock()
@@ -274,14 +283,20 @@ async def _session(session, usage, key: str, language: str, audio: asyncio.Queue
         await _close(ws)
 
 
-def _drain(audio: asyncio.Queue) -> bool:
-    """Empty the queue; True if the stop marker (None) was in it."""
-    while True:
-        try:
-            if audio.get_nowait() is None:
+def _drain(audio: asyncio.Queue, session) -> bool:
+    """Empty the queue, reporting the audio as lost; True if the stop marker (None) was in it."""
+    samples = 0
+    try:
+        while True:
+            item = audio.get_nowait()
+            if item is None:
                 return True
-        except asyncio.QueueEmpty:
-            return False
+            samples += len(item[1]) // 2
+    except asyncio.QueueEmpty:
+        return False
+    finally:
+        if samples:
+            session.lost(samples / RATE)
 
 
 async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
@@ -300,7 +315,7 @@ async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30)
             # Audio from while the line was down is not sent late; a stop asked for meanwhile is honoured.
-            if _drain(audio):
+            if _drain(audio, session):
                 return
             continue
         finally:

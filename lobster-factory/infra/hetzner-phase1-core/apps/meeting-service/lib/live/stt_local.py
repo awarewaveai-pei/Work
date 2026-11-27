@@ -1,9 +1,10 @@
 # Ported from OwnVoice Meet src-tauri/src/stt_chunk.rs (Apache-2.0, https://github.com/Zaious/ownvoice-meet, 08e3ab3).
 """Speech-to-text by sentence on this machine: the energy segmenter cuts utterances out of the audio
 and a resident faster-whisper model transcribes them one at a time (keeps captions in order).
-A gray "…" line shows while someone talks; the text arrives when the sentence ends.
+A gray "…" line shows while someone talks; the text arrives when the sentence ends. A line's start and
+end are where the segmenter heard the speech begin and end, as positions in the recording.
 
-`audio` carries bytes (16 kHz mono PCM16 little-endian) or None (= stop)."""
+`audio` carries (start in the recording in samples, bytes of 16 kHz mono PCM16 little-endian) or None (= stop)."""
 import asyncio
 import gc
 import threading
@@ -12,6 +13,7 @@ import time
 import numpy as np
 
 from lib import gpu_gate, transcribe
+from lib.live import langs
 from lib.live.vad import END, DISCARD, START, Segmenter
 
 RATE = 16_000
@@ -27,10 +29,6 @@ _model_lock = threading.Lock()
 _infer_lock = threading.Lock()
 
 
-def iso639(bcp47: str) -> str:
-    return (bcp47 or "").replace("_", "-").split("-")[0].strip().lower()
-
-
 def default_model():
     """The resident model, loaded on first use through transcribe.pick_device."""
     global _model
@@ -40,11 +38,12 @@ def default_model():
         return _model
 
 
-def _recognize(model_provider, utterance, language) -> str:
+def _recognize(model_provider, utterance, language) -> tuple:
+    """(text, the langs.py code whisper detected, "" when not in the table; None when `language` was given)."""
     with _infer_lock:
         model = model_provider()
         samples = utterance.astype(np.float32) / 32768.0
-        segments, _info = model.transcribe(
+        segments, info = model.transcribe(
             samples,
             beam_size=1,
             condition_on_previous_text=False,
@@ -53,7 +52,11 @@ def _recognize(model_provider, utterance, language) -> str:
             # Without it Whisper writes Simplified Chinese (same prompt as the batch pipeline).
             initial_prompt=transcribe.ZH_PROMPT if language == "zh" else None,
         )
-        return transcribe.joined_text(s.text for s in segments)
+        text = transcribe.joined_text(s.text for s in segments)
+        if language:
+            return text, None
+        found = langs.from_whisper(getattr(info, "language", "") or "")
+        return text, found.code if found else ""
 
 
 def _unload() -> None:
@@ -66,14 +69,35 @@ def _unload() -> None:
             gc.collect()
 
 
+class _Positions:
+    """Segmenter sample index -> seconds into the recording. The two stop running in step where audio
+    was dropped on the way here (and through the silence fed in below, where no speech is ever found)."""
+
+    def __init__(self):
+        self.marks = [(0, 0)]   # (segmenter index, recording position) where a stretch in step begins
+
+    def mark(self, index: int, at: int) -> None:
+        i, p = self.marks[-1]
+        if p + index - i != at:
+            self.marks.append((index, at))
+
+    def seconds(self, index: int) -> float:
+        i, p = next(m for m in reversed(self.marks) if m[0] <= index)
+        return (p + index - i) / RATE
+
+    def forget_before(self, index: int) -> None:
+        while len(self.marks) > 1 and self.marks[1][0] <= index:
+            del self.marks[0]
+
+
 async def _worker(session, usage, jobs, model_provider, language):
     while True:
         job = await jobs.get()
         if job is None:
             return
-        line, utterance = job
+        line, utterance, end = job
         try:
-            text = await asyncio.to_thread(_recognize, model_provider, utterance, language)
+            text, detected = await asyncio.to_thread(_recognize, model_provider, utterance, language)
         except asyncio.CancelledError:
             session.drop(line)
             raise
@@ -83,7 +107,7 @@ async def _worker(session, usage, jobs, model_provider, language):
             session.status(msg)
         else:
             usage.add_audio("local-whisper", len(utterance) / RATE)
-            session.finish(line, text)
+            session.finish(line, text, end, detected)
 
 
 async def run(session, usage, language: str, audio: asyncio.Queue, model_provider=None):
@@ -101,16 +125,17 @@ async def run(session, usage, language: str, audio: asyncio.Queue, model_provide
             session.status(f"本機辨識模型載入失敗：{type(e).__name__}: {e}")
             return
         session.status("聆聽中（本機辨識）")
-        lang = iso639(language) or None
+        lang = (langs.find(language).whisper if langs.find(language) else "") or None
         jobs = asyncio.Queue()
         worker = asyncio.ensure_future(_worker(session, usage, jobs, provider, lang))
         seg = Segmenter(RATE)
+        where = _Positions()
         current = None
         last_audio = time.monotonic()
         silence = bytes(CHUNK_SAMPLES * 2)
         while True:
             try:
-                chunk = await asyncio.wait_for(audio.get(), TICK)
+                item = await asyncio.wait_for(audio.get(), TICK)
             except asyncio.TimeoutError:
                 # Loopback delivers nothing while nothing plays: feed silence so a sentence can end.
                 if time.monotonic() - last_audio > SILENCE_AFTER and seg.in_speech():
@@ -118,21 +143,24 @@ async def run(session, usage, language: str, audio: asyncio.Queue, model_provide
                 else:
                     continue
             else:
-                if chunk is None:
+                if item is None:
                     break
+                at, pcm = item
                 last_audio = time.monotonic()
-                events = seg.push(chunk)
+                where.mark(seg.pushed, at)
+                events = seg.push(pcm)
             for ev in events:
                 if ev.kind == START:
-                    current = session.open()
+                    current = session.open(where.seconds(ev.start))
                 elif ev.kind == END:
                     if current is not None:
-                        jobs.put_nowait((current, ev.audio))
+                        jobs.put_nowait((current, ev.audio, where.seconds(ev.end)))
                         current = None
                 elif ev.kind == DISCARD:
                     if current is not None:
                         session.drop(current)
                         current = None
+            where.forget_before(seg.onset if seg.in_speech() else seg.done)
         if current is not None:
             session.drop(current)
         jobs.put_nowait(None)

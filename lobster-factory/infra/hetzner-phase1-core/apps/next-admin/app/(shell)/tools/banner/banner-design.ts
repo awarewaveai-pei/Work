@@ -265,34 +265,55 @@ export function scenePrompt(o: { subject: string; vibe: string; textArea: PicAre
  *  `visible` = the band of the picture the canvas shows (3:1 cuts the rest). */
 export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null; visible?: PicArea }): string {
   const scene = o.scene.trim() || "a clean professional studio background";
-  const v = o.visible ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
-  const a = o.productArea, t = o.textArea;
-  const sideBySide = !!t && (t.x1 <= a.x0 || a.x1 <= t.x0);
-  let placement: string, keepClear: string;
-  if (sideBySide) {
-    placement = `Place the product in the column x ${pct(a.x0)}-${pct(a.x1)} of the picture, centred in it, the WHOLE product inside that column ` +
-      `and between y ${pct(v.y0)} and ${pct(v.y1)} (the part of the picture that is shown), never cropped by an edge; ` +
-      `the product about ${pct((v.y1 - v.y0) * 0.5)} of the picture height tall -- about half of the shown height, not bigger. `;
-    keepClear = `Keep the whole column x ${pct(t!.x0)}-${pct(t!.x1)}, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.`;
-  } else {
-    // the lower-right rule-of-thirds crossing, named only when the layout put the product there (shares of the shown band)
-    const cx = ((a.x0 + a.x1) / 2 - v.x0) / (v.x1 - v.x0), cy = ((a.y0 + a.y1) / 2 - v.y0) / (v.y1 - v.y0);
-    const crossing = Math.abs(cx - 2 / 3) <= 0.1 && Math.abs(cy - 2 / 3) <= 0.1 ? " -- the lower-right crossing of the rule-of-thirds lines" : "";
-    placement = `Place the product inside ${areaText(a)}${crossing}: the WHOLE product inside that area and inside the picture, ` +
-      `never cropped by the edge, about ${pct(a.y1 - a.y0)} of the picture height tall -- not bigger. `;
-    const above = !!t && (t.y0 + t.y1) / 2 < (a.y0 + a.y1) / 2;
-    keepClear = !t ? `Keep clean negative space for a headline.`
-      : `Keep the ${above ? "top" : "bottom"} band y ${pct(t.y0)}-${pct(t.y1)} of the picture, across its whole width, clean and uncluttered for a headline -- ` +
-        `the product stays ${above ? "below" : "above"} it; nothing else in the picture carries text.`;
-  }
+  const { placement, keepClear } = zoning(o);
   return `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` + placement +
     `Physically PLACE it resting on a real surface that belongs to the scene -- a table, counter or shelf -- ` +
     `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
     `NOT floating, NOT pasted flat over the background. ` +
     `Match the scene's camera perspective, depth of field, lighting direction and color temperature; ` +
     `add soft contact shadows and subtle surface reflection so it looks physically present. ` +
-    `Keep the product's exact shape, label, colors, text and proportions unchanged -- do not distort, recolor, relabel or redraw it. ` +
-    keepClear;
+    PRODUCT_UNCHANGED + keepClear;
+}
+
+const PRODUCT_UNCHANGED = `Keep the product's exact shape, label, colors, text and proportions unchanged -- do not distort, recolor, relabel or redraw it. `;
+
+/** The placement and keep-clear sentences of a product picture at one size (compositePrompt's rules above). */
+function zoning(o: { productArea: PicArea; textArea: PicArea | null; visible?: PicArea }): { placement: string; keepClear: string } {
+  const v = o.visible ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
+  const a = o.productArea, t = o.textArea;
+  if (t && (t.x1 <= a.x0 || a.x1 <= t.x0)) {
+    return {
+      placement: `Place the product in the column x ${pct(a.x0)}-${pct(a.x1)} of the picture, centred in it, the WHOLE product inside that column ` +
+        `and between y ${pct(v.y0)} and ${pct(v.y1)} (the part of the picture that is shown), never cropped by an edge; ` +
+        `the product about ${pct((v.y1 - v.y0) * 0.5)} of the picture height tall -- about half of the shown height, not bigger. `,
+      keepClear: `Keep the whole column x ${pct(t.x0)}-${pct(t.x1)}, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.`,
+    };
+  }
+  // the lower-right rule-of-thirds crossing, named only when the layout put the product there (shares of the shown band)
+  const cx = ((a.x0 + a.x1) / 2 - v.x0) / (v.x1 - v.x0), cy = ((a.y0 + a.y1) / 2 - v.y0) / (v.y1 - v.y0);
+  const crossing = Math.abs(cx - 2 / 3) <= 0.1 && Math.abs(cy - 2 / 3) <= 0.1 ? " -- the lower-right crossing of the rule-of-thirds lines" : "";
+  const above = !!t && (t.y0 + t.y1) / 2 < (a.y0 + a.y1) / 2;
+  return {
+    placement: `Place the product inside ${areaText(a)}${crossing}: the WHOLE product inside that area and inside the picture, ` +
+      `never cropped by the edge, about ${pct(a.y1 - a.y0)} of the picture height tall -- not bigger. `,
+    keepClear: !t ? `Keep clean negative space for a headline.`
+      : `Keep the ${above ? "top" : "bottom"} band y ${pct(t.y0)}-${pct(t.y1)} of the picture, across its whole width, clean and uncluttered for a headline -- ` +
+        `the product stays ${above ? "below" : "above"} it; nothing else in the picture carries text.`,
+  };
+}
+
+/** R4-D: another size of a picked scene. The call carries TWO references -- the picked picture first, the product photo
+ *  second -- and asks for that same scene redrawn at this size's ratio (not a new scene from the words), the product
+ *  in this size's product area (the same zoning as compositePrompt). */
+export function extendPrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null; visible?: PicArea }): string {
+  const scene = o.scene.trim();
+  const { placement, keepClear } = zoning(o);
+  return `The FIRST reference image is an approved advertising scene; the SECOND is the product photo. ` +
+    `Redraw that SAME scene at this picture's aspect ratio: the same setting, surfaces, props, lighting, colour palette and camera feel, ` +
+    `extended or reframed to fill the new shape -- not a different scene${scene ? ` (the scene: ${scene})` : ""}. ` +
+    `The same product as in both references. ` + placement +
+    `It stands on the same surface as in the first reference, base touching it with a grounded contact shadow, NOT floating. ` +
+    PRODUCT_UNCHANGED + keepClear;
 }
 
 /** AI 一鍵設計's scene choice: how many pictures it draws (operator 2026-11-27: pick one of several; default 3). */

@@ -1,0 +1,9036 @@
+{
+  "schemaVersion": 1,
+  "source": "lib/portal/products.ts",
+  "products": [
+    {
+      "key": "cognitive",
+      "name": "AI LEGO Cognitive Engineering OS",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        },
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        },
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      }
+    },
+    {
+      "key": "content",
+      "name": "內容行銷",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "write-seo-article",
+          "name": "寫 SEO 文章",
+          "synonyms": [
+            "寫文章",
+            "部落格",
+            "SEO"
+          ]
+        },
+        {
+          "key": "plan-monthly-topics",
+          "name": "排每月題目",
+          "synonyms": [
+            "內容行事曆",
+            "選題"
+          ]
+        },
+        {
+          "key": "publish-to-site",
+          "name": "發布到網站",
+          "synonyms": [
+            "發文",
+            "上架文章",
+            "WordPress"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      }
+    },
+    {
+      "key": "design",
+      "name": "設計編輯器",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "edit-design",
+          "name": "編輯設計",
+          "synonyms": [
+            "畫布",
+            "向量"
+          ]
+        },
+        {
+          "key": "make-banner",
+          "name": "做橫幅",
+          "synonyms": [
+            "廣告圖",
+            "Banner"
+          ]
+        },
+        {
+          "key": "make-mockup",
+          "name": "做擬真圖",
+          "synonyms": [
+            "模型圖",
+            "Mockup"
+          ]
+        }
+      ],
+      "blurb": "畫布、橫幅、模型圖與向量設計",
+      "icon": "palette",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "design"
+      }
+    },
+    {
+      "key": "outreach",
+      "name": "行銷開發信",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "write-outreach-emails",
+          "name": "寫開發信",
+          "synonyms": [
+            "陌生開發",
+            "寄信"
+          ]
+        },
+        {
+          "key": "find-leads",
+          "name": "找潛在客戶",
+          "synonyms": [
+            "名單",
+            "開發名單"
+          ]
+        },
+        {
+          "key": "track-replies",
+          "name": "追蹤回信",
+          "synonyms": [
+            "回信分類",
+            "跟進"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      }
+    },
+    {
+      "key": "social",
+      "name": "社群發文",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "schedule-social-posts",
+          "name": "排社群貼文",
+          "synonyms": [
+            "排程發文",
+            "FB",
+            "IG"
+          ]
+        },
+        {
+          "key": "rewrite-per-platform",
+          "name": "改寫成各平台",
+          "synonyms": [
+            "改寫貼文",
+            "多平台"
+          ]
+        },
+        {
+          "key": "auto-reply",
+          "name": "自動回覆",
+          "synonyms": [
+            "留言回覆",
+            "私訊回覆"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      }
+    },
+    {
+      "key": "studio",
+      "name": "商品設計工作室",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "make-product-images",
+          "name": "做商品圖",
+          "synonyms": [
+            "商品照",
+            "產品圖"
+          ]
+        },
+        {
+          "key": "write-product-copy",
+          "name": "寫商品文案",
+          "synonyms": [
+            "商品描述",
+            "文案"
+          ]
+        },
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      }
+    },
+    {
+      "key": "tarot",
+      "name": "塔羅製圖",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "make-tarot-cards",
+          "name": "做塔羅牌",
+          "synonyms": [
+            "塔羅",
+            "牌卡"
+          ]
+        }
+      ],
+      "blurb": "生成塔羅牌圖片與提示詞",
+      "icon": "cards",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "tarot"
+      }
+    },
+    {
+      "key": "video",
+      "name": "影片製作",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "make-short-video",
+          "name": "做短影片",
+          "synonyms": [
+            "短影音",
+            "Reels"
+          ]
+        },
+        {
+          "key": "write-script",
+          "name": "寫腳本",
+          "synonyms": [
+            "分鏡",
+            "劇本"
+          ]
+        },
+        {
+          "key": "add-voiceover",
+          "name": "配旁白",
+          "synonyms": [
+            "配音",
+            "語音"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      }
+    }
+  ],
+  "features": [
+    {
+      "key": "ai.draft_record",
+      "name": "ai.draft_record -- Plain-language brief to method input draft (AI Gateway)",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.adr",
+      "name": "架構決策紀錄",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "架構決策紀錄",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.atam",
+      "name": "架構取捨分析法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "架構取捨分析法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.ddd",
+      "name": "領域驅動設計",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "領域驅動設計",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.dependency_mapping",
+      "name": "相依關係地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "相依關係地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.event_storming",
+      "name": "事件風暴",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "事件風暴",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.fitness_functions",
+      "name": "架構適應度函數",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "架構適應度函數",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.quality_attribute_scenario",
+      "name": "品質屬性情境",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "品質屬性情境",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.strangler_fig",
+      "name": "絞殺者模式",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "絞殺者模式",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.system_context_model",
+      "name": "C4 模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "C4 模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "architecture.trade_off_matrix",
+      "name": "架構取捨矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "架構取捨矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.conflict_mapping",
+      "name": "衝突地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "衝突地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.full_stop_method",
+      "name": "句點分析法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "句點分析法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.life_timeline",
+      "name": "生命時間線（正向／反向）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "生命時間線（正向／反向）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.life_wheel",
+      "name": "生命之輪",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "生命之輪",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.metaphor_dialogue",
+      "name": "隱喻對話",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "隱喻對話",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.motivation_matrix",
+      "name": "動機矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "動機矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.personal_swot",
+      "name": "個人 SWOT",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "個人 SWOT",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.role_playing",
+      "name": "角色扮演",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "角色扮演",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.story_completion",
+      "name": "故事延續",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "故事延續",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.storytelling",
+      "name": "故事敘說",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "故事敘說",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.synonym_substitution",
+      "name": "同義詞替換",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "同義詞替換",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.turning_point_analysis",
+      "name": "轉折點分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "轉折點分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.value_clarification",
+      "name": "價值澄清",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "價值澄清",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.visual_metaphor",
+      "name": "視覺隱喻創作",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "視覺隱喻創作",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.workshop_certificate_drawing",
+      "name": "工作坊證章畫",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "工作坊證章畫",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "art_therapy.wusheng_five_phase",
+      "name": "五階段療程系統（五行五階段）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "reflect-on-self",
+          "name": "自我覺察",
+          "synonyms": [
+            "藝術治療",
+            "反思"
+          ]
+        }
+      ],
+      "blurb": "五階段療程系統（五行五階段）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "artifact.generate_chart",
+      "name": "artifact.generate_chart -- Chart Rendering Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "artifact.generate_proposal",
+      "name": "artifact.generate_proposal -- Business Proposal Artifact Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "artifact.generate_research_paper",
+      "name": "artifact.generate_research_paper -- Research Findings to Research Memo/Paper Artifact Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.affinity_diagram",
+      "name": "親和圖／KJ 法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "親和圖／KJ 法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.analogy_mapping",
+      "name": "類比映射",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "類比映射",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.attribute_listing",
+      "name": "屬性列舉法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "屬性列舉法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.concept_map",
+      "name": "概念圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "概念圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.mind_map",
+      "name": "心智圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "心智圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "association.morphological_analysis",
+      "name": "型態分析法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "型態分析法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.counterfactual_reasoning",
+      "name": "反事實推理",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "反事實推理",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.dag",
+      "name": "因果圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "因果圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.difference_in_differences",
+      "name": "差異中的差異法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "差異中的差異法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.instrumental_variables",
+      "name": "工具變數法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "工具變數法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.logic_model",
+      "name": "邏輯模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "邏輯模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.process_tracing",
+      "name": "過程追蹤法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "過程追蹤法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.rct",
+      "name": "隨機對照試驗",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "隨機對照試驗",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.regression_discontinuity",
+      "name": "斷點迴歸設計",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "斷點迴歸設計",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.synthetic_control",
+      "name": "合成控制法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "合成控制法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "causal.theory_of_change",
+      "name": "改變理論",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "改變理論",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.blue_team",
+      "name": "藍隊防禦",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "藍隊防禦",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.counterexample_search",
+      "name": "反例搜尋",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "反例搜尋",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.devils_advocate",
+      "name": "魔鬼代言人",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "魔鬼代言人",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.disconfirming_evidence",
+      "name": "反證搜尋",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "反證搜尋",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.fmea",
+      "name": "失效模式與影響分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "失效模式與影響分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.hazop",
+      "name": "危害與可操作性分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "危害與可操作性分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.independent_judge",
+      "name": "獨立裁決",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "獨立裁決",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.pre_mortem",
+      "name": "事前驗屍",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "事前驗屍",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.red_team",
+      "name": "紅隊攻擊",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "紅隊攻擊",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "challenge.stress_testing",
+      "name": "壓力測試（情境）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "壓力測試（情境）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "computation.monte_carlo",
+      "name": "蒙地卡羅模擬",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "蒙地卡羅模擬",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "content.article",
+      "name": "文章生成",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "write-seo-article",
+          "name": "寫 SEO 文章",
+          "synonyms": [
+            "寫文章",
+            "部落格",
+            "SEO"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.brand-voice",
+      "name": "品牌語氣擷取",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "extract-brand-voice",
+          "name": "擷取品牌語氣",
+          "synonyms": [
+            "品牌語調",
+            "語氣"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.hook-brief",
+      "name": "Hook 草稿",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "write-hook",
+          "name": "寫開頭",
+          "synonyms": [
+            "Hook",
+            "開場"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.humanize",
+      "name": "文章人性化",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "humanize-text",
+          "name": "人性化文字",
+          "synonyms": [
+            "去 AI 味",
+            "潤稿"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.image",
+      "name": "內容配圖",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "make-article-images",
+          "name": "做文章配圖",
+          "synonyms": [
+            "配圖",
+            "封面圖"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.keywords",
+      "name": "關鍵字建議",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "find-keywords",
+          "name": "找關鍵字",
+          "synonyms": [
+            "關鍵字研究",
+            "SEO 關鍵字"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.market-analysis",
+      "name": "市場分析",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "analyze-competitors",
+          "name": "分析競爭對手",
+          "synonyms": [
+            "市場分析",
+            "競品"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.outline",
+      "name": "大綱生成",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "outline-article",
+          "name": "排文章大綱",
+          "synonyms": [
+            "大綱",
+            "架構"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.plan",
+      "name": "每月題目規劃",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "plan-monthly-topics",
+          "name": "排每月題目",
+          "synonyms": [
+            "內容行事曆",
+            "選題"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.seo-fix",
+      "name": "SEO 修正",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "fix-seo",
+          "name": "修 SEO",
+          "synonyms": [
+            "SEO 檢查",
+            "SEO 修正"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.syndicate",
+      "name": "多平台內容改寫",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "rewrite-per-platform",
+          "name": "改寫成各平台",
+          "synonyms": [
+            "改寫貼文",
+            "多平台"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.title",
+      "name": "標題建議",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "suggest-titles",
+          "name": "想標題",
+          "synonyms": [
+            "下標",
+            "標題"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "content.trending",
+      "name": "趨勢分析",
+      "category": "content",
+      "categoryName": "內容",
+      "tasks": [
+        {
+          "key": "find-trending-topics",
+          "name": "找熱門題目",
+          "synonyms": [
+            "趨勢",
+            "熱門話題"
+          ]
+        }
+      ],
+      "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+      "icon": "article",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "content"
+      },
+      "product": "content"
+    },
+    {
+      "key": "database_data.backup_restore_drill",
+      "name": "備份還原演練",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "備份還原演練",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.data_contract",
+      "name": "資料契約",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料契約",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.data_lineage",
+      "name": "資料血緣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料血緣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.data_quality_dimensions",
+      "name": "資料品質維度",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料品質維度",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.erd",
+      "name": "實體關係圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "實體關係圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.expand_contract_migration",
+      "name": "擴張-收縮式遷移",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "擴張-收縮式遷移",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.normalization",
+      "name": "正規化",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "正規化",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.reconciliation",
+      "name": "資料對帳",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料對帳",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.retention_deletion_model",
+      "name": "保留與刪除模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "保留與刪除模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "database_data.schema_compatibility_analysis",
+      "name": "Schema 相容性分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "Schema 相容性分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.ahp",
+      "name": "層級分析法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "層級分析法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.decision_tree",
+      "name": "決策樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "決策樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.eisenhower_matrix",
+      "name": "艾森豪矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "艾森豪矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.expected_value",
+      "name": "期望值",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "期望值",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.ice",
+      "name": "ICE 評分法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "ICE 評分法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.impact_effort",
+      "name": "影響力-努力矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "影響力-努力矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.kano",
+      "name": "卡諾模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "卡諾模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.mcda",
+      "name": "多準則決策分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "多準則決策分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.moscow",
+      "name": "MoSCoW 優先分級",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "MoSCoW 優先分級",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.pareto_frontier",
+      "name": "柏拉圖前緣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "柏拉圖前緣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.rice",
+      "name": "RICE 優先排序法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "RICE 優先排序法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.topsis",
+      "name": "逼近理想解排序法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "逼近理想解排序法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.weighted_decision_matrix",
+      "name": "加權決策矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "加權決策矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decision.wsjf",
+      "name": "加權最短工作優先法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "加權最短工作優先法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.fast",
+      "name": "功能分析系統技術",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "功能分析系統技術",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.functional_decomposition",
+      "name": "功能分解",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "功能分解",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.hierarchical_task_analysis",
+      "name": "階層式任務分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "階層式任務分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.issue_tree",
+      "name": "議題樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "議題樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.logic_tree",
+      "name": "邏輯樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "邏輯樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.mece",
+      "name": "MECE 檢查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "MECE 檢查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.objective_tree",
+      "name": "目標樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "目標樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.problem_tree",
+      "name": "問題樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "問題樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "decomposition.wbs",
+      "name": "工作分解結構",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "工作分解結構",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.change_risk_matrix",
+      "name": "變更風險矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "變更風險矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.critical_path_method",
+      "name": "要徑法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "要徑法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.decision_log",
+      "name": "決策日誌",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "決策日誌",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.definition_of_done",
+      "name": "完成的定義",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "完成的定義",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.dependency_graph",
+      "name": "任務相依圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "任務相依圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.gantt_chart",
+      "name": "甘特圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "甘特圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.outcome_roadmap",
+      "name": "成果導向路線圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "成果導向路線圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.raci",
+      "name": "交付 RACI 矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "交付 RACI 矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.raid_log",
+      "name": "RAID 日誌",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "RAID 日誌",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.risk_register",
+      "name": "風險登記表",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "風險登記表",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "delivery.stage_gate",
+      "name": "階段關卡法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "階段關卡法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "design.edit",
+      "name": "畫布與向量編輯",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "edit-design",
+          "name": "編輯設計",
+          "synonyms": [
+            "畫布",
+            "向量"
+          ]
+        },
+        {
+          "key": "make-banner",
+          "name": "做橫幅",
+          "synonyms": [
+            "廣告圖",
+            "Banner"
+          ]
+        },
+        {
+          "key": "make-mockup",
+          "name": "做擬真圖",
+          "synonyms": [
+            "模型圖",
+            "Mockup"
+          ]
+        }
+      ],
+      "blurb": "畫布、橫幅、模型圖與向量設計",
+      "icon": "palette",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "design"
+      },
+      "product": "design"
+    },
+    {
+      "key": "devops_sre.blue_green_deployment",
+      "name": "藍綠部署",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "藍綠部署",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.canary_deployment",
+      "name": "金絲雀部署",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "金絲雀部署",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.capacity_model",
+      "name": "容量模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "容量模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.chaos_engineering",
+      "name": "混沌工程",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "混沌工程",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.error_budget",
+      "name": "錯誤預算",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "錯誤預算",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.game_day",
+      "name": "演習日",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "演習日",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.load_test",
+      "name": "負載測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "負載測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.release_readiness_review",
+      "name": "發布就緒審查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "發布就緒審查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.rto_rpo",
+      "name": "復原時間目標／復原點目標",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "復原時間目標／復原點目標",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.runbook_execution",
+      "name": "作業手冊執行",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "作業手冊執行",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.sli_slo",
+      "name": "服務等級指標／目標／協議",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "服務等級指標／目標／協議",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.soak_test",
+      "name": "浸泡測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "浸泡測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "devops_sre.stress_test",
+      "name": "壓力測試（工程）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "壓力測試（工程）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.brainwriting",
+      "name": "腦力書寫法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "腦力書寫法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.classic_brainstorming",
+      "name": "經典腦力激盪",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "經典腦力激盪",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.crazy_eights",
+      "name": "瘋狂 8 法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "瘋狂 8 法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.creative_constraints",
+      "name": "創意限制",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "創意限制",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.design_thinking",
+      "name": "設計思考",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "設計思考",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.forced_connections",
+      "name": "強制關聯法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "強制關聯法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.lateral_thinking",
+      "name": "水平思考",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "水平思考",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.lotus_blossom",
+      "name": "蓮花座法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "蓮花座法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.random_stimulus",
+      "name": "隨機刺激法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "隨機刺激法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.reverse_brainstorming",
+      "name": "反向腦力激盪法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "反向腦力激盪法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.scamper",
+      "name": "SCAMPER 檢核表法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "SCAMPER 檢核表法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.six_thinking_hats",
+      "name": "六頂思考帽",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "六頂思考帽",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.six_three_five",
+      "name": "6-3-5 腦力書寫法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "6-3-5 腦力書寫法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.starbursting",
+      "name": "星爆法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "星爆法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.synectics",
+      "name": "類比創意法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "類比創意法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "divergent.triz",
+      "name": "創新理論工具",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "創新理論工具",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.argument_mapping",
+      "name": "論證地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "論證地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.assumption_mapping",
+      "name": "假設地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "假設地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.assumption_registry",
+      "name": "假設登記表",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "假設登記表",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.bayesian_updating",
+      "name": "貝氏更新",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "貝氏更新",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.confidence_calibration",
+      "name": "信心校準",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "信心校準",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.contradiction_detection",
+      "name": "矛盾偵測",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "矛盾偵測",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.evidence_hierarchy",
+      "name": "證據強度階層",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "證據強度階層",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.evidence_matrix",
+      "name": "證據矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "證據矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.ladder_of_inference",
+      "name": "推論階梯",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "推論階梯",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "epistemic.toulmin_model",
+      "name": "圖爾敏論證模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "圖爾敏論證模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "evidence.triangulation",
+      "name": "證據三角驗證",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "證據三角驗證",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.ab_test",
+      "name": "A/B 測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "A/B 測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.benchmark",
+      "name": "標竿比較",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "標竿比較",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.concierge_test",
+      "name": "門房測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "門房測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.fake_door",
+      "name": "假門測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "假門測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.mvp",
+      "name": "最小可行產品",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "最小可行產品",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.pilot",
+      "name": "試點計畫",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "試點計畫",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.proof_of_concept",
+      "name": "概念驗證",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "概念驗證",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.prototype",
+      "name": "原型測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "原型測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.smoke_test",
+      "name": "煙霧測試（市場）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "煙霧測試（市場）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.technical_spike",
+      "name": "技術試探",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "技術試探",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "experiment.wizard_of_oz",
+      "name": "綠野仙蹤測試",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "綠野仙蹤測試",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.break_even",
+      "name": "損益兩平分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "損益兩平分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.cost_benefit_analysis",
+      "name": "成本效益分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "成本效益分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.cost_effectiveness",
+      "name": "成本效果分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "成本效果分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.irr",
+      "name": "內部報酬率",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "內部報酬率",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.npv",
+      "name": "淨現值分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "淨現值分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.real_options",
+      "name": "實質選擇權",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "實質選擇權",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.tco",
+      "name": "總持有成本",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "總持有成本",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.telos",
+      "name": "TELOS 可行性檢核",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "TELOS 可行性檢核",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "feasibility.unit_economics",
+      "name": "單位經濟效益",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "單位經濟效益",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "finance.financial_assumptions",
+      "name": "財務假設",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "財務假設",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.adjacent_discipline_search",
+      "name": "鄰近學科搜尋",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "鄰近學科搜尋",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.backcasting",
+      "name": "回溯規劃",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "回溯規劃",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.black_swan_exercise",
+      "name": "黑天鵝演練",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "黑天鵝演練",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.cross_country_comparison",
+      "name": "跨國比較",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "跨國比較",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.cross_impact_analysis",
+      "name": "交叉影響分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "交叉影響分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.cross_industry_transfer",
+      "name": "跨產業移植",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "跨產業移植",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.delphi",
+      "name": "德爾菲法",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "德爾菲法",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.futures_wheel",
+      "name": "未來輪",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "未來輪",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.historical_analogy",
+      "name": "歷史類比",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "歷史類比",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.horizon_scanning",
+      "name": "地平線掃描",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "地平線掃描",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.outlier_analysis",
+      "name": "異常個案分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "異常個案分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.scenario_planning",
+      "name": "情境規劃",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "情境規劃",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.weak_signal_detection",
+      "name": "微弱訊號偵測",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "微弱訊號偵測",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "foresight.wild_cards",
+      "name": "外卡情境",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "外卡情境",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.boundary_critique",
+      "name": "邊界批判",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "邊界批判",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.five_w_one_h",
+      "name": "5W1H 問題輪廓",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "5W1H 問題輪廓",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.frame_storming",
+      "name": "框架風暴",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "框架風暴",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.future_compass",
+      "name": "未來羅盤",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "未來羅盤",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.goal_statement",
+      "name": "目標陳述",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "目標陳述",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.grow_model",
+      "name": "GROW 模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "GROW 模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.how_might_we",
+      "name": "我們可以如何…",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "我們可以如何…",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.non_goals",
+      "name": "非目標清單",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "非目標清單",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.north_star_metric",
+      "name": "北極星指標",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "北極星指標",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.okr",
+      "name": "OKR 目標關鍵成果",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "OKR 目標關鍵成果",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.problem_statement",
+      "name": "問題陳述",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "問題陳述",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.reframing",
+      "name": "框架轉換",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "框架轉換",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.smart",
+      "name": "SMART 目標",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "SMART 目標",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.success_criteria",
+      "name": "成功標準",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "成功標準",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "framing.value_sorting",
+      "name": "價值觀排序",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "generate-ideas",
+          "name": "發想點子",
+          "synonyms": [
+            "腦力激盪",
+            "創意"
+          ]
+        }
+      ],
+      "blurb": "價值觀排序",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.contextual_inquiry",
+      "name": "情境訪查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "情境訪查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.empathy_map",
+      "name": "同理心地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "同理心地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.focus_group",
+      "name": "焦點團體",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "焦點團體",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.interview",
+      "name": "深度訪談",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "深度訪談",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.journey_map",
+      "name": "顧客旅程地圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "顧客旅程地圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.jtbd",
+      "name": "待完成任務理論",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "待完成任務理論",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.persona",
+      "name": "使用者原型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "使用者原型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.service_blueprint",
+      "name": "服務藍圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "服務藍圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "insight.survey",
+      "name": "問卷調查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "問卷調查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "interpret.method_record",
+      "name": "interpret.method_record -- Project-bound AI interpretation of a validated method record",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.applicable_law_graph",
+      "name": "適用法規圖譜",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "適用法規圖譜",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.compliance_gap_analysis",
+      "name": "合規缺口分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "合規缺口分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.conflict_of_law_review",
+      "name": "法律衝突審查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "法律衝突審查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.cultural_context_review",
+      "name": "文化脈絡審查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "文化脈絡審查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.data_residency_assessment",
+      "name": "資料落地評估",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料落地評估",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.localization_review",
+      "name": "在地化審查",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "在地化審查",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.market_admission_control",
+      "name": "市場准入控管",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "市場准入控管",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.obligation_to_control_mapping",
+      "name": "義務對應控制措施",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "義務對應控制措施",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.regulatory_horizon_scan",
+      "name": "法規前瞻掃描",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "法規前瞻掃描",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "jurisdiction.resolver",
+      "name": "管轄權解析器",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "管轄權解析器",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.after_action_review",
+      "name": "行動後檢討",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "行動後檢討",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.appreciative_inquiry",
+      "name": "欣賞式探詢",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "欣賞式探詢",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.build_measure_learn",
+      "name": "建構-衡量-學習",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "建構-衡量-學習",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.decision_journal",
+      "name": "決策日誌",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "決策日誌",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.dmaic",
+      "name": "定義-測量-分析-改善-控制",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "定義-測量-分析-改善-控制",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.kill_criteria",
+      "name": "終止條件",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "終止條件",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.ooda",
+      "name": "OODA 循環",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "OODA 循環",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.pdca",
+      "name": "PDCA 循環",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "PDCA 循環",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.post_mortem",
+      "name": "事後檢討",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "事後檢討",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.prediction_tracking",
+      "name": "預測追蹤",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "預測追蹤",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "learning.reversal_criteria",
+      "name": "決策逆轉條件",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "決策逆轉條件",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "literature_search",
+      "name": "literature_search -- Research Question to Literature Set Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "outreach.classify",
+      "name": "回信分類",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "track-replies",
+          "name": "追蹤回信",
+          "synonyms": [
+            "回信分類",
+            "跟進"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "outreach.discover",
+      "name": "找名單",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "find-leads",
+          "name": "找潛在客戶",
+          "synonyms": [
+            "名單",
+            "開發名單"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "outreach.draft",
+      "name": "AI 開發信",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "write-outreach-emails",
+          "name": "寫開發信",
+          "synonyms": [
+            "陌生開發",
+            "寄信"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "outreach.qa",
+      "name": "事實核對",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "fact-check",
+          "name": "核對事實",
+          "synonyms": [
+            "事實查核",
+            "校對"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "outreach.research",
+      "name": "客戶研究",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "research-prospects",
+          "name": "研究客戶",
+          "synonyms": [
+            "客戶研究",
+            "背景調查"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "outreach.verify",
+      "name": "信箱驗證",
+      "category": "sales",
+      "categoryName": "開發",
+      "tasks": [
+        {
+          "key": "verify-emails",
+          "name": "驗證信箱",
+          "synonyms": [
+            "信箱驗證",
+            "退信"
+          ]
+        }
+      ],
+      "blurb": "寫開發信、管名單與追蹤回信",
+      "icon": "mail",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "outreach"
+      },
+      "product": "outreach"
+    },
+    {
+      "key": "project.manage",
+      "name": "管理專案",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-projects",
+          "name": "規劃專案",
+          "synonyms": [
+            "專案計畫",
+            "路線圖"
+          ]
+        }
+      ],
+      "blurb": "管理專案",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.audio_conversational_view",
+      "name": "語音／對話檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "語音／對話檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.causal_view",
+      "name": "因果檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "因果檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.concept_graph_view",
+      "name": "概念圖檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "概念圖檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.expert_lego_mode",
+      "name": "專家自由組裝模式",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "專家自由組裝模式",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.guided_mode",
+      "name": "引導模式",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "引導模式",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.mind_map_view",
+      "name": "心智圖檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "心智圖檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.switching",
+      "name": "表徵切換",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "表徵切換",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.table_matrix_view",
+      "name": "表格／矩陣檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "表格／矩陣檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.text_outline_view",
+      "name": "文字／大綱檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "文字／大綱檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "representation.timeline_view",
+      "name": "時間軸檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "make-charts-and-reports",
+          "name": "做圖表與報告",
+          "synonyms": [
+            "視覺化",
+            "提案"
+          ]
+        }
+      ],
+      "blurb": "時間軸檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "research.collect",
+      "name": "蒐集研究資料",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "蒐集研究資料",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "research.qualitative_coding",
+      "name": "質性編碼（開放／軸心／選擇性）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "質性編碼（開放／軸心／選擇性）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "research.reporting_guideline_checklist",
+      "name": "報告規範查核清單",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "報告規範查核清單",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.barrier_analysis",
+      "name": "屏障分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "屏障分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.bow_tie",
+      "name": "蝴蝶結分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "蝴蝶結分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.change_analysis",
+      "name": "變更分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "變更分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.event_tree",
+      "name": "事件樹分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "事件樹分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.fault_tree",
+      "name": "故障樹分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "故障樹分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.fishbone",
+      "name": "魚骨圖（石川圖）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "魚骨圖（石川圖）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.five_whys",
+      "name": "五個為什麼",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "五個為什麼",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.kepner_tregoe",
+      "name": "凱普納-崔果問題分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "凱普納-崔果問題分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "root_cause.pareto",
+      "name": "柏拉圖分析（80/20 法則）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "柏拉圖分析（80/20 法則）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "run_statistics",
+      "name": "run_statistics -- Inter-rater Reliability (Cohen's Kappa) Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.abuse_case",
+      "name": "濫用案例",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "濫用案例",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.attack_tree",
+      "name": "攻擊樹",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "攻擊樹",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.dpia_pia",
+      "name": "資料保護／隱私影響評估",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "資料保護／隱私影響評估",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.linddun",
+      "name": "LINDDUN 隱私威脅模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "LINDDUN 隱私威脅模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.pasta",
+      "name": "PASTA 攻擊模擬與威脅分析流程",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "PASTA 攻擊模擬與威脅分析流程",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.secrets_threat_review",
+      "name": "機密資訊威脅檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "機密資訊威脅檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.security_control_mapping",
+      "name": "安全控制對照表",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "安全控制對照表",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.stride",
+      "name": "STRIDE 威脅模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "STRIDE 威脅模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.supply_chain_threat_model",
+      "name": "供應鏈威脅模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "供應鏈威脅模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "security.zero_trust_review",
+      "name": "零信任架構檢視",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "review-architecture-risk",
+          "name": "審查架構與風險",
+          "synonyms": [
+            "資安",
+            "法規",
+            "維運"
+          ]
+        }
+      ],
+      "blurb": "零信任架構檢視",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "social.ads",
+      "name": "Meta 廣告管理",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "manage-ads",
+          "name": "管廣告",
+          "synonyms": [
+            "Meta 廣告",
+            "投廣告"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      },
+      "product": "social"
+    },
+    {
+      "key": "social.auto-reply",
+      "name": "Meta 自動回覆",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "auto-reply",
+          "name": "自動回覆",
+          "synonyms": [
+            "留言回覆",
+            "私訊回覆"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      },
+      "product": "social"
+    },
+    {
+      "key": "social.dispatch",
+      "name": "貼文派送",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "schedule-social-posts",
+          "name": "排社群貼文",
+          "synonyms": [
+            "排程發文",
+            "FB",
+            "IG"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      },
+      "product": "social"
+    },
+    {
+      "key": "social.meta",
+      "name": "Meta 資產設定",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "connect-social-accounts",
+          "name": "連接社群帳號",
+          "synonyms": [
+            "粉專連線",
+            "Meta 設定"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      },
+      "product": "social"
+    },
+    {
+      "key": "social.rewrite",
+      "name": "AI 多平台改寫",
+      "category": "social",
+      "categoryName": "社群",
+      "tasks": [
+        {
+          "key": "rewrite-per-platform",
+          "name": "改寫成各平台",
+          "synonyms": [
+            "改寫貼文",
+            "多平台"
+          ]
+        }
+      ],
+      "blurb": "改寫貼文、排程並派送到各社群",
+      "icon": "share",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "social"
+      },
+      "product": "social"
+    },
+    {
+      "key": "source.manage",
+      "name": "管理來源",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "管理來源",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.batna",
+      "name": "最佳替代方案（BATNA）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "最佳替代方案（BATNA）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.coalition_mapping",
+      "name": "聯盟關係圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "聯盟關係圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.game_theory",
+      "name": "賽局理論",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "賽局理論",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.incentive_mapping",
+      "name": "誘因圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "誘因圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.interest_based_negotiation",
+      "name": "利益導向談判",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "利益導向談判",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.power_interest",
+      "name": "權力-利益矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "權力-利益矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.raci",
+      "name": "RACI 責任矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "RACI 責任矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.salience_model",
+      "name": "顯著性模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "顯著性模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.stakeholder_map",
+      "name": "利害關係人圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "利害關係人圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "stakeholders.zopa",
+      "name": "可能同意區間（ZOPA）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "可能同意區間（ZOPA）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.ansoff",
+      "name": "Ansoff 矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "Ansoff 矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.bcg_matrix",
+      "name": "BCG 成長占有率矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "BCG 成長占有率矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.blue_ocean",
+      "name": "藍海策略",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "藍海策略",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.business_model_canvas",
+      "name": "商業模式圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "商業模式圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.lean_canvas",
+      "name": "精實畫布",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "精實畫布",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.market_analysis",
+      "name": "市場分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "市場分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.pestel",
+      "name": "PESTEL 分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "PESTEL 分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.porter_five_forces",
+      "name": "五力分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "五力分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.steepv",
+      "name": "STEEPV 分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "STEEPV 分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.stp",
+      "name": "STP 市場區隔定位",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "STP 市場區隔定位",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.swot",
+      "name": "SWOT 分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "SWOT 分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.three_c",
+      "name": "3C 分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "3C 分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.tows",
+      "name": "TOWS 矩陣",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "TOWS 矩陣",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.value_chain",
+      "name": "價值鏈分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "價值鏈分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.value_proposition_canvas",
+      "name": "價值主張圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "價值主張圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "strategy.vrio",
+      "name": "VRIO 資源分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "plan-strategy",
+          "name": "擬定策略",
+          "synonyms": [
+            "策略",
+            "未來情境"
+          ]
+        },
+        {
+          "key": "decide-with-methods",
+          "name": "用方法做決策",
+          "synonyms": [
+            "決策",
+            "分析方法"
+          ]
+        }
+      ],
+      "blurb": "VRIO 資源分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "studio.edit-prompt",
+      "name": "修圖提示詞",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "write-image-prompts",
+          "name": "寫提示詞",
+          "synonyms": [
+            "Prompt",
+            "咒語"
+          ]
+        },
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.fill",
+      "name": "生成填補",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.image",
+      "name": "圖片生成",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "make-product-images",
+          "name": "做商品圖",
+          "synonyms": [
+            "商品照",
+            "產品圖"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.inpaint",
+      "name": "局部重繪",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.product-copy",
+      "name": "商品文案",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "write-product-copy",
+          "name": "寫商品文案",
+          "synonyms": [
+            "商品描述",
+            "文案"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.remove-bg",
+      "name": "去背",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "studio.upscale",
+      "name": "圖片放大",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "enhance-quality",
+          "name": "提升畫質",
+          "synonyms": [
+            "畫質增強",
+            "放大"
+          ]
+        },
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "做商品圖、寫商品文案、修圖",
+      "icon": "image",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "studio"
+      },
+      "product": "studio"
+    },
+    {
+      "key": "synthesis.decision_evidence",
+      "name": "synthesis.decision_evidence -- Project-bound AI decision-evidence synthesis from the Source prompt manifest",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "synthesis.dossier_brief",
+      "name": "synthesis.dossier_brief -- Project-bound AI dossier synthesis from the Source prompt manifest",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "synthesis.literature_matrix",
+      "name": "synthesis.literature_matrix -- Project-bound AI literature-matrix synthesis from the Source prompt manifest",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.agent_based_modeling",
+      "name": "主體模型模擬",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "主體模型模擬",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.behavior_over_time",
+      "name": "隨時間變化行為圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "隨時間變化行為圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.causal_loop_diagram",
+      "name": "因果回饋圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "因果回饋圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.flowchart",
+      "name": "流程圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "流程圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.force_field_analysis",
+      "name": "場域分析（推力與阻力分析）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "場域分析（推力與阻力分析）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.iceberg_model",
+      "name": "冰山模型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "冰山模型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.leverage_point_analysis",
+      "name": "槓桿點分析",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "槓桿點分析",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.life_system_mapping",
+      "name": "生活系統圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "生活系統圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.rich_picture",
+      "name": "豐富圖像",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "豐富圖像",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.sipoc",
+      "name": "SIPOC（供應者-輸入-流程-輸出-顧客）",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "SIPOC（供應者-輸入-流程-輸出-顧客）",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.stock_and_flow",
+      "name": "存量與流量圖",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "存量與流量圖",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "systems.systems_archetypes",
+      "name": "系統原型",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "find-root-cause",
+          "name": "找根本原因",
+          "synonyms": [
+            "問題分析",
+            "根因"
+          ]
+        }
+      ],
+      "blurb": "系統原型",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "tarot.image",
+      "name": "塔羅圖生成",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "make-tarot-cards",
+          "name": "做塔羅牌",
+          "synonyms": [
+            "塔羅",
+            "牌卡"
+          ]
+        }
+      ],
+      "blurb": "生成塔羅牌圖片與提示詞",
+      "icon": "cards",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "tarot"
+      },
+      "product": "tarot"
+    },
+    {
+      "key": "tarot.prompt",
+      "name": "提示詞建議",
+      "category": "design",
+      "categoryName": "設計",
+      "tasks": [
+        {
+          "key": "write-image-prompts",
+          "name": "寫提示詞",
+          "synonyms": [
+            "Prompt",
+            "咒語"
+          ]
+        },
+        {
+          "key": "make-tarot-cards",
+          "name": "做塔羅牌",
+          "synonyms": [
+            "塔羅",
+            "牌卡"
+          ]
+        }
+      ],
+      "blurb": "生成塔羅牌圖片與提示詞",
+      "icon": "cards",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "tarot"
+      },
+      "product": "tarot"
+    },
+    {
+      "key": "transcribe",
+      "name": "transcribe -- Audio/Video to Transcript Capability Contract",
+      "category": "insight",
+      "categoryName": "洞察",
+      "tasks": [
+        {
+          "key": "do-research",
+          "name": "做研究",
+          "synonyms": [
+            "文獻",
+            "訪談",
+            "實驗"
+          ]
+        }
+      ],
+      "blurb": "組合認知方法做研究與決策",
+      "icon": "compass",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "cognitive"
+      },
+      "product": "cognitive"
+    },
+    {
+      "key": "video.3d",
+      "name": "圖片轉 3D",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "make-3d-model",
+          "name": "圖片轉 3D",
+          "synonyms": [
+            "3D 模型",
+            "立體"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.audio-tools",
+      "name": "音軌分離與重配音效",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "edit-audio",
+          "name": "處理音軌",
+          "synonyms": [
+            "音軌分離",
+            "音效"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.bg-remove",
+      "name": "去背",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "retouch-images",
+          "name": "修圖",
+          "synonyms": [
+            "去背",
+            "放大",
+            "局部重繪"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.enhance",
+      "name": "AI 畫質增強",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "enhance-quality",
+          "name": "提升畫質",
+          "synonyms": [
+            "畫質增強",
+            "放大"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.image",
+      "name": "場景圖生成",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "make-scene-images",
+          "name": "做場景圖",
+          "synonyms": [
+            "分鏡圖",
+            "畫面"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.motion",
+      "name": "影片動態",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "animate-video",
+          "name": "做影片動態",
+          "synonyms": [
+            "圖轉影片",
+            "動態"
+          ]
+        },
+        {
+          "key": "make-short-video",
+          "name": "做短影片",
+          "synonyms": [
+            "短影音",
+            "Reels"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.music",
+      "name": "音樂生成",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "make-music",
+          "name": "做配樂",
+          "synonyms": [
+            "音樂",
+            "背景音樂"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.script",
+      "name": "腳本生成",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "write-script",
+          "name": "寫腳本",
+          "synonyms": [
+            "分鏡",
+            "劇本"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.transcribe",
+      "name": "語音轉字幕",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "make-subtitles",
+          "name": "做字幕",
+          "synonyms": [
+            "語音轉字幕",
+            "逐字稿"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    },
+    {
+      "key": "video.tts",
+      "name": "付費旁白",
+      "category": "video",
+      "categoryName": "影片",
+      "tasks": [
+        {
+          "key": "add-voiceover",
+          "name": "配旁白",
+          "synonyms": [
+            "配音",
+            "語音"
+          ]
+        }
+      ],
+      "blurb": "寫腳本、做場景與動態、配旁白",
+      "icon": "film",
+      "keywords": [],
+      "addedAt": "2026-01-01",
+      "door": {
+        "subdomain": "video"
+      },
+      "product": "video"
+    }
+  ]
+}

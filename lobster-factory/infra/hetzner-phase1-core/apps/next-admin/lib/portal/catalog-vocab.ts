@@ -39,7 +39,72 @@ export const TASKS: Readonly<Record<string, { name: string; synonyms: readonly s
   "find-root-cause": { name: "找根本原因", synonyms: ["問題分析", "根因"] },
   "plan-projects": { name: "規劃專案", synonyms: ["專案計畫", "路線圖"] },
   "continuous-monitoring": { name: "持續監測", synonyms: ["監控", "人機互動"] },
+  // Feature layer (U25, blueprint §4.4): tasks a single feature does that its product's own tasks do not name.
+  "humanize-text": { name: "人性化文字", synonyms: ["去 AI 味", "潤稿"] },
+  "fix-seo": { name: "修 SEO", synonyms: ["SEO 檢查", "SEO 修正"] },
+  "extract-brand-voice": { name: "擷取品牌語氣", synonyms: ["品牌語調", "語氣"] },
+  "outline-article": { name: "排文章大綱", synonyms: ["大綱", "架構"] },
+  "suggest-titles": { name: "想標題", synonyms: ["下標", "標題"] },
+  "find-keywords": { name: "找關鍵字", synonyms: ["關鍵字研究", "SEO 關鍵字"] },
+  "write-hook": { name: "寫開頭", synonyms: ["Hook", "開場"] },
+  "analyze-competitors": { name: "分析競爭對手", synonyms: ["市場分析", "競品"] },
+  "find-trending-topics": { name: "找熱門題目", synonyms: ["趨勢", "熱門話題"] },
+  "make-article-images": { name: "做文章配圖", synonyms: ["配圖", "封面圖"] },
+  "manage-ads": { name: "管廣告", synonyms: ["Meta 廣告", "投廣告"] },
+  "connect-social-accounts": { name: "連接社群帳號", synonyms: ["粉專連線", "Meta 設定"] },
+  "make-scene-images": { name: "做場景圖", synonyms: ["分鏡圖", "畫面"] },
+  "animate-video": { name: "做影片動態", synonyms: ["圖轉影片", "動態"] },
+  "make-subtitles": { name: "做字幕", synonyms: ["語音轉字幕", "逐字稿"] },
+  "make-3d-model": { name: "圖片轉 3D", synonyms: ["3D 模型", "立體"] },
+  "enhance-quality": { name: "提升畫質", synonyms: ["畫質增強", "放大"] },
+  "make-music": { name: "做配樂", synonyms: ["音樂", "背景音樂"] },
+  "edit-audio": { name: "處理音軌", synonyms: ["音軌分離", "音效"] },
+  "write-image-prompts": { name: "寫提示詞", synonyms: ["Prompt", "咒語"] },
+  "classify-messages": { name: "分類訊息", synonyms: ["意圖分類", "分流"] },
+  "evaluate-answers": { name: "評測回答", synonyms: ["品質檢查", "回答評分"] },
+  "practice-support": { name: "練習客服對答", synonyms: ["模擬考", "客服訓練"] },
+  "translate-messages": { name: "翻譯訊息", synonyms: ["翻譯", "多語"] },
+  "fact-check": { name: "核對事實", synonyms: ["事實查核", "校對"] },
+  "research-prospects": { name: "研究客戶", synonyms: ["客戶研究", "背景調查"] },
+  "verify-emails": { name: "驗證信箱", synonyms: ["信箱驗證", "退信"] },
+  // Cognitive method groups (COGNITIVE_GROUPS below).
+  "generate-ideas": { name: "發想點子", synonyms: ["腦力激盪", "創意"] },
+  "plan-strategy": { name: "擬定策略", synonyms: ["策略", "未來情境"] },
+  "do-research": { name: "做研究", synonyms: ["文獻", "訪談", "實驗"] },
+  "review-architecture-risk": { name: "審查架構與風險", synonyms: ["資安", "法規", "維運"] },
+  "make-charts-and-reports": { name: "做圖表與報告", synonyms: ["視覺化", "提案"] },
+  "reflect-on-self": { name: "自我覺察", synonyms: ["藝術治療", "反思"] },
 };
+
+// Cognitive platform (300 methods in cognitive-features.json): a method's tasks come from its group, never typed per
+// method. Group of a method = COGNITIVE_PREFIXES[cognitivePrefix(id)]; products.test.ts fails on an unlisted prefix.
+export const COGNITIVE_GROUPS = {
+  decide: ["decide-with-methods"],
+  diagnose: ["find-root-cause"],
+  ideate: ["generate-ideas"],
+  strategize: ["plan-strategy", "decide-with-methods"],
+  research: ["do-research"],
+  deliver: ["plan-projects"],
+  engineer: ["review-architecture-risk"],
+  present: ["make-charts-and-reports"],
+  reflect: ["reflect-on-self"],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+export type CognitiveGroup = keyof typeof COGNITIVE_GROUPS;
+export const COGNITIVE_PREFIXES: Readonly<Record<string, CognitiveGroup>> = {
+  decision: "decide", feasibility: "decide", finance: "decide", computation: "decide", stakeholders: "decide",
+  root_cause: "diagnose", causal: "diagnose", systems: "diagnose",
+  divergent: "ideate", association: "ideate", framing: "ideate", decomposition: "ideate",
+  strategy: "strategize", foresight: "strategize", challenge: "strategize",
+  research: "research", literature_search: "research", source: "research", evidence: "research", epistemic: "research",
+  insight: "research", experiment: "research", run_statistics: "research", transcribe: "research", synthesis: "research",
+  interpret: "research", ai: "research",
+  delivery: "deliver", project: "deliver", learning: "deliver",
+  architecture: "engineer", devops_sre: "engineer", database_data: "engineer", security: "engineer", jurisdiction: "engineer",
+  representation: "present", artifact: "present",
+  art_therapy: "reflect",
+};
+// "decision.ahp" -> "decision"; an id with no "." (e.g. "transcribe") is its own prefix.
+export const cognitivePrefix = (id: string): string => id.split(".")[0];
 
 // Closed list of icon names (the renderer maps each to one glyph). Add a name here before a row uses it.
 export const ICONS = ["article", "share", "film", "image", "cards", "palette", "chat", "search", "mail", "compass", "pulse"] as const;

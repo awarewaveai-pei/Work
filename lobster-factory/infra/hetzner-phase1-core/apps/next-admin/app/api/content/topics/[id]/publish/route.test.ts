@@ -6,7 +6,8 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const m = vi.hoisted(() => ({ db: { row: null as unknown as Topic }, runs: 0, members: new Map<string, string>() }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (f: () => unknown) => { void f(); } }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
-vi.mock("@/lib/schedules/store", () => ({ listSchedules: async () => [{ jobKey: "content_pipeline", enabled: true }] }));
+// K31: the brand's content pipeline schedule is off -- a press publishes anyway (the 5-minute advance continues it)
+vi.mock("@/lib/schedules/store", () => ({ listSchedules: async () => [{ jobKey: "content_pipeline", enabled: false }] }));
 vi.mock("@/lib/social/store", () => ({ memberRoles: async () => m.members }));
 vi.mock("@/lib/content/topics/store", async (orig) => ({ ...(await orig<typeof import("@/lib/content/topics/store")>()), topicById: async () => ({ ...m.db.row }) }));
 vi.mock("@/lib/content/topics/make", () => ({

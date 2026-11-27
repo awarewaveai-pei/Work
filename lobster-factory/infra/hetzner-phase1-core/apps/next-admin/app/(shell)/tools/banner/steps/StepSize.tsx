@@ -21,7 +21,8 @@ export default function StepSize({ slot, s, setS }: StepCtx & { slot: StepSlot }
                 const isPicked = picked.includes(k), isEditing = editingSizeOf(s) === k;
                 return (
                   <div key={k} style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
-                  <button data-testid={`banner-size-${k}`} aria-pressed={isPicked}
+                  {/* paid generation is priced per picked size: the sizes wait for it (scene-flow.ts drawOthers) */}
+                  <button data-testid={`banner-size-${k}`} aria-pressed={isPicked} disabled={s.generating}
                     className="choice-card" style={{ flex: 1, ...(isEditing && multi ? { outline: "2px solid var(--text-primary)", outlineOffset: 2 } : {}) }}
                     title={isPicked ? (picked.length > 1 ? "再按一下：不輸出這個尺寸" : "至少要留一個尺寸") : "按一下：加入要輸出的尺寸"}
                     onClick={() => setS((prev) => ({ ...toggleSizePick(prev, k), saved: false, error: null }))}>
@@ -34,7 +35,7 @@ export default function StepSize({ slot, s, setS }: StepCtx & { slot: StepSlot }
                     {isEditing && multi && <span className="choice-card-note" style={{ fontWeight: 700 }}>✎ 編輯中（預覽顯示這張）</span>}
                   </button>
                   {isPicked && !isEditing && (
-                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 6px", height: "auto" }} data-testid={`banner-size-edit-${k}`}
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 6px", height: "auto" }} data-testid={`banner-size-edit-${k}`} disabled={s.generating}
                       onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))}>改這張</button>
                   )}
                   </div>
