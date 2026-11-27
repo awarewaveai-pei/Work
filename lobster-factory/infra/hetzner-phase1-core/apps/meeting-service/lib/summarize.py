@@ -19,7 +19,7 @@ API 模式下若驗證失敗會自動重試一次（人工回路則是使用者�
 
 Schema 與規則沿用 2026-08-17 對 BU5.m4a 手動處理時學到的教訓：
   - 不是每段錄音都是「會議」——閒聊不可硬套決議格式編造不存在的東西
-  - 講者標籤（A/B/C）是演算法推定，_provenance 要誠實說明限制
+  - 講者名（pyannote 的 A/B/C，或聆聽時標的名字）多半是演算法推定，來源寫進 prompt，_provenance 要誠實說明限制
   - coaching.per_slide 長度必須「精確等於」deck.plan_slides() 的頁數
 """
 import json
@@ -34,12 +34,12 @@ SCHEMA = """{
   "title": "string，依內容取的標題，不要用「未命名會議」這種空話",
   "date": "string，YYYY-MM-DD，若逐字稿無法判斷就留空字串",
   "duration_min": number,
-  "attendees": ["依對話內容推定的角色描述，如 'A — 供應商主談'；人數不明就盡量少猜"],
+  "attendees": ["依對話內容推定的角色描述，如 '講者名 — 供應商主談'（講者名照逐字稿上的寫）；人數不明就盡量少猜"],
   "_provenance": "string，誠實說明：轉錄方式、講者標籤是否為演算法推定、幻覺過濾比例、還原了哪些專有名詞、任何不確定之處",
   "tldr": ["三句話結論，每句是完整判斷句不是標題；不是會議可留空陣列"],
-  "decisions": [{"what": "string", "owner": "string，用逐字稿中的講者標籤如 A/B/C", "rationale": "string"}],
+  "decisions": [{"what": "string", "owner": "string，用逐字稿上的講者名", "rationale": "string"}],
   "actions": [{"task": "string", "owner": "string", "due": "string，逐字稿沒提到就填'未定'", "priority": "high|medium|low"}],
-  "topics": [{"heading": "string", "points": ["3-5條"], "quotes": [{"text": "逐字稿原句，不可意譯", "speaker": "A/B/C", "t": "mm:ss"}]}],
+  "topics": [{"heading": "string", "points": ["3-5條"], "quotes": [{"text": "逐字稿原句，不可意譯", "speaker": "逐字稿上的講者名", "t": "mm:ss"}]}],
   "open_questions": ["string"],
   "risks": ["string"],
   "coaching": {
@@ -55,12 +55,13 @@ SCHEMA = """{
   }
 }"""
 
-INSTRUCTIONS = f"""你是會議記錄助手兼報告教練。輸入是一份繁體中文逐字稿（可能帶 A/B/C 講者標籤）。
+INSTRUCTIONS = f"""你是會議記錄助手兼報告教練。輸入是一份逐字稿（每句前可能帶講者名）；
+逐字稿的語言、來源和要用哪種語言寫，在最後的資料說明裡。
 
 嚴格規則：
 1. 這份錄音不一定是正式會議。如果內容主要是閒聊、社交、跟業務無關，不要編造 decisions
    或硬套「雙方共識」這類空話。tldr/decisions/actions 可以是空陣列。
-2. 講者標籤（若有）來自語音分群演算法，不是人工核對過的，逐句歸屬可能有誤。
+2. 講者名（若有）不是人工核對過的（來源見資料說明），逐句歸屬可能有誤。
    _provenance 欄位必須誠實說明這個限制，不能省略或美化。
 3. 只根據逐字稿實際內容寫，不要用常識腦補逐字稿沒提到的細節（不要編造具體金額、
    日期，除非逐字稿真的有講）。
@@ -81,27 +82,32 @@ Schema:
 
 
 def build_transcript_text(turns: list = None, merged: list = None) -> str:
-    """優先用講者分離後的 turns；沒有就用合併後的 merged 輪次。"""
+    """優先用講者分離後的 turns；沒有就用合併後的 merged 輪次。每句有翻譯（聆聽時的即時翻譯）就附在它後面的括號裡（text_tr）。"""
     lines = []
-    if turns:
-        for t in turns:
-            mm, ss = int(t["start"] // 60), int(t["start"] % 60)
-            lines.append(f"[{mm:02d}:{ss:02d}] {t['speaker']}：{t['text']}")
-    elif merged:
-        for m in merged:
-            mm, ss = int(m["start"] // 60), int(m["start"] % 60)
-            lines.append(f"[{mm:02d}:{ss:02d}] {m['text']}")
+    for t in turns or merged or []:
+        mm, ss = int(t["start"] // 60), int(t["start"] % 60)
+        who = f"{t['speaker']}：" if turns else ""
+        lines.append(f"[{mm:02d}:{ss:02d}] {who}{t.get('text_tr') or t['text']}")
     text = "\n".join(lines)
     if len(text) > MAX_TRANSCRIPT_CHARS:
         text = text[:MAX_TRANSCRIPT_CHARS] + "\n\n（逐字稿過長，已截斷，可能影響後段內容判讀）"
     return text
 
 
+# build_prompt 的 about 沒給時＝上傳音檔的預設（今天的行為）。
+DEFAULT_ABOUT = {"source": "本機 faster-whisper 轉錄", "labels": "語音分群演算法（pyannote）推定，非人工核對",
+                 "language": "繁體中文", "output": "繁體中文（台灣用語）", "translated": False}
+
+
 def build_prompt(transcript_text: str, audio_duration_sec: float,
                   hallucination_stats: dict = None, overlap_sec: float = None,
-                  speakers: list = None) -> str:
-    """回傳完整可直接貼進聊天視窗的 prompt（instructions + 資料）。"""
-    extra = []
+                  speakers: list = None, about: dict = None) -> str:
+    """回傳完整可直接貼進聊天視窗的 prompt（instructions + 資料）。about＝逐字稿的來源說明
+    {source, labels, language, output, translated}，欄位見 DEFAULT_ABOUT。"""
+    about = {**DEFAULT_ABOUT, **(about or {})}
+    extra = [f"逐字稿語言：{about['language']}；來源：{about['source']}。會議記錄與講稿一律用 {about['output']} 寫。"]
+    if about["translated"]:
+        extra.append("逐字稿每句後面括號裡是聆聽時的即時翻譯，只幫助理解；引用（quotes）一律用原文。")
     if hallucination_stats:
         extra.append(f"幻覺偵測：約 {hallucination_stats.get('suspect_pct_chars', 0)}% 文字被標記為可疑"
                       f"（語速物理不可能或近距重複），寫 _provenance 時請提及此比例。")
@@ -109,14 +115,13 @@ def build_prompt(transcript_text: str, audio_duration_sec: float,
         extra.append(f"重疊語音（多人同時說話）共 {overlap_sec:.0f} 秒，佔音檔 "
                       f"{overlap_sec/max(audio_duration_sec,1)*100:.1f}%。")
     if speakers:
-        extra.append(f"偵測到講者：{', '.join(speakers)}（標籤為演算法推定，非人工核對）。")
+        extra.append(f"偵測到講者：{', '.join(speakers)}（標籤來源：{about['labels']}）。")
 
     parts = [
         INSTRUCTIONS,
         f"\n音檔長度：{audio_duration_sec/60:.1f} 分鐘",
+        "\n".join(extra),
     ]
-    if extra:
-        parts.append("\n".join(extra))
     parts.append("\n逐字稿：\n" + transcript_text)
     return "\n".join(parts)
 
@@ -159,7 +164,7 @@ API_MAX_TOKENS = 32000 + 8000
 
 def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: str,
                        hallucination_stats: dict = None, overlap_sec: float = None,
-                       speakers: list = None, log=print) -> dict:
+                       speakers: list = None, about: dict = None, log=print) -> dict:
     """直接呼叫 Anthropic API 產生摘要 JSON。會真的計費，呼叫前呼叫端應自行
     確認使用者已同意（app.py 的 upload 端點已要求 use_api 需搭配已設定的 key）。
 
@@ -173,7 +178,7 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
     client = anthropic.Anthropic(api_key=api_key)
     prompt = build_prompt(transcript_text, audio_duration_sec,
                           hallucination_stats=hallucination_stats,
-                          overlap_sec=overlap_sec, speakers=speakers)
+                          overlap_sec=overlap_sec, speakers=speakers, about=about)
 
     def _call(user_msg: str):
         """送一次請求，傳輸層錯誤自行重試（獨立額度）。回傳 resp 或丟 RuntimeError。"""
