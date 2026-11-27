@@ -10,7 +10,7 @@ export const META = {
 };
 
 // todo｜doing｜review｜done（done 要在 COMMITS 填 commit）
-export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done', 'R3-A': 'done', 'R3-B': 'done', 'R3-C': 'done', 'R3-D': 'done', 'R4-A': 'doing', 'R4-B': 'doing', 'R4-C': 'todo' };
+export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done', 'R3-A': 'done', 'R3-B': 'done', 'R3-C': 'done', 'R3-D': 'done', 'R4-A': 'review', 'R4-B': 'review', 'R4-C': 'todo', 'R4-D': 'doing' };
 export const COMMITS = { 'R2-A': 'ef6572105', 'R2-B1': '528cb59d5', 'R2-B2': '06c46341e', 'R2-C': 'e2d125cd9', 'R3-A': 'ccaa2d151', 'R3-B': '4e97d619a', 'R3-C': '6496abefc', 'R3-D': 'd137012fa' };
 
 // 等你決定：要提前手動部署或高風險時才放這裡。{ card, what, rollback }
@@ -143,7 +143,8 @@ export const BATCHES = [
     cards: [
       C('R4-A', 'Medium', 'Opus 5.5', '', '排版：標題大小上下限、構圖三群、16:9 拆兩個；背景圖與商品位置一起換（R3-E 的三條）。'),
       C('R4-B', 'Low', 'Sonnet 5.5', '', '合成指令：橫式商品在右欄、高度約一半；先查 AI 能不能直接出 21:9 給 3:1 用。'),
-      C('R4-C', 'Low', 'Sonnet 5.5', 'R4-A、R4-B', '驗收：同素材再實打一次並量測。'),
+      C('R4-C', 'Low', 'Sonnet 5.5', 'R4-A、R4-B、R4-D', '驗收：同素材再實打一次並量測。'),
+      C('R4-D', 'Medium', 'Opus 5.5', 'R4-B', 'AI 生圖流程：點縮圖只預覽不花錢、另按標價按鈕生成其他尺寸；其他尺寸以選中的圖延伸（場景一致）；一鍵設計與畫面步驟共用同一流程。'),
     ] },
 ];
 
