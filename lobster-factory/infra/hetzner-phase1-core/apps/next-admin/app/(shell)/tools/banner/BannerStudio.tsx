@@ -49,16 +49,19 @@ const STRIP_H = 132;
 /** Wide + several sizes: the preview card's share of the column (fixed, whatever the canvas ratio). */
 const PREVIEW_SHARE = "58%";
 
-/** Desktop width: the preview stays in view (sticky) while the controls scroll; narrower, it sits above them. */
-function useWide(minPx = 960): boolean {
+/** Two columns need preview basis 520 + gap 24 + controls basis 340. Measured on the page container itself (the sidebar and padding are already out of it), never the window. */
+const TWO_COL_MIN_PX = 884;
+/** Sticky two-column layout only when the container fits both columns; narrower, the preview sits above the controls. */
+function useWide(ref: React.RefObject<HTMLElement | null>): boolean {
   const [wide, setWide] = useState(true);
   useEffect(() => {
-    const mq = window.matchMedia(`(min-width: ${minPx}px)`);
-    const on = () => setWide(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, [minPx]);
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWide(el.clientWidth >= TWO_COL_MIN_PX));
+    ro.observe(el);
+    setWide(el.clientWidth >= TWO_COL_MIN_PX);
+    return () => ro.disconnect();
+  }, [ref]);
   return wide;
 }
 
@@ -117,7 +120,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // into (staff work for a customer; the designs route checks access). Read once; unknown values are ignored.
   const [saveOrg, setSaveOrg] = useState<string | null>(null);
   const [saveOrgName, setSaveOrgName] = useState<string | null>(null);
-  const wide = useWide();
+  const rowRef = useRef<HTMLDivElement>(null);
+  const wide = useWide(rowRef);
   // C8: the brand kit of the organization this banner is saved for (null = own / default organization)
   const brand = useBrandKit(saveOrg);
   const saveOrgRef = useRef(saveOrg);
@@ -248,7 +252,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div ref={rowRef} style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Controls (right side) ── */}
         <div style={{ order: 2, flex: "1 1 340px", maxWidth: wide ? 420 : "100%", minWidth: 0,
