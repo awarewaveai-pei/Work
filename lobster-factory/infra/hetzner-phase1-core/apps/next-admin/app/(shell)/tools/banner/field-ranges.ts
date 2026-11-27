@@ -4,7 +4,7 @@
 export interface FieldRange { min: number; max: number; step: number }
 
 export const FIELD_RANGES = {
-  /** px; the upper end covers the automatic size on a 9:16 card (30% of 1920). */
+  /** px set by hand (the automatic title has its own range per size: titleRange below). */
   headlineSize: { min: 16, max: 600, step: 1 },
   subtextSize: { min: 10, max: 260, step: 1 },
   letterSpacing: { min: -2, max: 16, step: 1 },
@@ -21,6 +21,16 @@ export const FIELD_RANGES = {
   trustStars: { min: 1, max: 5, step: 1 },
 } as const satisfies Record<string, FieldRange>;
 export type RangedField = keyof typeof FIELD_RANGES;
+
+/** R4 (T1 決定 1): the title as shown is 36-57 CSS px (Material 3 display small..large) at the width the size is
+ *  displayed at; the subtitle is the title / SUB_RATIO (Figma type scale 1.25). */
+export const TITLE_SHOWN_PX = { min: 36, max: 57 } as const;
+export const SUB_RATIO = 1.25;
+/** The automatic title's range in canvas px for a canvas `canvasW` wide shown `displayW` CSS px wide. */
+export function titleRange(canvasW: number, displayW: number): { min: number; max: number } {
+  const k = canvasW / displayW;
+  return { min: Math.ceil(TITLE_SHOWN_PX.min * k), max: Math.floor(TITLE_SHOWN_PX.max * k) };
+}
 
 /** `v` kept inside the field's range; undefined when it is not a finite number. */
 export function clampField(field: RangedField, v: unknown): number | undefined {

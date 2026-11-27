@@ -63,8 +63,11 @@ export async function encodeDesign(st: State, fmt: ExportFormat, targetKb: numbe
   const out = encodeLossy(cv, mime, targetKb);
   return { url: out.url, ...(out.over ? { note: `${fmt.toUpperCase()} 壓到最低畫質仍有 ${Math.ceil(out.kb)} KB，比目標 ${targetKb} KB 大；已照最低畫質。` } : {}) };
 }
-/** A file name per size: banner-9x16.png, banner-1.91x1.psd … */
-export const sizeFileName = (k: PresetKey, fmt: ExportFormat) => `banner-${PRESETS[k].ratio.replace(":", "x")}.${fmt}`;
+/** A file name per size: banner-9x16.png, banner-1.91x1.psd, banner-16x9-hero.png (two 16:9 sizes) … */
+export const sizeFileName = (k: PresetKey, fmt: ExportFormat) => {
+  const ps: { ratio: string; file?: string } = PRESETS[k];
+  return `banner-${ps.file ?? ps.ratio.replace(":", "x")}.${fmt}`;
+};
 /** A small JPEG of a design for the size thumbnails. */
 export async function thumbOf(st: State): Promise<string> {
   const full = await flatCanvas(st);

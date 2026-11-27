@@ -3,9 +3,10 @@
 import { describe, expect, it } from "vitest";
 import { forgePrompt } from "@/lib/script-forge/modules";
 import { askJsonWithRetry, designPlan, parseAiJson, sanitizeCopyVariants, type SizeSpec } from "./banner-design";
+import type { PresetKey } from "./banner-state";
 
 const ctx = { lang: "繁體中文", sceneCount: 6, customScenes: 3, brand: null };
-const size = (key: string, w: number, h: number): SizeSpec => ({ key, ratio: key, use: "x", w, h });
+const size = (key: PresetKey, w: number, h: number): SizeSpec => ({ key, ratio: key, use: "x", w, h });
 const MAIN = size("r191x1", 1200, 630), TALL = size("r9x16", 1080, 1920), SQUARE = size("r1x1", 1080, 1080), WIDE = size("r16x9", 1920, 1080);
 
 describe("AI 一鍵設計 across sizes", () => {

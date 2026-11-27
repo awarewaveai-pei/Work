@@ -4,7 +4,8 @@
 import { BANNER_COPY_VARIANTS, BANNER_DESIGN_COPY_VARIANTS } from "@/lib/script-forge/modules";
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
-import type { CopyVariant, State } from "./banner-state";
+import { PRESETS, type CopyVariant, type PresetKey, type State } from "./banner-state";
+import { COMPOSITION } from "./composition";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -49,7 +50,7 @@ export interface LayoutPatch {
   badgePos?: "tl" | "tr";
   logoPos?: "bl" | "br" | "tl" | "tr";
 }
-export interface SizeSpec { key: string; ratio: string; use: string; w: number; h: number }
+export interface SizeSpec { key: PresetKey; ratio: string; use: string; w: number; h: number }
 
 const enumOf = <T extends string>(v: unknown, allowed: readonly T[]) => (typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : undefined);
 
@@ -67,13 +68,9 @@ export function sanitizeLayout(raw: unknown): LayoutPatch {
   return out;
 }
 
-/** A sensible layout by shape when the AI left a size out: tall = words on top, product under them; wide = words left,
- *  product right; square = centred stack. */
-export function shapeLayout(size: { w: number; h: number }): LayoutPatch {
-  const r = size.w / size.h;
-  if (r < 0.9) return { textPos: "top", textAlignH: "center", productPos: "center" };
-  if (r > 1.25) return { textPos: "center", textAlignH: "left", productPos: "right" };
-  return { textPos: "center", textAlignH: "center", productPos: "center" };
+/** The layout of a size the AI left out: its composition group's (composition.ts). */
+export function shapeLayout(key: PresetKey): LayoutPatch {
+  return { ...COMPOSITION[PRESETS[key].group].layout };
 }
 
 /** The AI answer's per-size layouts -> the main size's layout and an override for every other chosen size (a size the
@@ -81,7 +78,7 @@ export function shapeLayout(size: { w: number; h: number }): LayoutPatch {
 export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen: readonly SizeSpec[]): { main: LayoutPatch; overrides: Record<string, LayoutPatch> } {
   if (!chosen.length) return { main: sanitizeLayout(raw), overrides: {} };
   const layouts = raw.layouts && typeof raw.layouts === "object" ? (raw.layouts as Record<string, unknown>) : {};
-  const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key]); return Object.keys(l).length ? l : shapeLayout(s); };
+  const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key]); return Object.keys(l).length ? l : shapeLayout(s.key); };
   const overrides: Record<string, LayoutPatch> = {};
   for (const s of chosen) if (s.key !== main.key) overrides[s.key] = layoutOf(s);
   return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key]) : {}, overrides };

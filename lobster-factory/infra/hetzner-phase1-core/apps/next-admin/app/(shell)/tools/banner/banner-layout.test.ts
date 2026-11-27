@@ -1,13 +1,17 @@
 // Card R2-A (named tests a-d): the layout engine -- no two boxes overlap and all are inside the canvas at every size and
 // placement; a position control always moves its element (even over an old AI answer's coordinates); the automatic
-// title has no lone-character line and is legible on 3:1; the reflection grows with its length and stays in the canvas.
+// title has no lone-character line (R4: its size range is tested in R4-A); the reflection grows and stays in the canvas.
 import { describe, expect, it } from "vitest";
 import { applySemantic, areaOnCanvas, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
-import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
+import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
+import { COMPOSITION, type LayoutSize } from "./composition";
+import { SUB_RATIO, titleRange } from "./field-ranges";
+import { shapeLayout } from "./banner-design";
+import { sizeFileName } from "./steps/export-files";
 
 // Every size of the tool: a new preset is covered by the overlap matrix automatically.
-const SIZES: Record<string, { w: number; h: number }> = PRESETS;
+const SIZES: Record<string, LayoutSize> = PRESETS;
 
 // CJK = a square em, anything else 0.55 em; pictures by name
 const measure: LayoutMeasure = {
@@ -171,9 +175,76 @@ describe("(c) automatic title size", () => {
     const h = layoutBanner(f, SIZES[key], measure).headline!;
     if (h.lines.length > 1) for (const ln of h.lines) expect(Array.from(ln.map((r) => r.text).join("")).length).toBeGreaterThan(1);
   });
-  it("3:1: the title is at least 12% of the banner's height", () => {
-    const h = layoutBanner(f, SIZES.r3x1, measure).headline!;
-    expect(h.box.h).toBeGreaterThanOrEqual(SIZES.r3x1.h * 0.12);
+});
+
+// R4-A (PLAN-R4 §1 #2-3, t1/T1-measure.md 決定 1-2): the automatic title stays in its size's range (36-57 px as shown at
+// displayW), the subtitle is title / 1.25; each size is in its composition group; 9:16 keeps Meta Reels' bands.
+describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
+  // the T1 run's words and product (中央, 60%)
+  const t1: BannerFields = { ...base, typeAuto: true, headline: "用香氣與色彩，療癒疲憊的心", subtext: "精油芳療×藝術治療體驗課｜立即報名",
+    ctaText: "", productImage: "product", productPos: "center", productScale: 0.6 };
+  it.each(Object.keys(SIZES).filter((k) => k !== "r16x9"))("%s (its group's layout): title in its range, subtitle = title / 1.25; never above the range", (key) => {
+    const size = SIZES[key], r = titleRange(size.w, size.displayW);
+    const L = layoutBanner({ ...t1, ...COMPOSITION[size.group].layout }, size, measure);
+    expect(L.headlineSize).toBeGreaterThanOrEqual(r.min);
+    expect(L.headlineSize).toBeLessThanOrEqual(r.max);
+    expect(L.subtextSize).toBe(Math.round(L.headlineSize / SUB_RATIO));
+    for (const productPos of ["center", "left", "right", "bottom-right"] as const)
+      for (const textPos of ["top", "center", "bottom"] as const) {
+        const hs = layoutBanner({ ...t1, productPos, textPos }, size, measure).headlineSize;
+        expect(hs).toBeGreaterThanOrEqual(r.min);
+        expect(hs).toBeLessThanOrEqual(r.max);
+      }
+  });
+  // Open for the supervisor (T1 決定 1 x 決定 2): 16:9 社群 shown 393 wide wants a 176-278 px title; in the card group's
+  // left ~55% column the T1 words need 3 + 3 lines (> the height). The engine shrinks them (inside the canvas) instead.
+  it("r16x9 社群, card layout: the T1 words cannot reach the floor -> shrunk below it, inside the canvas; centred product reaches it", () => {
+    const size = SIZES.r16x9, r = titleRange(size.w, size.displayW);
+    const L = layoutBanner({ ...t1, ...COMPOSITION.card.layout }, size, measure);
+    expect(L.headlineSize).toBeLessThan(r.min);
+    for (const k of ["headline", "subtext"] as const) expect(inside(L.boxes[k]!, size)).toBe(true);
+    expect(layoutBanner(t1, size, measure).headlineSize).toBeGreaterThanOrEqual(r.min);
+  });
+  it("each size's group and shown width (16:9 = 社群 card at 393 + Hero web at 1920; ?ratio=16:9 opens 社群)", () => {
+    const groups = Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, `${p.group} ${p.displayW}`]));
+    expect(groups).toEqual({
+      r9x16: "phone 393", r2x3: "phone 393", r3x4: "phone 393", r4x5: "phone 393", r1x1: "phone 393",
+      r4x3: "card 700", r16x9: "card 393", r191x1: "card 500", r2x1: "card 500",
+      r16x9hero: "web 1920", r3x1: "web 1920", r3x2: "web 700",
+    });
+    expect(RATIO_PRESET["16:9"]).toBe("r16x9");
+    expect(sizeFileName("r16x9", "png")).toBe("banner-16x9.png");
+    expect(sizeFileName("r16x9hero", "png")).toBe("banner-16x9-hero.png");
+  });
+  it("a size of another group starts from its group's layout; the same group inherits the main size's; the AI default = the table", () => {
+    const st: State = { ...INIT, preset: "r4x5", textPos: "bottom", textAlignH: "right", productPos: "left", multiSizes: ["r9x16", "r16x9hero", "r4x3"] };
+    expect(variantOf(st, "r9x16")).toMatchObject({ textPos: "bottom", textAlignH: "right", productPos: "left" });
+    expect(variantOf(st, "r16x9hero")).toMatchObject(COMPOSITION.web.layout);
+    expect(variantOf(st, "r4x3")).toMatchObject(COMPOSITION.card.layout);
+    expect(variantOf({ ...st, sizeOverrides: { r4x3: { textPos: "top" } } }, "r4x3").textPos).toBe("top");
+    expect(INIT).toMatchObject(COMPOSITION.phone.layout);
+    for (const k of Object.keys(PRESETS) as PresetKey[]) expect(shapeLayout(k)).toEqual(COMPOSITION[PRESETS[k].group].layout);
+  });
+  it("9:16: every text block / badge / logo at or below 14% of the height, the product (and reflection) within the top 65%", () => {
+    const size = SIZES.r9x16, bad: string[] = [];
+    for (const productPos of ["center", "left", "right", "bottom-right"] as const)
+      for (const textPos of ["top", "center", "bottom"] as const)
+        for (const f of [t1, everything]) {
+          const L = layoutBanner({ ...f, productPos, textPos, logoPos: "bl" }, size, measure);
+          for (const k of ["headline", "subtext", "price", "cta", "trust", "badge", "logo"] as const) {
+            const b = L.boxes[k];
+            if (b && (b.y < size.h * 0.14 - 0.5 || b.y + b.h > size.h * 0.65 + 0.5)) bad.push(`${productPos}/${textPos}: ${k} ${Math.round(b.y)}-${Math.round(b.y + b.h)}`);
+          }
+          const p = L.product!, bottom = Math.max(p.box.y + p.box.h, p.reflection ? p.reflection.y + p.reflection.h : 0);
+          if (p.box.y < size.h * 0.14 - 0.5 || bottom > size.h * 0.65 + 0.5) bad.push(`${productPos}/${textPos}: product ${Math.round(p.box.y)}-${Math.round(bottom)}`);
+        }
+    expect(bad).toEqual([]);
+  });
+  it("phone default: words on top, the product under them centred on the lower-right thirds crossing where it fits", () => {
+    const size = SIZES.r4x5, L = layoutBanner({ ...t1, ...COMPOSITION.phone.layout }, size, measure), p = L.product!.box;
+    expect(L.boxes.headline!.y).toBeLessThan(size.h / 3);
+    expect(p.y).toBeGreaterThan(L.boxes.subtext!.y + L.boxes.subtext!.h);
+    expect(p.x + p.w / 2).toBeCloseTo(Math.min(size.w * 2 / 3, size.w * 0.95 - p.w / 2), 0);
   });
 });
 
@@ -283,7 +354,7 @@ describe("R3-A 一3: no title line is drawn past the text column or the canvas",
 // (F3) at the smallest size a subtitle with no space (a long URL) was one line past the column: a word wider than the
 // column breaks between characters, so every drawn line is within the column at the floor too.
 describe("R3-A Codex F2 / F3: every text block inside the column, a size set by hand and at the floor too", () => {
-  const sizes = { ...SIZES, sq600: { w: 600, h: 600 } };
+  const sizes = { ...SIZES, sq600: { w: 600, h: 600, ratio: "1:1", displayW: 393, group: "phone" } as LayoutSize };
   const colOf = (L: ReturnType<typeof layoutBanner>) => [L.padX - 0.5, L.w - L.padX + 0.5] as const;
   it("F2: price / button / trust rows stay in the column at every size, title 40..600 px by hand", () => {
     const f: BannerFields = { ...base, typeAuto: false, showPrice: true, priceNow: "NT$999", priceWas: "NT$1,999", trustType: "reviews" };
