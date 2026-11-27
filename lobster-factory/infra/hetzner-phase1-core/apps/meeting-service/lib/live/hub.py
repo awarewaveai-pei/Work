@@ -119,7 +119,12 @@ class Hub:
             s.on_translated.append(self._line_translated)
             s.on_drop.append(lambda id: self.archive and self.archive.drop_line(id))
             s.on_clear.append(self.summary.clear)
+            s.on_lost.append(self._audio_lost)
         return self.session
+
+    def _audio_lost(self, seconds: float) -> None:
+        if self.archive is not None:
+            self.archive.dropped_sec += seconds
 
     def _complete(self, system, user):
         return self.translator.complete(system, user)
@@ -393,11 +398,11 @@ class Hub:
 
     def _put(self, queue: asyncio.Queue, item) -> None:
         """Into a queue on the way to the speech service; when it is full (the service fell behind) the
-        oldest chunk goes, and its length is counted in the saved session's dropped_sec."""
+        oldest chunk goes, and is reported lost (the saved session's dropped_sec)."""
         if queue.full():
             old = queue.get_nowait()
-            if old and self.archive is not None:
-                self.archive.dropped_sec += len(old[1]) // 2 / RATE
+            if old:
+                self._session().lost(len(old[1]) // 2 / RATE)
         queue.put_nowait(item)
 
     def feed(self, sender, chunk: bytes) -> None:

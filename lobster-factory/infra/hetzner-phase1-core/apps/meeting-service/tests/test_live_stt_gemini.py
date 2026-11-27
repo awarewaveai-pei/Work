@@ -121,6 +121,23 @@ class LiveTests(unittest.TestCase):
             stt_gemini._session = real
         self.assertEqual(session.calls[-1], ("finish", 1, "Then we retire the old build servers"))
 
+    def test_audio_left_in_the_queue_while_the_line_was_down_is_reported_lost(self):
+        # Reconnecting can take up to 30 s; that speech never reaches Gemini and must not look complete.
+        import asyncio
+        from lib.live import stt_gemini
+
+        lost = []
+
+        class Session:
+            def lost(self, seconds):
+                lost.append(seconds)
+
+        q = asyncio.Queue()
+        q.put_nowait((0, bytes(3200)))
+        q.put_nowait((1600, bytes(3200)))
+        self.assertFalse(stt_gemini._drain(q, Session()))
+        self.assertEqual(lost, [0.2])
+
 
 if __name__ == "__main__":
     unittest.main()

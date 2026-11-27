@@ -65,6 +65,8 @@ class Session:
         # on_drop(id) when a line came to nothing, on_clear() when the captions were cleared.
         self.on_drop: list = []
         self.on_clear: list = []
+        # on_lost(seconds) for audio the speech service never got (it fell behind, or the line was down).
+        self.on_lost: list = []
         self._seg_seq = 0
         self._lines: dict = {}
         self._tasks: set = set()
@@ -114,6 +116,10 @@ class Session:
         lines += [m for m in self.my_lines if keep(m.id)]
         lines.sort(key=lambda s: (s.id, s.who == "me"))
         return [("Me: " if s.who == "me" else "Them: ") + s.text for s in lines[max(len(lines) - n, 0):]]
+
+    def lost(self, seconds: float) -> None:
+        for cb in self.on_lost:
+            cb(seconds)
 
     def status(self, text: str) -> None:
         self.status_text = text

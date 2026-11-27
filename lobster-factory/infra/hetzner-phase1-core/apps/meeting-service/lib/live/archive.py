@@ -126,6 +126,8 @@ def write_atomic(path: str, text: str) -> None:
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", errors="replace", newline="\n") as f:
         f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
     for attempt in range(REPLACE_RETRIES + 1):
         try:
             return os.replace(tmp, path)
@@ -385,8 +387,9 @@ class Archive:
 
     def write(self) -> None:
         header = render_header(self.started_at, self.about)
-        write_atomic(os.path.join(self.dir, "transcript.md"), render(header, self.segments, self.lines))
+        # Two files, two replaces: one failing leaves `dirty` set, so the next tick writes both again.
         write_atomic(os.path.join(self.dir, SIDECAR), json.dumps(self.sidecar(), ensure_ascii=False, indent=1) + "\n")
+        write_atomic(os.path.join(self.dir, "transcript.md"), render(header, self.segments, self.lines))
         for i, seg in enumerate(self.segments):
             path = os.path.join(self.dir, f"{stem(i + 1, seg.name)}.md")
             old = self.written.get(i)

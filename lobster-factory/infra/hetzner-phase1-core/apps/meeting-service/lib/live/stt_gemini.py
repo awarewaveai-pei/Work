@@ -282,14 +282,20 @@ async def _session(session, usage, key: str, language: str, audio: asyncio.Queue
         await _close(ws)
 
 
-def _drain(audio: asyncio.Queue) -> bool:
-    """Empty the queue; True if the stop marker (None) was in it."""
-    while True:
-        try:
-            if audio.get_nowait() is None:
+def _drain(audio: asyncio.Queue, session) -> bool:
+    """Empty the queue, reporting the audio as lost; True if the stop marker (None) was in it."""
+    samples = 0
+    try:
+        while True:
+            item = audio.get_nowait()
+            if item is None:
                 return True
-        except asyncio.QueueEmpty:
-            return False
+            samples += len(item[1]) // 2
+    except asyncio.QueueEmpty:
+        return False
+    finally:
+        if samples:
+            session.lost(samples / RATE)
 
 
 async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
@@ -308,7 +314,7 @@ async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30)
             # Audio from while the line was down is not sent late; a stop asked for meanwhile is honoured.
-            if _drain(audio):
+            if _drain(audio, session):
                 return
             continue
         finally:

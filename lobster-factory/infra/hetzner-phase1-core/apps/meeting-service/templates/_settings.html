@@ -46,7 +46,15 @@ window.Settings = (function () {
     .then(d => { if (d) { data = d; notify(); } return d; })
     .catch(() => null);
 
-  async function put(patch) {
+  // Writes go out one at a time: an older PUT still on its way (the migration below) must not land after a newer one.
+  let queue = Promise.resolve();
+  function put(patch) {
+    const p = queue.then(() => send(patch));
+    queue = p.catch(() => {});
+    return p;
+  }
+
+  async function send(patch) {
     const r = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(typeof body.detail === "string" ? body.detail : "設定沒存到（" + r.status + "）"), { status: r.status });
@@ -70,6 +78,7 @@ window.Settings = (function () {
     ready.then(async () => {
       for (const [k, s] of Object.entries(map)) {
         if (!(k in old)) continue;
+        if (data && data.stored.includes(s)) { forget(k); continue; }   // the server already holds a newer value (another browser)
         try { await put({ [s]: old[k] }); forget(k); } catch (e) { if (e.status === 400) forget(k); }
       }
       on(fromServer);

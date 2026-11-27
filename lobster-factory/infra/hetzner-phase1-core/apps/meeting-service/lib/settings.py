@@ -6,6 +6,8 @@
 """
 import contextlib
 import json
+import logging
+import math
 import os
 import re
 import tempfile
@@ -30,7 +32,7 @@ LANG_RE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}")
 
 def _number(lo, hi, integer=False):
     def check(v):
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
             raise ValueError("要是數字")
         if integer and v != int(v):
             raise ValueError("要是整數")
@@ -127,6 +129,8 @@ def _save(data: dict):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())   # a power cut right after the replace must not leave an empty file
         _retry(lambda: os.replace(tmp_path, SETTINGS_PATH))
     except BaseException:
         with contextlib.suppress(OSError):
@@ -154,10 +158,10 @@ def has_api_key() -> bool:
     return bool(get_api_key())
 
 
-def pref(name: str):
-    """偏好值；檔案裡的值壞了（手改、舊版）就用預設。"""
+def pref(name: str, data=None):
+    """偏好值；檔案裡的值壞了（手改、舊版）就用預設。`data`：已讀出的設定檔（同一次回應的各欄出自同一版）。"""
     default, check = PREFS[name]
-    data = _load()
+    data = _load() if data is None else data
     if name not in data:
         return default
     try:
@@ -167,15 +171,15 @@ def pref(name: str):
 
 
 def _mask(value: str) -> str:
-    if len(value) <= 12:
-        return "*" * len(value)
-    return value[:8] + "..." + value[-4:]
+    # Only enough to tell two keys apart: the last 4 characters of a long key, nothing of a short one.
+    return "..." + value[-4:] if len(value) >= 20 else "***"
 
 
 def public() -> dict:
     """給頁面的樣子：偏好照值，金鑰只有遮罩與來源（settings／env／""），絕不回明文。"""
     data = _load()
-    out = {name: pref(name) for name in PREFS}
+    out = {name: pref(name, data) for name in PREFS}
+    out["stored"] = sorted(name for name in PREFS if name in data)   # the page's one-time migration skips these
     for name, env in KEYS.items():
         stored = _stored_key(data, name)
         from_env = "" if stored or not env else os.environ.get(env, "").strip()
@@ -212,7 +216,13 @@ def update(patch) -> dict:
         with _WRITE_LOCK:
             try:
                 data = _read()
-            except (OSError, ValueError) as e:
+            except ValueError:
+                # Broken JSON (a hand edit) never heals by itself: keep it aside for recovery and start over.
+                bad = f"{SETTINGS_PATH}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
+                os.replace(SETTINGS_PATH, bad)
+                logging.getLogger(__name__).warning("settings file unreadable, moved to %s", os.path.basename(bad))
+                data = {}
+            except OSError as e:
                 raise OSError(f"設定檔讀不到，這次沒有存（{type(e).__name__}）") from None
             for name, value in clean.items():
                 if name in KEYS and not value:

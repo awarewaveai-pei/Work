@@ -13,3 +13,4 @@ __pycache__/
 .live-usage.json
 .live-script.json
 .live-script.json.corrupt-*
+.settings.json.bad-*

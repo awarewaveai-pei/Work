@@ -35,8 +35,17 @@ class _TempSettings(unittest.TestCase):
 
 
 class ValidationTests(_TempSettings):
+    def test_a_broken_settings_file_is_kept_aside_and_saving_works_again(self):
+        # A hand edit with a JSON error used to make every save fail until the file was deleted by hand.
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write('{"anthropic_api_key": "x",')
+        settings.update({"pause_min": 5})
+        self.assertEqual(self.stored(), {"pause_min": 5})
+        kept = [n for n in os.listdir(os.path.dirname(self.path)) if n.startswith(".settings.json.bad-")]
+        self.assertEqual(len(kept), 1)
+
     def test_bad_type_unknown_field_and_too_long_are_rejected_and_nothing_is_written(self):
-        for patch in ({"save": "yes"}, {"pause_min": "3"}, {"caption_size": 18.5}, {"stt": "cloud"},
+        for patch in ({"save": "yes"}, {"pause_min": "3"}, {"caption_size": 18.5}, {"caption_size": float("inf")}, {"stt": "cloud"},
                       {"gemini_api_key": 123}, {"no_such_field": 1},
                       {"gemini_api_key": "x" * (settings.KEY_MAX + 1)}, {"listen": "en-" + "A" * 20},
                       {"save": False, "unknown": 1}):
@@ -48,7 +57,7 @@ class ValidationTests(_TempSettings):
         settings.update({"gemini_api_key": FAKE})
         out = settings.update({"pause_min": 5})
         self.assertEqual(out["pause_min"], 5)
-        self.assertEqual(out["gemini_api_key"], {"set": True, "masked": "fake-key...cdef", "source": "settings"})
+        self.assertEqual(out["gemini_api_key"], {"set": True, "masked": "...cdef", "source": "settings"})
         self.assertNotIn(FAKE, json.dumps(out))
         self.assertEqual(self.stored()["gemini_api_key"], FAKE)
 

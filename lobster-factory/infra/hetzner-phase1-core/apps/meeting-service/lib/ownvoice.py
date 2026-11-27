@@ -103,12 +103,20 @@ def read_text(session_id: str, name: str) -> str:
 
 def session_lines(session_id: str):
     """session.json 的內容（version、listen、target、stt、channels、lines、dropped_sec、failed_lines）；
-    沒有這個檔＝舊場次，回 None。"""
-    try:
-        with open(os.path.join(session_dir(session_id), SIDECAR), encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return None
+    沒有或讀不懂這個檔＝當舊場次，回 None（會後整理就整條重跑）。"""
+    path = os.path.join(session_dir(session_id), SIDECAR)
+    for _ in range(3):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else None
+        except FileNotFoundError:
+            return None
+        except PermissionError:
+            time.sleep(0.05)   # Windows: the recorder is replacing the file this instant
+        except ValueError:
+            return None
+    return None
 
 
 def live_transcript(max_age_sec: int = 1800) -> str:
