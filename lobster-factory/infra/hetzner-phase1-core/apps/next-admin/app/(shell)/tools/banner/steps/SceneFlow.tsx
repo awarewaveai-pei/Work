@@ -3,7 +3,7 @@
 // count buttons and the candidate grid with the priced 「生成其他 N 個尺寸」 button.
 import { useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { DEFAULT_SCENE_COUNT, SCENE_COUNTS, ntdLabel } from "../banner-design";
-import { PRESETS, mainOf, presetLabel, type PresetKey, type State } from "../banner-state";
+import { PRESETS, mainOf, presetLabel, selectedSizes, type PresetKey, type State } from "../banner-state";
 import {
   EMPTY_VIEW, SIZE_DRAWING, guardOnDrawn, otherSizesLabel, otherSizesOf, sceneFlow, type FlowView, type OtherSizesMode,
 } from "../scene-flow";
@@ -72,7 +72,8 @@ export function ScenePicker({ flow, s }: { flow: SceneFlowHandle; s: State }) {
       )}
       {Object.entries(sizeJobs).map(([k, msg]) => (
         <p key={k} className="form-hint" data-testid={`banner-scene-size-${k}`} style={{ margin: 0, ...(msg === SIZE_DRAWING ? {} : { color: "var(--badge-red-text)" }) }}>
-          {presetLabel(k as PresetKey)}：{msg === SIZE_DRAWING ? "以選中的圖延伸成這個尺寸的比例中…" : `${msg}；這個尺寸暫用主尺寸的圖裁切`}
+          {presetLabel(k as PresetKey)}：{msg === SIZE_DRAWING ? "以選中的圖延伸成這個尺寸的比例中…"
+            : selectedSizes(s).includes(k as PresetKey) ? `${msg}；這個尺寸暫用主尺寸的圖裁切` : msg}
         </p>
       ))}
     </div>

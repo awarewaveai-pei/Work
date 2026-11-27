@@ -113,12 +113,18 @@ export async function drawOtherSizes(st: State, sizes: readonly PresetKey[], o: 
   return { pics, errs };
 }
 
-/** The other picked sizes a picked cell can still be drawn at: only while the design's main picture is that cell's
- *  picture with the product baked in (a plain scene is cropped by every size for free). */
-export function otherSizesOf(st: State, cell: SceneCell | undefined): PresetKey[] {
+/** What other sizes are paid against still holds: the main picture is the cell's picture with the product baked in, and
+ *  that product is the one on the page now (a 換圖 after the pick must not pay for the old product). Checked when the
+ *  button is offered and again before the paid pictures are applied. */
+function stillPicked(st: State, cell: OkCell): boolean {
   const m = mainOf(st);
-  if (!cell || cell.state !== "ok" || !cell.product || m.bgImage !== cell.image || !m.bgImageHasProduct) return [];
-  return selectedSizes(st).filter((k) => k !== m.preset);
+  return !!cell.product && cell.product === m.productImage && m.bgImage === cell.image && m.bgImageHasProduct;
+}
+
+/** The other picked sizes a picked cell can still be drawn at (stillPicked; a plain scene is cropped by every size for free). */
+export function otherSizesOf(st: State, cell: SceneCell | undefined): PresetKey[] {
+  if (!cell || cell.state !== "ok" || !stillPicked(st, cell)) return [];
+  return selectedSizes(st).filter((k) => k !== mainOf(st).preset);
 }
 
 /** The flow's actions on the page's state (`current` / `apply`) and its own view. Picks and other-size runs share one
@@ -190,13 +196,19 @@ export function sceneFlow(deps: {
     deps.view((v) => ({ ...v, sizeJobs: Object.fromEntries(others.map((k) => [k, SIZE_DRAWING])) }));
     const { pics, errs } = await drawOtherSizes(deps.current(), others, { src, picked: cell.image, mode }, { generate, areas });
     if (!lane.isLatest(token)) return; // a newer pick / draw owns the sizes now
-    // the main picture changed while they were drawn: the paid pictures are not applied -- say so per size
-    const gone = mainOf(deps.current()).bgImage !== cell.image;
+    // what they were paid against changed while they were drawn (main picture / product replaced, size dropped):
+    // those paid pictures are not applied -- say so per size
+    const now = deps.current(), gone = !stillPicked(now, cell), live = selectedSizes(now);
     const billed = `（已計費${ntdLabel(imageNtd(otherSizesModel(src.model, mode)))}）`;
-    deps.view((v) => ({ ...v, sizeJobs: { ...errs, ...(gone ? Object.fromEntries(Object.keys(pics).map((k) => [k, `主背景已換，這張沒有套用${billed}`])) : {}) } }));
-    if (gone || !Object.keys(pics).length) return;
-    await lane.runAs(token, (prev) => (mainOf(prev).bgImage === cell.image ? withSizeBackgrounds(prev, pics, others) : prev),
-      deps.check, (built, g) => ({ ...built, ...g.patch }), failed("其他尺寸的圖沒有套用，請再按一次。"));
+    const unused = Object.keys(pics).filter((k) => gone || !live.includes(k as PresetKey))
+      .map((k) => [k, `${gone ? "主背景或商品已換" : "這個尺寸已取消"}，這張沒有套用${billed}`]);
+    deps.view((v) => ({ ...v, sizeJobs: { ...errs, ...Object.fromEntries(unused) } }));
+    if (gone || unused.length === Object.keys(pics).length) return;
+    await lane.runAs(token, (prev) => {
+      if (!stillPicked(prev, cell)) return prev;
+      const sizes = others.filter((k) => selectedSizes(prev).includes(k));
+      return withSizeBackgrounds(prev, Object.fromEntries(sizes.flatMap((k) => (pics[k] ? [[k, pics[k]]] : []))), sizes);
+    }, deps.check, (built, g) => ({ ...built, ...g.patch }), failed("其他尺寸的圖沒有套用，請再按一次。"));
   }
 
   return { draw, pick, drawOthers, reset: () => { drawId++; lane.claim(); deps.view(() => EMPTY_VIEW); } };

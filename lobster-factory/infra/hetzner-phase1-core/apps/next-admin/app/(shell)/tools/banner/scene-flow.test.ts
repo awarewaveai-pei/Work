@@ -3,8 +3,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { INIT, variantOf, type PresetKey, type State } from "./banner-state";
-import { EMPTY_VIEW, imageNtd, otherSizesLabel, otherSizesNtd, sceneFlow, type FlowView, type OkCell, type SceneSource } from "./scene-flow";
+import { INIT, toggleSizePick, variantOf, type PresetKey, type State } from "./banner-state";
+import { EMPTY_VIEW, imageNtd, otherSizesLabel, otherSizesNtd, otherSizesOf, sceneFlow, type FlowView, type OkCell, type SceneSource } from "./scene-flow";
 
 const PRODUCT = "data:image/png;base64,PPPP", SCENE = "data:image/png;base64,SSSS";
 const areaOf: Record<string, { x0: number; y0: number; x1: number; y1: number }> = {
@@ -97,5 +97,39 @@ describe("R4-D 付費生成中點縮圖不作廢已付費的圖", () => {
     await run;
     expect(h.state()).toMatchObject({ bgImage: SCENE, generating: false });
     expect(variantOf(h.state(), "r9x16").bgProductArea).toEqual(areaOf.r9x16);
+  });
+});
+
+describe("R4-D Codex F1 換商品後不付費畫舊商品", () => {
+  it("after 換圖 the picked cell offers no other sizes and the button spends nothing", async () => {
+    const h = harness(design);
+    await h.flow.pick(0, cell);
+    expect(otherSizesOf(h.state(), cell)).toEqual(["r9x16", "r16x9"]);
+    const swapped: State = { ...h.state(), productImage: "data:image/png;base64,NEWPRODUCT" };
+    expect(otherSizesOf(swapped, cell)).toEqual([]);
+    const h2 = harness(swapped);
+    await h2.flow.drawOthers(cell, src, "extend");
+    expect(h2.generate).not.toHaveBeenCalled();
+  });
+});
+
+describe("R4-D Codex F2 付費中取消的尺寸不寫入", () => {
+  it("a size dropped while the other sizes draw gets no picture and is named as billed, not applied", async () => {
+    const h = harness(design);
+    await h.flow.pick(0, cell);
+    const waiting: (() => void)[] = [];
+    h.generate.mockImplementation(() => new Promise<string>((r) => { waiting.push(() => r(SCENE)); }));
+    const release = () => waiting.splice(0).forEach((f) => f());
+    const run = h.flow.drawOthers(cell, src, "extend");
+    await new Promise((r) => setTimeout(r, 0));
+    // StepSize disables the size buttons while generating; the flow must still hold if the picked sizes change
+    const dropped = toggleSizePick(h.state(), "r9x16");
+    Object.assign(h.state(), dropped);
+    release(); await new Promise((r) => setTimeout(r, 0)); release();
+    await run;
+    expect(h.state().multiSizes).toEqual(["r16x9"]);
+    expect(h.state().sizeOverrides.r9x16?.bgImage).toBeUndefined();
+    expect(h.view().sizeJobs.r9x16).toMatch(/^這個尺寸已取消，這張沒有套用（已計費/);
+    expect(variantOf(h.state(), "r16x9").bgProductArea).toEqual(areaOf.r16x9);
   });
 });
