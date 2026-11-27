@@ -263,8 +263,8 @@ function count(n: Record<string, number>, r: Outcome) {
 }
 
 /** Rows a firing moves on without starting anything: the topic was started already (by a person's 「核准並開始」, or by the
- *  schedule), or a person pressed 「發布」. 'scheduled' is not one: it waits only for an auto publish (publishReviewed). */
-export const STARTED_STATUSES: TopicStatus[] = ["generating", "drafted", "waiting_video", "embedded", "publishing"];
+ *  schedule), or a person pressed 「發布」; 'scheduled' = its site's publish mode dated it (publishReviewed). */
+export const STARTED_STATUSES: TopicStatus[] = ["generating", "drafted", "waiting_video", "embedded", "scheduled", "publishing"];
 
 const newCounts = () => ({ interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
   video_started: 0, expired: 0, publishing: 0 });
@@ -295,13 +295,13 @@ async function advanceRows(deps: TickDeps, n: Record<string, number>, t0: Date, 
   }
 }
 
-/** K31: one push of a brand whose content_pipeline schedule is off. What a person started is finished whatever the
- *  switch (its video made, put on YouTube and into the article; a pressed 「發布」 continued); what only the schedule
- *  does is not: nothing is started, no proposal expired, nothing published by the site's auto mode (a topic reaching
- *  'reviewed' stays there for a person's 「發布」; a 'scheduled' one waits for the schedule). */
+/** K31: one push of a brand whose content_pipeline schedule is off. What was started is finished whatever the switch
+ *  (its video made and attached, a pressed 「發布」 continued), and whether it then goes out is its site's publish mode,
+ *  as with the schedule on (publishReviewed: auto publish now or on its day, else 'reviewed' for a person's 「發布」).
+ *  What only the schedule does is not done: nothing is started, no proposal expired. */
 export async function advanceStartedTopics(deps: TickDeps, opts: { budgetMs?: number } = {}): Promise<string> {
   const n = newCounts();
-  await advanceRows({ ...deps, autoPublishes: async () => false }, n, deps.now(), opts.budgetMs ?? TICK_BUDGET_MS, STARTED_STATUSES);
+  await advanceRows(deps, n, deps.now(), opts.budgetMs ?? TICK_BUDGET_MS, STARTED_STATUSES);
   return summaryOf(n);
 }
 
@@ -318,7 +318,7 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     if (await deps.move(t, "rejected", { last_error: expiredReason(t.scheduled_for!) })) n.expired++;
   }
 
-  await advanceRows(deps, n, t0, budget, [...STARTED_STATUSES, "scheduled"]);
+  await advanceRows(deps, n, t0, budget, STARTED_STATUSES);
 
   for (const t of (await deps.due(t0)).filter(makesNow)) {
     if (deps.now().getTime() - t0.getTime() >= budget) break;

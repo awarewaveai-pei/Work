@@ -1,6 +1,7 @@
 // K31: a topic a person started (「核准並開始」) or pressed 「發布」 on is finished by the system whether or not its brand's
 // content_pipeline schedule is on. Every run-due firing (host cron, every 5 minutes) moves on the started topics of every
-// organization whose schedule is off (tick.ts advanceStartedTopics: nothing started, planned or auto published); an
+// organization whose schedule is off (tick.ts advanceStartedTopics: nothing started or planned; going out follows the
+// site's publish mode, as with the schedule on); an
 // organization whose schedule is on is left to its own content_pipeline run, which does the same and more. The press is
 // the consent, so no client_schedules row is needed -- the same rule as the 「做到草稿」 video projects
 // (lib/content/video/advance-auto-projects.ts).

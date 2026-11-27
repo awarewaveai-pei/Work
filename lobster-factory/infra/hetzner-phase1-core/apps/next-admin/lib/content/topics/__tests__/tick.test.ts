@@ -433,29 +433,38 @@ describe("publish in steps (N5a)", () => {
   });
 });
 
-// K31: the brand's content_pipeline schedule is off. A topic a person started runs to the end; nothing else moves.
+// K31: the brand's content_pipeline schedule is off. What was started runs to the end, and whether it goes out is the
+// site's publish mode, as with the schedule on; nothing is started and no proposal is returned.
 describe("advanceStartedTopics: schedule off (K31)", () => {
   const withVideo = (id: string, over: Partial<Topic> = {}) => topic(id, { formats: ["article", "social", "video"], ...over });
-
-  it("a person-started video topic: video started, attached, reviewed; the pressed 發布 goes on until YouTube's link is back", async () => {
-    let youtubeLive = false;
-    const q = queue([withVideo("a", { status: "drafted", review, artifacts: { wp_post_id: 1 } })], undefined, undefined,
-      { auto: true, publish: async (t) => ({ artifacts: { ...t.artifacts, youtube: youtubeLive }, done: youtubeLive }) });
+  const toReviewed = async (auto: boolean) => {
+    const q = queue([withVideo("a", { status: "drafted", review, artifacts: { wp_post_id: 1 } })], undefined, undefined, { auto });
     expect(await advanceStartedTopics(q.deps)).toContain("video_started=1");
     expect(q.db.get("a")).toMatchObject({ status: "waiting_video", artifacts: { video: { job_id: "job1" } } });
     q.video.polls.set("job1", { state: "done", url: "https://cdn.example/v.mp4" });
     await advanceStartedTopics(q.deps);
-    // the site is set to auto publish, but without the schedule only a person's press sends it
+    return q;
+  };
+
+  it("site set to auto publish: a person-started video topic is made, attached and goes out as the setting says", async () => {
+    const q = await toReviewed(true);
+    expect(q.db.get("a")?.status).toBe("published");
+    expect(q.published).toEqual(["a"]);
+  });
+
+  it("site set to human review: it stops at reviewed; a pressed 發布 goes on until YouTube's link is back", async () => {
+    const q = await toReviewed(false);
     expect(q.db.get("a")?.status).toBe("reviewed");
     expect(q.published).toEqual([]);
+    let youtubeLive = false;
+    q.deps.publish = async (t) => ({ artifacts: { ...t.artifacts, youtube: youtubeLive }, done: youtubeLive });
     expect(await requestPublish(q.deps, q.db.get("a")!, "staff:u1")).toMatchObject({ status: "publishing" });
     expect(await advanceStartedTopics(q.deps)).toContain("publishing=1");   // YouTube sent, its link not back yet
     youtubeLive = true;
     expect(await advanceStartedTopics(q.deps)).toContain("published=1");
-    expect(q.db.get("a")?.status).toBe("published");
   });
 
-  it("nothing the schedule alone does: an approved topic is not started, a stale proposal not returned, a reviewed or scheduled one not published", async () => {
+  it("a scheduled topic goes out on its day; an approved topic is not started, a stale proposal not returned, a reviewed one left", async () => {
     const q = queue([
       topic("due"),
       topic("old", { status: "proposed", scheduled_for: "2026-10-19T17:00:00Z" }),
@@ -463,8 +472,8 @@ describe("advanceStartedTopics: schedule off (K31)", () => {
       topic("sch", { status: "scheduled", review, scheduled_for: "2026-11-01T00:00:00Z" }),
     ], undefined, undefined, { auto: true });
     await advanceStartedTopics(q.deps);
-    expect([...q.db.values()].map((t) => [t.id, t.status])).toEqual([["due", "approved"], ["old", "proposed"], ["rev", "reviewed"], ["sch", "scheduled"]]);
+    expect([...q.db.values()].map((t) => [t.id, t.status])).toEqual([["due", "approved"], ["old", "proposed"], ["rev", "reviewed"], ["sch", "published"]]);
     expect(q.made).toEqual([]);
-    expect(q.published).toEqual([]);
+    expect(q.published).toEqual(["sch"]);
   });
 });
