@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-27（續7）— oracle WP：全站頁面改用 wp-bridge Kadence 積木、訂閱表單改 Fluent Forms Pro、工具跟著 Kadence 色盤（已上線）
+
+- [根因] 操作者：首頁「這啥小?」→「要一起重做，都要用 Kadence，訂閱頁用 Fluent Forms Pro」→「要可以被 theme 控制」→「WP-bridge 不是有」。頁面原是監工 wp-cli 寫的短碼＋核心區塊；派工時沒查既有的 `wp-bridge-plugin/includes/Content/BlockLibrary.php`＋`KadenceValidator`（操作者 2026-06-05／06-09 規則），先叫工人手寫 Kadence 標記，經操作者指正後改向。
+- [步驟] 三工人：`oracle-pages-kadence`（Opus 5.5：bridge 新增 7 種頁面積木＋`site-content/{pages,apply,translations}.php`）、`wp-plugin-051`（oracle 外掛 0.5.3：Fluent Forms 當訂閱前台、送出內容不寫入 Fluent Forms、表單外觀繼承佈景）、`oracle-embed-theme`（Opus 5.5：引擎嵌入頁吃 `aw-palette1..9`／字體／圓角，外掛 `Embed/ThemeTokens.php` 讀 Kadence）。監工：cherry-pick 併入（`Settings/Options.php`、`Normalize.php` 兩邊各加一鍵的衝突取聯集）→ bridge 升 0.23.0（`d35a34924`）→ `release-wp-bridge.sh` 發佈 bridge v0.23.0（鏡像 sha `ee3fea2c…`）與 oracle v0.5.3（`2deef8cd…`）→ `sg-deploy.sh oracle-web`（`DEPLOY_HOLD` 為 Banner 線對 next-admin 的暫停；以 `DEPLOY_HOLD_OVERRIDE=1` 只部署 oracle-web）→ 站上裝 Fluent Forms Pro 6.2.4、bridge 0.23.0、oracle 0.5.3 → `wp aworacle daily-form`（表單 id 3）→ `apply.php`（`AWORACLE_PG1_DAILY_FORM_ID=3`）＋`translations.php`。
+- [驗證] 合併後 oracle 外掛 phpunit 36 過（composer:2）；兩個 release CI 過；sg-deploy smoke 10 項 OK。站上：`apply.php` 16 頁 ok、27 theme mods、選單 4；`translations.php` 76 列；`/`、`/tools/`、`/tools/ziwei/`、`/my-charts/`、`/daily-letter/`、`/english/`、`/english/tools/bazi/` 皆 200。`/tools/ziwei/` HTML：iframe `src` 帶 `aw-palette1..9`＋`aw-body-font`＋`aw-heading-font`＋`aw-button-radius`，嵌入頁含 `data-href="aw-host-theme"`；區塊皆 `wp-block-kadence-*`、無「無效內容」字樣；`/daily-letter/` 內容為 `[fluentform id="3"]`。瀏覽器（桌機）實看首頁、紫微頁、訂閱頁：深色紫金一致。英文首頁主內容 0 個中文字、標題英文。
+- [未驗／剩餘風險] 手機寬度監工未在正式站實看（Chrome 視窗縮不到 375；只看了工人本機 375 截圖）；正式站未實際改色盤驗連動（工人本機改 palette1→綠已截圖）；Fluent Forms 表單未以真人送出（Turnstile）、送出後四張 FF 表是否為 0 筆未在正式站查；`.deployed-commit` 被 oracle-web 部署寫成 `d35a34924`，但 next-admin 實際仍是 `e3ec3c494`（是否影響夜間自動部署的判斷未查）；`/my-charts/` 仍是兩個短碼；訂閱表單年月日時分各佔一列偏長；Kadence「Load Google Fonts Locally」未確認已開；bridge 0.23.0 只裝在 oracle 站，Soulful／AW 未 rollout。
+- [rollback] 頁面：`wp eval-file apply.php rollback`＋`translations.php rollback`；外掛：裝回鏡像 v0.5.2／v0.22.0；引擎：`sg-deploy.sh` 回前一版（`e3ec3c494`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh oracle-web；wp eval-file apply.php；curl /tools/ziwei/ grep aw-palette | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=1c/2m/8n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=AWORACLE_PG1_DAILY_FORM_ID | hits=3
+- ORACLE_WAIVED: 三工人各一輪 critic（T1 另有 Codex NO FINDINGS）＋T1 驗證守衛突變、P7 不落地守衛突變；監工讀回報與合併衝突處、正式站實測。
 ## 2026-11-27（續6）— meeting-service 段 4 批 3：C16 輸出目的地、C17 我／對方兩路聲音（上線 8420）
 
 - 根因：同步只能設一個環境變數、每次另勾；麥克風與電腦聲音混成一路，分不出我／對方；本機辨識載入模型期間丟開頭的話。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。

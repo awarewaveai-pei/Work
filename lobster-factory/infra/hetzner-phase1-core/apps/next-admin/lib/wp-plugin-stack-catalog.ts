@@ -78,10 +78,10 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
 
   { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
   // Own plugins (release-url): pinned versions; bump with each scripts/release-wp-bridge.sh release.
-  { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url", releaseRepo: "aware-wave-wp-bridge", releaseVersion: "0.22.0" },
+  { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url", releaseRepo: "aware-wave-wp-bridge", releaseVersion: "0.23.0" },
   // Opt-in per site (required: false): the site flow installs it only when the operator ticks it at the WordPress step.
   // Release: scripts/release-wp-bridge.sh --plugin oracle (repo awarewaveai-pei/aware-wave-oracle, asset aware-wave-oracle-v<ver>.zip).
-  { slug: "aware-wave-oracle",                 label: "AwareWave Oracle（命理工具）†",               free: false, required: false, module: "base", installSource: "release-url", releaseRepo: "aware-wave-oracle", releaseVersion: "0.5.2" },
+  { slug: "aware-wave-oracle",                 label: "AwareWave Oracle（命理工具）†",               free: false, required: false, module: "base", installSource: "release-url", releaseRepo: "aware-wave-oracle", releaseVersion: "0.5.3" },
   { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", kind: "theme", excludeForModules: ["tourism"] },
   { slug: "kadence-blocks", label: "Kadence Blocks", free: true, required: true, module: "base", excludeForModules: ["tourism"] },
   { slug: "kadence-pro",    label: "Kadence Pro Add-on (WordPressIT)", free: false, required: true, module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },

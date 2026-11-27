@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Signup form on /daily-letter/: 0 = the oracle plugin's signup block; a Fluent Forms form id (e.g. 3) = that form.
-const AWORACLE_PG1_DAILY_FORM_ID = 0;
+const AWORACLE_PG1_DAILY_FORM_ID = 3;
 const AWORACLE_PG1_BACKUP     = 'aworacle_pg1_backup';
 const AWORACLE_PG1_MENU       = '東西方命理主選單';
 
