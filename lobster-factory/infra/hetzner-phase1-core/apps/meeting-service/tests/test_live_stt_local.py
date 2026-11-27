@@ -33,7 +33,7 @@ class FakeSession:
     def interim(self, line, text):
         self.calls.append(("interim", line, text))
 
-    def finish(self, line, text, end):
+    def finish(self, line, text, end, lang=None):
         self.calls.append(("finish", line, text))
 
     def drop(self, line):

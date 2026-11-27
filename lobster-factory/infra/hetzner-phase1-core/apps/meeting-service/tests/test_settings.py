@@ -35,6 +35,13 @@ class _TempSettings(unittest.TestCase):
 
 
 class ValidationTests(_TempSettings):
+    def test_a_language_not_in_the_table_is_rejected(self):
+        for patch in ({"listen": "fr-FR"}, {"target": "auto"}, {"listen": "none"}, {"target": "xx"}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                settings.update(patch)
+        self.assertFalse(os.path.exists(self.path))
+        self.assertEqual(settings.update({"listen": "ja-JP", "target": "none"})["target"], "none")
+
     def test_a_broken_settings_file_is_kept_aside_and_saving_works_again(self):
         # A hand edit with a JSON error used to make every save fail until the file was deleted by hand.
         with open(self.path, "w", encoding="utf-8") as f:

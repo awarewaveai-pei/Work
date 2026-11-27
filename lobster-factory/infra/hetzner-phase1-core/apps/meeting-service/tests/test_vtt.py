@@ -38,7 +38,7 @@ class VttWriterTests(unittest.TestCase):
         ), patch.object(pipeline.summarize, "build_transcript_text", return_value="x"), patch.object(
             pipeline.summarize, "build_prompt", return_value="prompt"
         ), patch.object(pipeline.keep_awake, "prevent_sleep"), patch.object(pipeline.keep_awake, "allow_sleep"):
-            pipeline.run_pipeline_phase1(d, "input.mp4", do_diarize=False)
+            pipeline.run_pipeline_phase1(d, "input.mp4", pipeline.Options(diarize=False))
             self.assertEqual((Path(d) / "transcript.vtt").read_text(encoding="utf-8").splitlines()[0], "WEBVTT")
 
 

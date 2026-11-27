@@ -95,6 +95,14 @@ window.Settings = (function () {
         const cur = read(); cur[name] = value; write(cur);
         return Promise.resolve();
       },
+      // 本機欄位改了名字：舊鍵的值搬到新鍵（新鍵已有值就不搬），舊鍵刪掉。
+      rename(from, to) {
+        const cur = read();
+        if (!(from in cur)) return;
+        if (!(to in cur)) values[to] = cur[to] = cur[from];
+        delete cur[from]; delete values[from];
+        write(cur);
+      },
     };
   }
 

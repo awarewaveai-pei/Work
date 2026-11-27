@@ -10,12 +10,17 @@ MAX_SPAN = 45.0
 END_PUNCT = "。！？!?…"
 
 
+def _text_tr(s: dict) -> str:
+    """原文後面括號附翻譯（tr，聆聽時的即時翻譯）；給會議記錄的輸入用，lib/diarize.py turns 同一規則。"""
+    return s["text"] + (f"（{s['tr']}）" if s.get("tr") else "")
+
+
 def merge(segments: list) -> list:
     out = []
     cur = None
     for s in segments:
         if cur is None:
-            cur = {"start": s["start"], "end": s["end"], "text": s["text"],
+            cur = {"start": s["start"], "end": s["end"], "text": s["text"], "text_tr": _text_tr(s),
                    "ids": [s["id"]], "min_lp": s["avg_logprob"]}
             continue
         gap = s["start"] - cur["end"]
@@ -29,12 +34,13 @@ def merge(segments: list) -> list:
 
         if joinable:
             cur["text"] = joined_text((cur["text"], s["text"]))
+            cur["text_tr"] = joined_text((cur["text_tr"], _text_tr(s)))
             cur["end"] = s["end"]
             cur["ids"].append(s["id"])
             cur["min_lp"] = min(cur["min_lp"], s["avg_logprob"])
         else:
             out.append(cur)
-            cur = {"start": s["start"], "end": s["end"], "text": s["text"],
+            cur = {"start": s["start"], "end": s["end"], "text": s["text"], "text_tr": _text_tr(s),
                    "ids": [s["id"]], "min_lp": s["avg_logprob"]}
     if cur:
         out.append(cur)

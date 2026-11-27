@@ -50,6 +50,8 @@ class Summary:
                  clock: Callable[[], float] = time.monotonic, now: Callable[[], datetime] = datetime.now):
         """`await complete(system_blocks, user) -> text`; `system()` gives the system blocks at call time."""
         self.complete, self.system, self.emit, self.clock, self.now = complete, system, emit, clock, now
+        # () -> (the others' language, mine) for the request text (langs.py codes); () = the defaults.
+        self.languages: Callable[[], tuple] = tuple
         # Called with (text, updated) after every successful update; set per listening by the hub.
         self.on_update: Optional[Callable[[str, str], None]] = None
         self.enabled = False
@@ -152,7 +154,7 @@ class Summary:
     async def _run(self, lines: list, generation: int, on_update) -> None:
         text, error = "", ""
         try:
-            text = (await self.complete(self.system(), summary_user(self.text, transcript(lines)))).strip()
+            text = (await self.complete(self.system(), summary_user(self.text, transcript(lines), *self.languages()))).strip()
             if not text:
                 error = "摘要失敗：模型沒有回傳內容"
         except TranslateError as e:
