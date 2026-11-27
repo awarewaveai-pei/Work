@@ -22,12 +22,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from lib import gpu_gate, lookup, mindmap, ownvoice, settings, summarize, workspace
+from lib import gpu_gate, jobs, lookup, mindmap, ownvoice, postmeeting, settings, summarize, workspace
 from lib.live import hub as live_hub
-from lib.live import script_store
+from lib.live import langs, script_store
 from lib.live.translate import TranslateError
 from lib.transcribe import LANGUAGES
-from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
+from pipeline import MODELS, Options, resume_after_summary, run_pipeline_phase1, run_video_transcription, write_status
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(BASE_DIR, "jobs")
@@ -104,9 +104,10 @@ def _check_language(language: str) -> None:
 
 
 class _BatchGpu:
-    """一個批次工作對顯卡的登記：從請求一進來，到它的背景執行緒結束。"""
+    """一個批次工作對顯卡的登記：從請求一進來，到它的背景執行緒結束。gpu=False＝這個工作不用顯卡，不登記。"""
 
-    def __init__(self):
+    def __init__(self, gpu: bool = True):
+        self.gpu = gpu
         self.handed = False
 
     def start(self, target, *args, **kwargs) -> None:
@@ -114,23 +115,49 @@ class _BatchGpu:
             try:
                 target(*args, **kwargs)
             finally:
-                gpu_gate.release_batch()
+                if self.gpu:
+                    gpu_gate.release_batch()
 
         threading.Thread(target=run, daemon=True).start()
         self.handed = True
 
 
-def _batch_gpu():
-    """會用顯卡的批次端點的依賴：本機即時辨識進行中就回 409（8 GB 顯存放不下兩份模型）。
-    登記在請求開頭就完成，上傳檔案那幾分鐘裡即時辨識也拿不到顯卡；沒交給執行緒就結束（失敗）時在這裡登出。"""
-    if not gpu_gate.acquire_batch():
+@contextlib.contextmanager
+def _gpu_claim(gpu: bool = True):
+    """本機即時辨識進行中就回 409（8 GB 顯存放不下兩份模型）。登記在請求開頭就完成，上傳檔案那幾分鐘裡
+    即時辨識也拿不到顯卡；沒交給執行緒就結束（失敗）時在這裡登出。gpu=False 不登記也不擋。"""
+    if gpu and not gpu_gate.acquire_batch():
         raise HTTPException(409, "會議工作區正在用這台電腦的顯卡做即時辨識，請先按停止，再做會後整理")
-    claim = _BatchGpu()
+    claim = _BatchGpu(gpu)
     try:
         yield claim
     finally:
-        if not claim.handed:
+        if gpu and not claim.handed:
             gpu_gate.release_batch()
+
+
+def _batch_gpu():
+    """一定會用顯卡（要轉錄）的批次端點的依賴。"""
+    with _gpu_claim() as claim:
+        yield claim
+
+
+def _options(diarize, model, language, sync_drive, use_api) -> Options:
+    """會後整理的選項，三個入口（上傳、舊場次、聆聽場次）共用這一個檢查。"""
+    if model not in MODELS:
+        raise HTTPException(400, f"不支援的模型 {model}；可選：{', '.join(MODELS)}")
+    _check_language(language)
+    return Options(diarize=bool(diarize), model=model, language=language, sync_drive=bool(sync_drive),
+                   use_api=bool(use_api), target=settings.pref("target"))
+
+
+def _new_job(source: dict) -> tuple:
+    """(job_id, job 資料夾)；source 記在 status.json（工作清單顯示它從哪來）。"""
+    job_id = uuid.uuid4().hex[:12]
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    os.makedirs(job_dir)
+    write_status(job_dir, source=source)
+    return job_id, job_dir
 
 
 def _api_key_for(use_api: bool) -> str:
@@ -218,7 +245,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
                   model: str = "large-v3", sync_drive: bool = False,
                   use_api: bool = False, language: str = "zh",
                   gpu: _BatchGpu = Depends(_batch_gpu)):
-    _check_language(language)
+    opts = _options(diarize, model, language, sync_drive, use_api)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
@@ -228,9 +255,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     # 這段時間夠使用者在設定頁換掉或清除 key，屆時才讀會用錯 key 或誤退回人工。
     api_key = _api_key_for(use_api)
 
-    job_id = uuid.uuid4().hex[:12]
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    os.makedirs(job_dir, exist_ok=True)
+    job_id, job_dir = _new_job({"kind": "upload", "name": os.path.basename(file.filename or "")})
 
     media_path = os.path.join(job_dir, f"input{ext}")
     size = 0
@@ -248,9 +273,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     # 真的會計費；key 由使用者自行在 /api/settings 填入，不共用操作者的訂閱。
     # 講者分離缺 HF_TOKEN 也不擋主流程——pipeline 內會自動退回無標籤繼續跑。
 
-    gpu.start(run_pipeline_phase1, job_dir, media_path,
-              model_name=model, do_diarize=diarize, sync_drive=sync_drive,
-              use_api=use_api, api_key=api_key, language=language)
+    gpu.start(run_pipeline_phase1, job_dir, media_path, opts, api_key)
 
     return {"job_id": job_id}
 
@@ -268,32 +291,73 @@ def _ownvoice(call, *args):
 
 @app.get("/api/ownvoice/sessions")
 def ownvoice_sessions():
-    return {"sessions": ownvoice.sessions(), "language": ownvoice.language(), "dir": ownvoice.base_dir()}
+    """每一場：有沒有聆聽逐字稿（live）、預設做法與理由（recommend）、整理過的工作（jobs，新到舊）。"""
+    index = jobs.session_index(JOBS_DIR)
+    known = {j["id"]: j for j in jobs.listing(JOBS_DIR, DOWNLOADS)}
+    found = ownvoice.sessions()
+    for s in found:
+        sidecar = ownvoice.session_lines(s["id"])
+        s["live"] = sidecar is not None
+        s["recommend"] = postmeeting.recommend(sidecar, s["wavs"])
+        linked = index.get(os.path.join(ownvoice.base_dir(), s["id"]), [])
+        s["jobs"] = sorted((known[i] for i in linked if i in known), key=lambda j: -j["started_at"])
+    return {"sessions": found, "language": ownvoice.language(), "dir": ownvoice.base_dir()}
 
 
 @app.post("/api/ownvoice/import")
-def ownvoice_import(body: dict = Body(...), gpu: _BatchGpu = Depends(_batch_gpu)):
-    """把一場 OwnVoice 會議的錄音接成一個檔，走跟上傳一樣的流程。"""
-    language = body.get("language") or ownvoice.language()
-    _check_language(language)
-    use_api = bool(body.get("use_api"))
-    api_key = _api_key_for(use_api)
+def ownvoice_import(body: dict = Body(...)):
+    """一場會議交給會後整理產物鏈。body：session、reuse（true＝用聆聽的逐字稿，false＝從錄音重新辨識；
+    沒給＝postmeeting.recommend 的預設）、diarize、model、language、sync_drive、use_api。
+    顯卡只在要轉錄或要跑 pyannote 時登記。場次資料夾只讀，產物全在 job 資料夾。"""
+    opts = _options(body.get("diarize", True), str(body.get("model") or "large-v3"),
+                    body.get("language") or ownvoice.language(), body.get("sync_drive"), body.get("use_api"))
+    api_key = _api_key_for(opts.use_api)
     # "latest" 在這裡定成實際資料夾名，之後不再重新解析（中途開了新會議也不會接到另一場）。
-    session_id = os.path.basename(_ownvoice(ownvoice.session_dir, str(body.get("session", ""))))
+    folder = _ownvoice(ownvoice.session_dir, str(body.get("session", "")))
+    session_id = os.path.basename(folder)
+    wavs = next(s["wavs"] for s in ownvoice.sessions() if s["id"] == session_id)
+    sidecar = ownvoice.session_lines(session_id)
+    reuse = body["reuse"] if isinstance(body.get("reuse"), bool) else postmeeting.recommend(sidecar, wavs)["reuse"]
+    if reuse and sidecar is None:
+        raise HTTPException(400, "這場沒有聆聽逐字稿，只能從錄音重新辨識")
+    if not reuse and not wavs:
+        raise HTTPException(400, "這場沒有錄音，不能重新辨識")
+    labelled = reuse and postmeeting.speakers(postmeeting.segments(sidecar.get("lines") or [])) is not None
+    needs_gpu = not reuse or (opts.diarize and bool(wavs) and not labelled)
 
-    job_id = uuid.uuid4().hex[:12]
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    os.makedirs(job_dir)
-    media_path = os.path.join(job_dir, "input.wav")
-    try:
-        _ownvoice(ownvoice.join_wavs, session_id, media_path)
-    except Exception:
-        shutil.rmtree(job_dir, ignore_errors=True)
-        raise
-    gpu.start(run_pipeline_phase1, job_dir, media_path,
-              do_diarize=bool(body.get("diarize", True)), use_api=use_api,
-              api_key=api_key, language=language)
-    return {"job_id": job_id}
+    with _gpu_claim(needs_gpu) as claim:
+        job_id, job_dir = _new_job({"kind": "session", "session": session_id, "reuse": reuse})
+        media_path = None
+        try:
+            duration = None
+            if wavs:
+                media_path = os.path.join(job_dir, "input.wav")
+                duration = _ownvoice(ownvoice.join_wavs, session_id, media_path)
+            if reuse:
+                postmeeting.write_products(job_dir, sidecar, duration)
+        except Exception:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise
+        jobs.link(JOBS_DIR, folder, job_id)
+        claim.start(run_pipeline_phase1, job_dir, media_path, opts, api_key)
+    return {"job_id": job_id, "reuse": reuse}
+
+
+@app.get("/api/jobs")
+def jobs_list():
+    """jobs/ 裡每一個工作（含等貼上摘要的），新到舊。"""
+    return {"jobs": jobs.listing(JOBS_DIR, DOWNLOADS)}
+
+
+@app.get("/api/postmeeting/options")
+def postmeeting_options():
+    """會後整理面板的選項按鈕：模型、會議語言（顯示名）、能不能用 API 自動處理。"""
+    def label(code):
+        row = langs.find(code) or langs.from_whisper(code)
+        return row.label if row else code
+    return {"models": list(MODELS), "languages": [{"code": c, "label": label(c)} for c in LANGUAGES],
+            "language": ownvoice.language(), "has_api_key": settings.has_api_key(),
+            "dropped_max_sec": postmeeting.DROPPED_MAX_SEC}
 
 
 @app.post("/api/lookup/search")

@@ -192,16 +192,24 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
         s["speaker"] = bl or "?"
     log(f"      標籤來源：直接 {n_excl} / 重疊回退 {n_full} / 鄰近推定 {n_near} / 無法判定 {n_unk}")
 
-    turns = []
+    out = turns(segments)
+    short = sum(1 for t in out if t["end"] - t["start"] < 1.5)
+    log(f"      {len(out)} 輪次 / 極短(<1.5s) {short} ({short/max(len(out),1)*100:.1f}%)")
+
+    return {"speakers": spans["speakers"], "overlap_sec": spans["overlap_sec"], "turns": out}
+
+
+def turns(segments: list) -> list:
+    """已標講者的 segments → 說話輪次：同一人、間隔 < 2 秒的接在一起。沒標的算「?」。
+    text_tr＝每句原文後面括號附它的翻譯（tr，聆聽時的即時翻譯），給會議記錄的輸入用。"""
+    out = []
     for s in segments:
-        if turns and turns[-1]["speaker"] == s["speaker"] and s["start"] - turns[-1]["end"] < 2.0:
-            turns[-1]["text"] = _join(turns[-1]["text"], s["text"])
-            turns[-1]["end"] = s["end"]
+        who = s.get("speaker") or "?"
+        text_tr = s["text"] + (f"（{s['tr']}）" if s.get("tr") else "")
+        if out and out[-1]["speaker"] == who and s["start"] - out[-1]["end"] < 2.0:
+            out[-1]["text"] = _join(out[-1]["text"], s["text"])
+            out[-1]["text_tr"] = _join(out[-1]["text_tr"], text_tr)
+            out[-1]["end"] = s["end"]
         else:
-            turns.append({"speaker": s["speaker"], "start": s["start"],
-                          "end": s["end"], "text": s["text"]})
-
-    short = sum(1 for t in turns if t["end"] - t["start"] < 1.5)
-    log(f"      {len(turns)} 輪次 / 極短(<1.5s) {short} ({short/max(len(turns),1)*100:.1f}%)")
-
-    return {"speakers": spans["speakers"], "overlap_sec": spans["overlap_sec"], "turns": turns}
+            out.append({"speaker": who, "start": s["start"], "end": s["end"], "text": s["text"], "text_tr": text_tr})
+    return out
