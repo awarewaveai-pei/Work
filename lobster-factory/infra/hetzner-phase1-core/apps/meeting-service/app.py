@@ -292,14 +292,13 @@ def _ownvoice(call, *args):
 @app.get("/api/ownvoice/sessions")
 def ownvoice_sessions():
     """每一場：有沒有聆聽逐字稿（live）、預設做法與理由（recommend）、整理過的工作（jobs，新到舊）。"""
-    index = jobs.session_index(JOBS_DIR)
     known = {j["id"]: j for j in jobs.listing(JOBS_DIR, DOWNLOADS)}
     found = ownvoice.sessions()
     for s in found:
         sidecar = ownvoice.session_lines(s["id"])
         s["live"] = sidecar is not None
         s["recommend"] = postmeeting.recommend(sidecar, s["wavs"])
-        linked = index.get(os.path.join(ownvoice.base_dir(), s["id"]), [])
+        linked = jobs.for_session(JOBS_DIR, os.path.join(ownvoice.base_dir(), s["id"]))
         s["jobs"] = sorted((known[i] for i in linked if i in known), key=lambda j: -j["started_at"])
     return {"sessions": found, "language": ownvoice.language(), "dir": ownvoice.base_dir()}
 
@@ -309,14 +308,16 @@ def ownvoice_import(body: dict = Body(...)):
     """一場會議交給會後整理產物鏈。body：session、reuse（true＝用聆聽的逐字稿，false＝從錄音重新辨識；
     沒給＝postmeeting.recommend 的預設）、diarize、model、language、sync_drive、use_api。
     顯卡只在要轉錄或要跑 pyannote 時登記。場次資料夾只讀，產物全在 job 資料夾。"""
-    opts = _options(body.get("diarize", True), str(body.get("model") or "large-v3"),
-                    body.get("language") or ownvoice.language(), body.get("sync_drive"), body.get("use_api"))
-    api_key = _api_key_for(opts.use_api)
     # "latest" 在這裡定成實際資料夾名，之後不再重新解析（中途開了新會議也不會接到另一場）。
     folder = _ownvoice(ownvoice.session_dir, str(body.get("session", "")))
     session_id = os.path.basename(folder)
     wavs = next(s["wavs"] for s in ownvoice.sessions() if s["id"] == session_id)
     sidecar = ownvoice.session_lines(session_id)
+    # 沒指定語言：聆聽場次用它當時聽的語言，舊場次用 OwnVoice 的設定。
+    language = body.get("language") or postmeeting.transcribe_language(sidecar) or ownvoice.language()
+    opts = _options(body.get("diarize", True), str(body.get("model") or "large-v3"),
+                    language, body.get("sync_drive"), body.get("use_api"))
+    api_key = _api_key_for(opts.use_api)
     reuse = body["reuse"] if isinstance(body.get("reuse"), bool) else postmeeting.recommend(sidecar, wavs)["reuse"]
     if reuse and sidecar is None:
         raise HTTPException(400, "這場沒有聆聽逐字稿，只能從錄音重新辨識")

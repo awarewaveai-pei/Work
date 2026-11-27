@@ -18,15 +18,24 @@ def _read_json(path: str):
         return None
 
 
+def _key(session_path: str) -> str:
+    # One key per folder, whatever the slashes or letter case it was spelled with.
+    return os.path.normcase(os.path.normpath(session_path))
+
+
 def session_index(jobs_dir: str) -> dict:
     data = _read_json(os.path.join(jobs_dir, INDEX))
     return data if isinstance(data, dict) else {}
 
 
+def for_session(jobs_dir: str, session_path: str) -> list:
+    return session_index(jobs_dir).get(_key(session_path), [])
+
+
 def link(jobs_dir: str, session_path: str, job_id: str) -> None:
     with _lock:
         index = session_index(jobs_dir)
-        index.setdefault(session_path, []).append(job_id)
+        index.setdefault(_key(session_path), []).append(job_id)
         write_atomic(os.path.join(jobs_dir, INDEX), json.dumps(index, ensure_ascii=False, indent=1))
 
 

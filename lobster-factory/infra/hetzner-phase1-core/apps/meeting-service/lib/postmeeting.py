@@ -14,7 +14,7 @@ BACKENDS = {"gemini": "聆聽 Gemini", "local": "聆聽 本機"}
 # 聆聽時有這麼多秒聲音沒送到辨識（約一兩句話），聆聽逐字稿就有缺口：預設改成重新辨識。
 DROPPED_MAX_SEC = 5.0
 # 「不翻譯」時會議記錄用的語言（操作者自己的語言；設定裡沒有這一欄）。
-OPERATOR_LANG = "zh-TW"
+OPERATOR_LANG = langs.MINE   # 「我的語言」：不翻譯時會議記錄用它寫
 
 
 def segments(lines: list) -> list:
@@ -88,6 +88,12 @@ def recommend(sidecar, wavs: int) -> dict:
     if failed:
         return {"reuse": False, "reason": f"聆聽時有 {failed} 句翻譯失敗"}
     return {"reuse": True, "reason": ""}
+
+
+def transcribe_language(sidecar) -> str:
+    """The language the session was listened in, as a lib.transcribe.LANGUAGES key; "" without a sidecar."""
+    row = langs.find(str((sidecar or {}).get("listen") or ""))
+    return (row.whisper or "auto") if row else ""
 
 
 def language_name(code: str) -> str:
