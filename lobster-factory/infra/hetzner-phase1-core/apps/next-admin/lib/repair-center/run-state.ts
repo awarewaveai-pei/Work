@@ -44,11 +44,14 @@ export function visibleRunButtons(
  * Callers must resolve can_escalate_to_pr from the policy catalog before calling.
  */
 export function escalateGuard(
-  run: { policy: string; state: string },
+  run: { policy: string; state: string; github_issue_number: number | null },
   canEscalateToPr: boolean,
 ): { can: boolean; reason?: string } {
   if (run.policy !== "analysis_only") return { can: false, reason: "not_analysis_only" };
   if (!canEscalateToPr) return { can: false, reason: "source_cannot_escalate" };
   if (isTerminalState(run.state)) return { can: false, reason: "run_in_terminal_state" };
+  // Escalation works by commenting on the run's issue; with no issue (backup or issue creation
+  // failed) the policy would flip while GitHub never hears of it. Approve the repair again first.
+  if (run.github_issue_number == null) return { can: false, reason: "no_github_issue" };
   return { can: true };
 }

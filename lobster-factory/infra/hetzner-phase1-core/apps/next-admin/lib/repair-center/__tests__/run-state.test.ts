@@ -136,7 +136,7 @@ describe("visibleRunButtons — escalate button", () => {
 });
 
 describe("escalateGuard", () => {
-  const escalatableRun = { policy: "analysis_only", state: "repairing" };
+  const escalatableRun = { policy: "analysis_only", state: "repairing", github_issue_number: 7 };
 
   it("allows escalation when all conditions met", () => {
     const g = escalateGuard(escalatableRun, true);
@@ -145,13 +145,13 @@ describe("escalateGuard", () => {
   });
 
   it("blocks when policy is not analysis_only", () => {
-    const g = escalateGuard({ policy: "auto_repair", state: "repairing" }, true);
+    const g = escalateGuard({ policy: "auto_repair", state: "repairing", github_issue_number: 7 }, true);
     expect(g.can).toBe(false);
     expect(g.reason).toBe("not_analysis_only");
   });
 
   it("blocks when policy is human_only", () => {
-    expect(escalateGuard({ policy: "human_only", state: "repairing" }, false).reason).toBe("not_analysis_only");
+    expect(escalateGuard({ policy: "human_only", state: "repairing", github_issue_number: 7 }, false).reason).toBe("not_analysis_only");
   });
 
   it("blocks when source cannot escalate (can_escalate_to_pr=false)", () => {
@@ -161,18 +161,24 @@ describe("escalateGuard", () => {
   });
 
   it.each([...TERMINAL_STATES])("blocks when run is in terminal state: %s", (state) => {
-    const g = escalateGuard({ policy: "analysis_only", state }, true);
+    const g = escalateGuard({ policy: "analysis_only", state, github_issue_number: 7 }, true);
     expect(g.can).toBe(false);
     expect(g.reason).toBe("run_in_terminal_state");
   });
 
   it("priority order: policy check before source check", () => {
-    const g = escalateGuard({ policy: "auto_repair", state: "repairing" }, false);
+    const g = escalateGuard({ policy: "auto_repair", state: "repairing", github_issue_number: 7 }, false);
     expect(g.reason).toBe("not_analysis_only");
   });
 
+  it("blocks when the run has no GitHub issue (comment would trigger nothing)", () => {
+    const g = escalateGuard({ ...escalatableRun, github_issue_number: null }, true);
+    expect(g.can).toBe(false);
+    expect(g.reason).toBe("no_github_issue");
+  });
+
   it("priority order: source check before terminal state check", () => {
-    const g = escalateGuard({ policy: "analysis_only", state: "resolved" }, false);
+    const g = escalateGuard({ policy: "analysis_only", state: "resolved", github_issue_number: 7 }, false);
     expect(g.reason).toBe("source_cannot_escalate");
   });
 });
@@ -209,21 +215,21 @@ describe("visibleRunButtons — archive button", () => {
 // mirrors this logic — both must agree on what constitutes a valid escalation target).
 describe("escalateGuard — M9 atomic-WHERE contract", () => {
   it("analysis_only + active state → can escalate (DB WHERE will match)", () => {
-    const g = escalateGuard({ policy: "analysis_only", state: "repairing" }, true);
+    const g = escalateGuard({ policy: "analysis_only", state: "repairing", github_issue_number: 7 }, true);
     expect(g.can).toBe(true);
   });
 
   it.each([...TERMINAL_STATES])(
     "terminal state '%s' → cannot escalate (DB .not('state','in',...) will filter out)",
     (state) => {
-      const g = escalateGuard({ policy: "analysis_only", state }, true);
+      const g = escalateGuard({ policy: "analysis_only", state, github_issue_number: 7 }, true);
       expect(g.can).toBe(false);
       expect(g.reason).toBe("run_in_terminal_state");
     },
   );
 
   it("non-analysis_only policy → guard blocks before DB (DB eq('policy','analysis_only') also blocks)", () => {
-    const g = escalateGuard({ policy: "auto_repair", state: "repairing" }, true);
+    const g = escalateGuard({ policy: "auto_repair", state: "repairing", github_issue_number: 7 }, true);
     expect(g.can).toBe(false);
     expect(g.reason).toBe("not_analysis_only");
   });

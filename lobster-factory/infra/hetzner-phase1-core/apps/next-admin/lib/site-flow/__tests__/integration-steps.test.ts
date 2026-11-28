@@ -35,7 +35,7 @@ vi.mock("@/lib/secret-vault", () => ({
 import { executeStep, getSiteFlowStatus, planStep, SITE_STEP_DEFINITIONS, type EngineDeps } from "../engine";
 import { createSiteGateClient, gateTargetOf, type GateTransport } from "../gate-client";
 import { HOST_STEPS } from "../steps";
-import { bridgeStep, versionAtLeast } from "../steps/bridge";
+import { bridgeStep, expectedBridgeVersion, versionAtLeast } from "../steps/bridge";
 import { connectionOf } from "../mainwp-client";
 import { bridgeSiteOrg } from "@/lib/payments/woo";
 import type { EnvironmentRow, SiteRow, SiteStepDefinition, SiteStepKey } from "../types";
@@ -216,7 +216,8 @@ interface World {
   fetchLog: string[];
   siteUrl: string;
 }
-const newWorld = (): World => ({ mainwpSites: [], mainwpAdds: [], mainwpTruncated: false, childUniqueId: null, siteKeys: new Map(), gatePutFails: false, bridgeVersion: "0.22.0", signedCalls: 0, fetchLog: [], siteUrl: URL_ });
+// The site runs the catalog-pinned bridge; a hardcoded "0.22.0" broke every bridge test when ff49d498 moved the pin.
+const newWorld = (): World => ({ mainwpSites: [], mainwpAdds: [], mainwpTruncated: false, childUniqueId: null, siteKeys: new Map(), gatePutFails: false, bridgeVersion: expectedBridgeVersion(), signedCalls: 0, fetchLog: [], siteUrl: URL_ });
 
 /** fetch: MainWP v2 (list, add) and the new site's wp-bridge (/health public, /drafts signed). */
 function stubFetch(world: World) {
@@ -574,7 +575,7 @@ describe("live observation and staging subdirectory sites", () => {
     expect((await observe(engine(db, gate.transport), tables, "bridge")).state).toBe("done");
     world.bridgeVersion = "down";
     expect((await observe(engine(db, gate.transport), tables, "bridge")).observation?.status).toBe("partial");
-    world.bridgeVersion = "0.22.0";
+    world.bridgeVersion = expectedBridgeVersion();
     tables.client_credentials[0].secret_ref = null;
     expect((await observe(engine(db, gate.transport), tables, "bridge")).observation?.status).toBe("partial");
   });

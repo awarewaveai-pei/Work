@@ -190,6 +190,13 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
     }
   }
 
+  // Errors from escalateAnalysisOnlyRun the operator can act on; others show the raw code.
+  const ESCALATE_ERROR_TEXT: Record<string, string> = {
+    escalation_comment_failed: "GitHub 留言沒送出，已退回「僅分析」。可再按一次升級。",
+    escalation_comment_failed_revert_failed: "GitHub 留言沒送出，且退回「僅分析」失敗；此筆不會自動修復，請到該 Issue 留言「@claude」手動觸發。",
+    no_github_issue: "這筆還沒有 GitHub Issue，請先重新核准修復建立 Issue 再升級。",
+  };
+
   async function escalate() {
     if (!runId) return;
     if (!confirm("確認已分析根因為 code regression，要升級為自動修復 PR 嗎？")) return;
@@ -202,7 +209,7 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
       });
       const json = await res.json();
       setOk(json.ok === true);
-      setMsg(json.ok ? "已升級為 auto_repair。GitHub Issue 將收到升級通知。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
+      setMsg(json.ok ? "已升級為 auto_repair。GitHub Issue 將收到升級通知。重新整理即可查看最新狀態。" : `失敗：${ESCALATE_ERROR_TEXT[json.error] ?? json.error ?? "未知錯誤"}`);
     } catch (e) {
       setOk(false);
       setMsg((e as Error).message);

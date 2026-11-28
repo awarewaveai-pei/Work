@@ -503,13 +503,40 @@ export async function escalateAnalysisOnlyRun(
   if (updateError) return { ok: false, error: "update_failed", details: updateError.message };
   if (!updated) return { ok: false, error: "state_conflict_concurrent_modify" };
 
-  if (run.github_issue_number && run.github_owner && run.github_repo) {
-    await postEscalationComment({
-      owner: run.github_owner,
-      repo: run.github_repo,
-      issueNumber: run.github_issue_number,
-      actor,
-    }).catch(() => {});
+  // Invariant: policy=auto_repair only once GitHub got the comment that re-runs the workflow
+  // (escalateGuard guarantees an issue exists). A failed post puts the policy back so the run
+  // still shows the escalate button and the operator can retry.
+  const comment = await postEscalationComment({
+    owner: run.github_owner ?? resolveGithubTarget(run).owner,
+    repo: run.github_repo ?? resolveGithubTarget(run).repo,
+    issueNumber: run.github_issue_number!,
+    actor,
+  }).catch((e: unknown) => ({ ok: false, error: `github_comment_exception:${String(e).slice(0, 200)}` }));
+  if (!comment.ok) {
+    const { data: reverted } = await supabase
+      .from("repair_runs")
+      .update({
+        policy: "analysis_only",
+        audit_log: appendAudit((updated as RepairRun).audit_log, {
+          actor: "system",
+          action: "escalation_reverted",
+          detail: "GitHub comment that re-runs auto-repair was not posted; policy put back to analysis_only.",
+          data: { error: comment.error, issue_number: run.github_issue_number },
+        }),
+      })
+      .eq("id", id)
+      .eq("policy", "auto_repair")
+      .select("*")
+      .maybeSingle();
+    if (!reverted) {
+      console.error(`[repair] run ${id}: escalation comment failed (${comment.error}) and policy revert did not apply.`);
+    }
+    return {
+      ok: false,
+      run: ((reverted ?? updated) as RepairRun),
+      error: reverted ? "escalation_comment_failed" : "escalation_comment_failed_revert_failed",
+      details: { github_error: comment.error },
+    };
   }
 
   return { ok: true, run: updated as RepairRun };
