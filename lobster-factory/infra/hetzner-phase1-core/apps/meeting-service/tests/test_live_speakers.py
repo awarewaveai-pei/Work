@@ -125,6 +125,25 @@ class SavedVoices(unittest.TestCase):
         self.assertEqual(windows, r"C:\Users\pei\AppData\Local\meeting-service\voices.json")
 
 
+class NotOffered(unittest.IsolatedAsyncioTestCase):
+    async def test_live_speakers_do_not_start_while_not_ready(self):
+        # 2026-11-29: 19% on the operator's real recording (card bar 80%): asking for it starts captions only.
+        from lib.live import hub as hub_mod
+        from lib.live.usage import Usage
+
+        async def fake_gemini(session, usage, key, language, audio, who="them"):
+            while await audio.get() is not None:
+                pass
+
+        with tempfile.TemporaryDirectory() as d,                 mock.patch.object(hub_mod.script_store, "load", lambda: {"script": "", "glossary": ""}),                 mock.patch.object(hub_mod.stt_gemini, "run", fake_gemini),                 mock.patch.object(hub_mod.settings, "key", lambda name: "k"):
+            hub = hub_mod.Hub(Usage(os.path.join(d, "usage.json")))
+            hub.translator = type("T", (), {"set_keys": lambda *a: None, "__call__": None})()
+            await hub.start(object(), "gemini", "en-US", live_speakers=True)
+            self.assertIsNone(hub.tracker)
+            self.assertIsNone(gpu_gate.active(), "no GPU claim for a Gemini listening")
+            await hub.stop()
+
+
 class Window(unittest.TestCase):
     def test_a_line_whose_audio_left_the_ring_gets_no_vector(self):
         ring = echo.Ring()
@@ -143,6 +162,10 @@ class Teardown(unittest.IsolatedAsyncioTestCase):
     async def test_a_cancelled_stop_releases_the_gpu_only_after_the_model_left(self):
         from lib.live import hub as hub_mod
         from lib.live.usage import Usage
+
+        p = mock.patch.object(speakers, "READY", True)      # the feature itself, though not offered yet
+        p.start()
+        self.addCleanup(p.stop)
 
         loading = threading.Event()
         order = []
