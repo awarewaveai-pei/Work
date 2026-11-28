@@ -7,6 +7,8 @@
  *    again; signing up again starts from scratch). The send records stay (only subscriber id + date, purged
  *    after Store::SENT_KEEP_DAYS) so re-subscribing on the same day cannot bring a second letter that day.
  *  - contact deleted in FluentCRM: profile and send records deleted.
+ *  - both also delete the address's signup entries Fluent Forms kept (before deletion, while FluentCRM still
+ *    knows the address).
  * Requests become active only through the plugin's own link (Daily\Confirm), never through FluentCRM's
  * double opt-in, which confirms the contact rather than one request.
  * Housekeeping (expired requests, old records, orphans) runs on Members\Store::PURGE_HOOK (daily).
@@ -35,6 +37,7 @@ final class Hooks {
 		foreach ( Crm::SUPPRESSED as $status ) {
 			add_action( 'fluentcrm_subscriber_status_to_' . $status, array( self::class, 'onSuppressed' ) );
 		}
+		add_action( 'fluentcrm_before_subscribers_deleted', array( self::class, 'beforeContactsDeleted' ) );
 		add_action( 'fluentcrm_after_subscribers_deleted', array( self::class, 'onContactsDeleted' ) );
 	}
 
@@ -82,6 +85,14 @@ final class Hooks {
 	public static function onSuppressed( $subscriber ): void {
 		if ( is_object( $subscriber ) && isset( $subscriber->id ) ) {
 			Store::deleteForSubscriber( (int) $subscriber->id, false );
+			FluentFormsEntries::delete( (string) ( $subscriber->email ?? '' ) );
+		}
+	}
+
+	/** @param mixed $ids */
+	public static function beforeContactsDeleted( $ids ): void {
+		foreach ( Crm::emails( array_map( 'intval', (array) $ids ) ) as $email ) {
+			FluentFormsEntries::delete( $email );
 		}
 	}
 

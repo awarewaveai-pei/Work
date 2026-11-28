@@ -150,6 +150,8 @@ final class FluentFormsDefinition {
 				array( 'type' => $type, 'name' => $name, 'value' => $type === 'checkbox' ? array() : $value ),
 				array(
 					'label'            => $type === 'checkbox' ? '' : $labels[ $name ],
+					// Column name on Fluent Forms' entry screen.
+					'admin_field_label' => $labels[ $name ],
 					'advanced_options' => $options,
 					// Not ff_list_buttons: Fluent Forms' always-loaded CSS paints it its own blue whatever the theme.
 					'layout_class'     => $type === 'radio' ? 'ff_list_inline' : '',
@@ -158,8 +160,9 @@ final class FluentFormsDefinition {
 				'inputCheckable'
 			);
 		};
-		$hidden = static function ( string $name ): array {
-			return self::element( 'input_hidden', array( 'type' => 'hidden', 'name' => $name, 'value' => '' ), array( 'admin_field_label' => $name ), 'inputHidden' );
+		$hidden = static function ( string $name ) use ( $labels ): array {
+			$column = $name === 'aw_place_label' ? $labels['aw_place'] : $name;
+			return self::element( 'input_hidden', array( 'type' => 'hidden', 'name' => $name, 'value' => '' ), array( 'admin_field_label' => $column ), 'inputHidden' );
 		};
 		$html   = static function ( string $codes ): array {
 			return self::element( 'custom_html', array(), array( 'html_codes' => $codes ), 'customHTML' );
@@ -307,11 +310,12 @@ final class FluentFormsDefinition {
 			$settings['layout']['labelPlacement']        = 'top';
 			$settings['layout']['errorMessagePlacement'] = 'inline';
 		}
-		// Backstop only, every time: nothing is inserted in the first place (FluentFormsEntry).
-		$settings['delete_entry_on_submission'] = 'yes';
+		// While entries are not kept: a backstop only, nothing is inserted in the first place (FluentFormsEntry).
+		$settings['delete_entry_on_submission'] = FluentFormsEntries::kept() ? 'no' : 'yes';
 		\FluentForm\App\Models\FormMeta::persist( $id, 'formSettings', $settings );
 		\FluentForm\App\Models\FormMeta::persist( $id, self::META, '1' );
 		update_option( Options::OPTION, array_merge( Options::get(), array( 'fluentform_id' => $id ) ) );
+		FluentFormsEntries::syncRetention(); // copies of the form too
 		return $id;
 	}
 
@@ -322,23 +326,11 @@ final class FluentFormsDefinition {
 	public static function setPublished( bool $published ): void {
 		global $wpdb;
 		$table = $wpdb->prefix . 'fluentform_forms';
-		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === null ) {
-			return;
-		}
 		// Not through Fluent Forms' classes: it may be inactive at this moment.
 		if ( $published ) {
 			$ids = array_map( 'intval', (array) get_option( self::UNPUBLISHED_OPTION, array() ) );
 		} else {
-			$ids = array_map(
-				'intval',
-				$wpdb->get_col(
-					$wpdb->prepare(
-						"SELECT id FROM {$table} WHERE status = 'published' AND ( id = %d OR form_fields LIKE %s )", // phpcs:ignore WordPress.DB.PreparedSQL
-						(int) ( Options::get()['fluentform_id'] ?? 0 ),
-						'%' . $wpdb->esc_like( '"' . FluentFormsEntry::MARKER . '"' ) . '%'
-					)
-				)
-			);
+			$ids = FluentFormsEntries::formIds( 'published' );
 		}
 		foreach ( $ids as $id ) {
 			$wpdb->update( $table, array( 'status' => $published ? 'published' : 'unpublished' ), array( 'id' => $id ) );

@@ -87,6 +87,10 @@ final class Normalize {
 		$formRaw              = is_int( $in['fluentform_id'] ?? null ) ? (string) $in['fluentform_id'] : trim( self::scalar( $in['fluentform_id'] ?? '' ) );
 		$out['fluentform_id'] = preg_match( self::PAGE_ID_PATTERN, $formRaw ) ? (int) $formRaw : 0;
 
+		// A ticked box posts "1"; a stored value comes back as a bool. Anything else is off.
+		$keep                           = $in['fluentform_keep_entries'] ?? false;
+		$out['fluentform_keep_entries'] = $keep === true || $keep === 1 || $keep === '1';
+
 		$turnstileRaw              = self::scalar( $in['turnstile_site_key'] ?? '' );
 		$out['turnstile_site_key'] = self::turnstileKey( $turnstileRaw );
 		if ( $out['turnstile_site_key'] === '' && trim( $turnstileRaw ) !== '' ) {

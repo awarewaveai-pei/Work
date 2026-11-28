@@ -1,7 +1,12 @@
 <?php
 /**
  * Fluent Forms as the front of the daily-letter signup (checked against fluentform 6.2.17). The form is only a
- * face: a submission goes to Rest::accept, the same path as the built-in form, and Fluent Forms never stores it.
+ * face: a submission goes to Rest::accept, the same path as the built-in form.
+ *
+ * Whether Fluent Forms also keeps the submission is the operator's setting (FluentFormsEntries::kept, off by
+ * default). On: Rest::accept runs first in before_insert_submission; refused → answered and ended there, so
+ * no entry; accepted → Fluent Forms goes on and inserts, with its own entry screen, and only the
+ * notifications and integrations the operator set on the form. Off:
  *
  * Nothing stored — two independent guards, only for the signup form (the configured id, or any copy that has
  * our birthplace field):
@@ -34,6 +39,10 @@ final class FluentFormsEntry {
 		add_filter( 'fluentform/akismet_check_spam', array( self::class, 'noSpamService' ), PHP_INT_MAX, 2 );
 		add_filter( 'fluentform/cleantalk_check_spam', array( self::class, 'noSpamService' ), PHP_INT_MAX, 2 );
 		add_filter( 'fluentform/disable_captcha', array( self::class, 'noSecondCaptcha' ), PHP_INT_MAX, 2 );
+		add_filter( 'fluentform/form_submission_confirmation', array( self::class, 'confirmation' ), PHP_INT_MAX, 3 );
+		// Settings saved in the admin or patched with wp-cli: keep the form's own auto-delete in step.
+		add_action( 'update_option_' . Options::OPTION, array( FluentFormsEntries::class, 'syncRetention' ), 10, 0 );
+		add_action( 'add_option_' . Options::OPTION, array( FluentFormsEntries::class, 'syncRetention' ), 10, 0 );
 	}
 
 	/** @param mixed $form a Fluent Forms form object (id, form_fields), or just its id */
@@ -52,7 +61,45 @@ final class FluentFormsEntry {
 	 * @return mixed
 	 */
 	public static function blank( $data, $formId ) {
-		return self::isSignupForm( self::formById( $formId ) ) ? array() : $data;
+		if ( ! self::isSignupForm( self::formById( $formId ) ) ) {
+			return $data;
+		}
+		if ( ! FluentFormsEntries::kept() ) {
+			return array();
+		}
+		if ( is_array( $data ) ) {
+			unset( $data['aw_turnstile'] ); // a spent single-use token, nothing to keep
+		}
+		return $data;
+	}
+
+	/**
+	 * fluentform/form_submission_confirmation: with entries kept, Fluent Forms answers an accepted signup itself.
+	 *
+	 * @param mixed $confirmation
+	 * @param mixed $formData
+	 * @param mixed $form
+	 * @return mixed
+	 */
+	public static function confirmation( $confirmation, $formData, $form ) {
+		if ( ! self::isSignupForm( $form ) || ! FluentFormsEntries::kept() ) {
+			return $confirmation;
+		}
+		$locale = self::locale( is_array( $formData ) ? $formData : array() );
+		return array(
+			'redirectTo'           => 'samePage',
+			'messageToShow'        => Lang::with( Runner::WP_LOCALES[ $locale ] ?? 'en_US', array( self::class, 'accepted' ) ),
+			'samePageFormBehavior' => 'hide_form',
+		);
+	}
+
+	public static function accepted(): string {
+		return esc_html__( 'One more step: check your inbox and confirm your e-mail address.', 'aware-wave-oracle' );
+	}
+
+	/** @param array<string,mixed> $in */
+	private static function locale( array $in ): string {
+		return in_array( $in['aw_locale'] ?? '', EmbedUrl::ENGINE_LOCALES, true ) ? $in['aw_locale'] : EmbedUrl::FALLBACK_LOCALE;
 	}
 
 	/**
@@ -72,7 +119,8 @@ final class FluentFormsEntry {
 	}
 
 	/**
-	 * fluentform/before_insert_submission. For the signup form this ends the request.
+	 * fluentform/before_insert_submission. For the signup form this ends the request, except for an accepted
+	 * signup while entries are kept: returning lets Fluent Forms insert it.
 	 *
 	 * @param mixed $insertData
 	 * @param mixed $submitted the posted fields as Fluent Forms parsed them
@@ -89,6 +137,9 @@ final class FluentFormsEntry {
 			error_log( 'aware-wave-oracle: Fluent Forms signup failed: ' . get_class( $e ) . ' at ' . basename( $e->getFile() ) . ':' . $e->getLine() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
 			list( $status, $payload ) = array( 500, array( 'errors' => array( 'aworacle' => array( __( 'Something went wrong. Reload the page and try again.', 'aware-wave-oracle' ) ) ) ) );
 		}
+		if ( $status === 200 && FluentFormsEntries::kept() ) {
+			return;
+		}
 		wp_send_json( $payload, $status ); // exits
 		exit; // never fall through to the insert, even if something replaced the die handler
 	}
@@ -100,7 +151,7 @@ final class FluentFormsEntry {
 	 * @return array{0:int,1:array<string,mixed>} HTTP status, JSON body
 	 */
 	public static function handle( array $in ): array {
-		$locale = in_array( $in['aw_locale'] ?? '', EmbedUrl::ENGINE_LOCALES, true ) ? $in['aw_locale'] : EmbedUrl::FALLBACK_LOCALE;
+		$locale = self::locale( $in );
 		$result = Rest::accept( self::body( $in, $locale ) );
 
 		return Lang::with(
@@ -114,7 +165,7 @@ final class FluentFormsEntry {
 							'data'    => array(
 								'insert_id' => 0,
 								'result'    => array(
-									'message' => esc_html__( 'One more step: check your inbox and confirm your e-mail address.', 'aware-wave-oracle' ),
+									'message' => self::accepted(),
 									'action'  => 'hide_form',
 								),
 							),

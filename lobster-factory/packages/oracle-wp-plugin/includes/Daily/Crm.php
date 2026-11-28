@@ -40,6 +40,21 @@ final class Crm {
 	}
 
 	/**
+	 * @param array<int,int> $ids
+	 * @return array<int,string> addresses of those contacts
+	 */
+	public static function emails( array $ids ): array {
+		if ( ! self::available() || ! $ids ) {
+			return array();
+		}
+		$out = array();
+		foreach ( \FluentCrm\App\Models\Subscriber::whereIn( 'id', $ids )->get() as $s ) {
+			$out[] = (string) $s->email;
+		}
+		return $out;
+	}
+
+	/**
 	 * Create the contact as pending, or leave an existing one as it is (FluentCRM never downgrades a
 	 * subscribed contact or lifts a suppressed one on a non-forced write).
 	 *

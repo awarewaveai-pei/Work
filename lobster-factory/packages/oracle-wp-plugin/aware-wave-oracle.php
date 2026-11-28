@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave Oracle
  * Plugin URI:        https://aware-wave.com
  * Description:       Embeds the AwareWave divination engine (Zi Wei, BaZi, I Ching, Tarot …) in this site's pages with a shortcode or block. Engine address, site key and languages are site settings.
- * Version:           0.5.3
+ * Version:           0.5.4
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWORACLE_VERSION', '0.5.3' );
+define( 'AWORACLE_VERSION', '0.5.4' );
 define( 'AWORACLE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWORACLE_URL', plugin_dir_url( __FILE__ ) );
 define( 'AWORACLE_FILE', __FILE__ );
@@ -93,7 +93,7 @@ add_action( 'plugins_loaded', array( Seo\TranslatedTitles::class, 'register' ), 
 ( new Daily\Rest() )->register();
 ( new Daily\Confirm() )->register();
 ( new Daily\Hooks() )->register();
-// The same signup drawn by Fluent Forms (nothing of it stored there); inert without Fluent Forms.
+// The same signup drawn by Fluent Forms (stored there only if the operator turned that on); inert without it.
 ( new Daily\FluentFormsEntry() )->register();
 ( new Daily\FluentFormsDefinition() )->register();
 register_activation_hook( __FILE__, function () { Daily\FluentFormsDefinition::setPublished( true ); } );

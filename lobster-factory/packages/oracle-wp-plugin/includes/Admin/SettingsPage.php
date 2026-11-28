@@ -223,6 +223,7 @@ final class SettingsPage {
 		$this->areaRow( $name . '[theme_map]', Normalize::pairsToText( $s['theme_map'] ), __( 'Theme colour map', 'aware-wave-oracle' ), __( 'Optional, one per line: tool palette slot=this site\'s palette slug, e.g. palette9=base. The tools use Kadence\'s nine global palette slots (1–2 accents, 3–6 text dark to light, 7–9 backgrounds). Kadence needs no entry; other themes map from theme.json automatically, list a slot here to set or replace it.', 'aware-wave-oracle' ) );
 		$this->mailerRow( $name . '[mailer]', $s['mailer'] );
 		$this->textRow( $name . '[fluentform_id]', $s['fluentform_id'] ? (string) $s['fluentform_id'] : '', __( 'Signup form (Fluent Forms ID)', 'aware-wave-oracle' ), __( 'Optional: set by “wp aworacle daily-form”. Put that form’s shortcode on the signup page. Empty: the built-in form [aw_oracle_daily].', 'aware-wave-oracle' ) );
+		$this->keepEntriesRow( $name . '[fluentform_keep_entries]', ! empty( $s['fluentform_keep_entries'] ) );
 		$this->textRow( $name . '[turnstile_site_key]', $s['turnstile_site_key'], __( 'Turnstile site key', 'aware-wave-oracle' ), __( 'Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below.', 'aware-wave-oracle' ) );
 		echo '</table>';
 		submit_button();
@@ -479,6 +480,12 @@ final class SettingsPage {
 				. '</p>';
 		}
 		echo '</fieldset></td></tr>';
+	}
+
+	private function keepEntriesRow( string $name, bool $on ): void {
+		echo '<tr><th scope="row">' . esc_html__( 'Keep signups in Fluent Forms', 'aware-wave-oracle' ) . '</th><td>';
+		echo '<label><input type="checkbox" name="' . esc_attr( $name ) . '" value="1"' . checked( $on, true, false ) . '> ' . esc_html__( 'Also store each signup in Fluent Forms', 'aware-wave-oracle' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'On: what the visitor sent, including birth date, birth time and birthplace, is stored in Fluent Forms without encryption. Site administrators can read it, and it is in database backups. Off: nothing more is stored; entries already stored stay until you delete them in Fluent Forms. Erasing personal data or unsubscribing removes that person’s entries either way.', 'aware-wave-oracle' ) . '</p></td></tr>';
 	}
 
 	private function textRow( string $name, string $value, string $label, string $help ): void {

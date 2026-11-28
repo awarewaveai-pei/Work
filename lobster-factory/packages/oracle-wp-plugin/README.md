@@ -1,6 +1,6 @@
 # aware-wave-oracle（WordPress 外掛）
 
-版本：0.5.3（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
+版本：0.5.4（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
 
 把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
@@ -64,8 +64,9 @@
 1. 每日運勢信照「設定步驟」開好後，執行 `wp aworacle daily-form`：從 `includes/Daily/FluentFormsDefinition.php` 建表單（重跑只更新同一張、不重複建）、發佈、把 ID 記到設定 `fluentform_id`。
 2. 訂閱頁放指令回報的 `[fluentform id="N"]`。
 
-- 送出走與內建表單同一條 `Daily\Rest::accept`（`includes/Daily/FluentFormsEntry.php`）。
-- Fluent Forms 不存任何送出內容：`fluentform/insert_response_data` 清空；`fluentform/before_insert_submission` 處理後直接回應並結束（同它自己的 honeypot），不寫 entry、明細、log，不寄通知、不跑整合。因此 Fluent Forms 後台看不到訂閱紀錄、它的整合與通知對這張表單無效。這張表單也不跑 Akismet／CleanTalk。
+- 兩種設定下送出都走與內建表單同一條 `Daily\Rest::accept`（`includes/Daily/FluentFormsEntry.php`）。
+- 預設（`fluentform_keep_entries` 關）Fluent Forms 不存任何送出內容：`fluentform/insert_response_data` 清空；`fluentform/before_insert_submission` 處理後直接回應並結束（同它自己的 honeypot），不寫 entry、明細、log，不寄通知、不跑整合。因此 Fluent Forms 後台看不到訂閱紀錄、它的整合與通知對這張表單無效。這張表單也不跑 Akismet／CleanTalk。
+- **站長可開「Fluent Forms 也存一份」**（設定頁核取方格，`fluentform_keep_entries`，預設關）：開＝送出內容（含生日、出生時間、出生地）以**明文**存在 Fluent Forms，管理員看得到、資料庫備份裡也有，Fluent Forms 另記 IP、瀏覽器與來源頁。核心路徑照跑，被拒（欄位不合、限流、寄信失敗）不留 entry；只執行站長自己在表單上開的通知與整合。寄信仍只用加密的 `aworacle_daily_profiles`。WordPress 匯出／清除個人資料、刪會員、FluentCRM 退訂／退信／投訴／刪聯絡人，會一併匯出或刪除這些表單中該信箱的 entry（`Daily\FluentFormsEntries`）。切回關只是之後不再存，已存的要在 Fluent Forms 後台刪（清除個人資料與退訂仍會刪當事人的）；移除外掛不刪 Fluent Forms 的 entry。切換設定時表單的「送出後刪除 entry」自動跟著改（`wp option patch` 也算）。
 - 認定訂閱表單＝設定的 ID，或任何含 `aw_place_lat` 欄位的複本。
 - 人機驗證用外掛自己的 Turnstile（金鑰只在本外掛設定）；開著時 Fluent Forms 的驗證碼對這張表單停用。不要在表單上加它的 Turnstile 欄位。
 - 停用本外掛時，訂閱表單和它的複本都改為未發佈（否則 Fluent Forms 會自己收件存明文），啟用時恢復。停用期間不要手動把它發佈回去。
@@ -145,7 +146,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 人機驗證 | `includes/Daily/Turnstile.php` |
 | 翻譯站的標題與描述 | `includes/Seo/TranslatedTitles.php` |
 | 出生地城市搜尋 | `includes/Places/Birthplace.php`、`assets/birthplace.js` |
-| Fluent Forms 訂閱表單 | `includes/Daily/{FluentFormsEntry,FluentFormsDefinition}.php`、`assets/ff-daily.js` |
+| Fluent Forms 訂閱表單 | `includes/Daily/{FluentFormsEntry,FluentFormsDefinition,FluentFormsEntries}.php`、`assets/ff-daily.js` |
 | 翻譯 | `languages/`：改字串後 `wp i18n make-pot . languages/aware-wave-oracle.pot --exclude=tests,bin,vendor`、`wp i18n update-po languages/aware-wave-oracle.pot languages`，補完 `.po` 的 `msgstr` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
 | 打包與發佈 | `bin/build-zip.sh`（依 `.distignore`）；發佈 repo 的 CI／Release 在 `.github/workflows/`（由 `scripts/release-wp-bridge.sh --plugin oracle` 鏡像過去） |
 

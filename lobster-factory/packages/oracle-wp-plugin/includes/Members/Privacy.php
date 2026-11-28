@@ -9,6 +9,7 @@
  * Daily letter (P3): the profile(s) of this e-mail's FluentCRM contact and of the member's linked profiles are
  * exported (time zone, language, birth data) and erased with the same tools; deleting the member erases
  * the linked ones.
+ * Signup entries Fluent Forms kept (Daily\FluentFormsEntries) are exported and erased by e-mail address.
  *
  * @package AwareWave\Oracle\Members
  */
@@ -16,6 +17,7 @@
 namespace AwareWave\Oracle\Members;
 
 use AwareWave\Oracle\Daily\Crm;
+use AwareWave\Oracle\Daily\FluentFormsEntries;
 use AwareWave\Oracle\Daily\Store as DailyStore;
 use AwareWave\Oracle\Crypto\Vault;
 use AwareWave\Oracle\Settings\Options;
@@ -66,8 +68,38 @@ final class Privacy {
 			'done' => true,
 		);
 		$daily = self::dailyProfiles( $email, $user ? (int) $user->ID : 0 );
-		if ( ( ! $user && ! $daily ) || $page > 1 ) {
+		if ( $page > 1 ) {
 			return $empty;
+		}
+		// Plain entries: no data key needed.
+		$entries = array();
+		foreach ( FluentFormsEntries::of( $email ) as $entry ) {
+			$values = array(
+				array(
+					'name'  => __( 'Sent', 'aware-wave-oracle' ),
+					'value' => $entry['created_at'],
+				),
+			);
+			foreach ( $entry['fields'] as $name => $value ) {
+				if ( strpos( (string) $name, '_' ) !== 0 ) {
+					$values[] = array(
+						'name'  => (string) $name,
+						'value' => is_array( $value ) ? implode( ', ', array_filter( $value, 'is_scalar' ) ) : (string) $value,
+					);
+				}
+			}
+			foreach ( $entry['visit'] as $name => $value ) {
+				$values[] = array(
+					'name'  => $name,
+					'value' => $value,
+				);
+			}
+			$entries[] = array(
+				'group_id'    => 'aworacle-signup-entries',
+				'group_label' => __( 'Daily letter signup form entries', 'aware-wave-oracle' ),
+				'item_id'     => 'aworacle-signup-entry-' . $entry['id'],
+				'data'        => $values,
+			);
 		}
 		$key    = Options::dataKey();
 		$kinds  = $user ? array_values( array_filter( array_keys( Store::KINDS ), array( Store::class, 'tableExists' ) ) ) : array();
@@ -76,7 +108,10 @@ final class Privacy {
 			$stored += count( Store::listFor( $kind, (int) $user->ID, '', true ) );
 		}
 		if ( $stored === 0 ) {
-			return $empty;
+			return array(
+				'data' => $entries,
+				'done' => true,
+			);
 		}
 		if ( $key === '' ) {
 			return new \WP_Error( 'aworacle_export_no_key', __( 'AwareWave Oracle: this member has saved charts, but AWORACLE_DATA_KEY is missing or invalid in wp-config.php, so they cannot be exported.', 'aware-wave-oracle' ) );
@@ -85,7 +120,7 @@ final class Privacy {
 			'charts'  => __( 'Saved charts', 'aware-wave-oracle' ),
 			'persons' => __( 'Saved people (private compatibility readings)', 'aware-wave-oracle' ),
 		);
-		$data = array();
+		$data = $entries;
 		foreach ( $kinds as $kind ) {
 			$label = $groups[ $kind ];
 			foreach ( Store::listFor( $kind, (int) $user->ID, $key, true ) as $row ) {
@@ -118,6 +153,7 @@ final class Privacy {
 		foreach ( self::dailyProfiles( $email, $user ? (int) $user->ID : 0 ) as $profile ) {
 			$removed += DailyStore::deleteForSubscriber( (int) $profile['subscriber_id'] );
 		}
+		$removed += FluentFormsEntries::delete( $email );
 		return array(
 			'items_removed'  => $removed > 0,
 			'items_retained' => false,
@@ -128,6 +164,7 @@ final class Privacy {
 
 	/** @param int|string $userId */
 	public static function onDeleteUser( $userId ): void {
+		self::deleteEntriesOf( (int) $userId );
 		Store::deleteAllFor( (int) $userId );
 		DailyStore::deleteForUser( (int) $userId );
 	}
@@ -150,6 +187,7 @@ final class Privacy {
 			);
 			foreach ( $ids as $id ) {
 				switch_to_blog( (int) $id );
+				self::deleteEntriesOf( (int) $userId );
 				Store::deleteAllFor( (int) $userId );
 				DailyStore::deleteForUser( (int) $userId );
 				restore_current_blog();
@@ -166,10 +204,18 @@ final class Privacy {
 		if ( $switch ) {
 			switch_to_blog( (int) $blogId );
 		}
+		self::deleteEntriesOf( (int) $userId );
 		Store::deleteAllFor( (int) $userId );
 		DailyStore::deleteForUser( (int) $userId );
 		if ( $switch ) {
 			restore_current_blog();
+		}
+	}
+
+	private static function deleteEntriesOf( int $userId ): void {
+		$user = $userId > 0 ? get_userdata( $userId ) : false;
+		if ( $user ) {
+			FluentFormsEntries::delete( (string) $user->user_email );
 		}
 	}
 
