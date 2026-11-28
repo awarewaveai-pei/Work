@@ -143,6 +143,25 @@ const LATENCY = 300;
     await client.evaluate(() => { window.documentOrg = null; });
     assert.equal((await scopedRead()).status, 503, "locked document is denied before a cache read");
     await client.close();
+    // The workbench's own pages (shared/adapters.js) must answer the worker themselves: the top document and a framed
+    // page each read a file. A worker's question arrives on navigator.serviceWorker; a page listening anywhere else
+    // never answers and every picture and video is 503.
+    testOrg = orgA;
+    const real = await page.context().newPage();
+    await real.goto(base + "/index.html");
+    // The page scripts load after the worker already controls the tab: wait for the page's own context, not the controller.
+    await real.waitForFunction(() => !!navigator.serviceWorker.controller && !!window.VideoWorkbenchAdapters?.context);
+    const realRead = await real.evaluate(async (u) => {
+      const top = await fetch(u);
+      const frame = document.createElement("iframe");
+      frame.src = "/pages/projects.html";
+      await new Promise((r) => { frame.onload = r; document.body.append(frame); });
+      for (let i = 0; i < 100 && !frame.contentWindow.VideoWorkbenchAdapters?.context; i++) await new Promise((r) => setTimeout(r, 50));
+      const framed = await frame.contentWindow.fetch(u);
+      return { top: top.status, framed: framed.status };
+    }, url);
+    assert.deepEqual(realRead, { top: 200, framed: 200 }, "the real page and a framed page read media through the worker");
+    await real.close();
     testOrg = null;
     console.log("PASS 真實 Edge：新版控制 worker 握手、org header、A 副本不給 B、舊分頁 403、鎖頁 503");
     // Kill switch: <dataDir>/media-cache-off created on the running server. One reload retires the worker and deletes the copies.

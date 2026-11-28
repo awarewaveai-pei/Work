@@ -3,17 +3,18 @@ const source = fs.readFileSync(path.join(__dirname, "../shared/adapters.js"), "u
 const ORG = "11111111-1111-4111-8111-111111111111";
 function page(parent) {
   let identify;
-  const sent = [], fetched = [], listeners = {}, controller = {};
+  const sent = [], fetched = [], listeners = {}, windowListeners = {}, controller = {};
   class XHR {
     constructor() { this.upload = {}; this.headers = {}; }
     open(method, url) { this.method = method; this.url = url; }
     setRequestHeader(key, value) { this.headers[key] = value; }
     send() { sent.push(this); this.status = 200; this.responseText = "{}"; this.onload(); }
   }
-  const window = { VW_CONFIG: { mode: "http", apiBaseUrl: "/api/vw" }, addEventListener: (type, fn) => { listeners[type] = fn; } };
+  const window = { VW_CONFIG: { mode: "http", apiBaseUrl: "/api/vw" }, addEventListener: (type, fn) => { windowListeners[type] = fn; } };
   window.parent = parent || window; window.top = window;
   const sandbox = {
-    window, navigator: { serviceWorker: { controller } }, XMLHttpRequest: XHR, Headers, URL,
+    // A worker's client.postMessage is delivered to navigator.serviceWorker (never to window): the listener must be there.
+    window, navigator: { serviceWorker: { controller, addEventListener: (type, fn) => { listeners[type] = fn; } } }, XMLHttpRequest: XHR, Headers, URL,
     location: { href: "https://video.test/", origin: "https://video.test", pathname: "/", search: "", hash: "" },
     setTimeout, clearTimeout,
     fetch: (input, init) => {
@@ -23,7 +24,7 @@ function page(parent) {
     },
   };
   vm.runInNewContext(source, sandbox);
-  return { window, sent, fetched, listeners, controller, identify: (value) => identify(new Response(JSON.stringify(value))) };
+  return { window, sent, fetched, listeners, windowListeners, controller, identify: (value) => identify(new Response(JSON.stringify(value))) };
 }
 (async () => {
   const root = page(), api = root.window.VideoWorkbenchAdapters;
@@ -43,6 +44,8 @@ function page(parent) {
   assert.throws(() => api.context.lock(), /仍在傳送/);
   finish(); await active;
   let reply;
+  assert.equal(typeof root.listeners.message, "function", "the worker's question is heard on navigator.serviceWorker");
+  assert.equal(root.windowListeners.message, undefined, "window never receives a worker's message");
   await root.listeners.message({ data: { type: "vw:document-organization" }, source: root.controller, ports: [{ postMessage: (v) => { reply = v; } }] });
   assert.equal(reply.organizationId, ORG);
   api.context.lock();
