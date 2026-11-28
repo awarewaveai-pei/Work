@@ -7,6 +7,7 @@ import type { IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
 import { loadIntegrationBlockers } from "@/lib/repair-os/integration-blockers-load";
 import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import { collapseStormChildren } from "@/lib/repair-center/correlate";
+import { escalateGuard } from "@/lib/repair-center/run-state";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
 import { AutoRefresh } from "@/app/AutoRefresh";
@@ -268,10 +269,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                     mode="run"
                     runState={run.state}
                     archivedAt={run.archived_at ?? null}
-                    canEscalate={
-                      run.policy === "analysis_only" &&
-                      policyCatalogForSource(run.source).can_escalate_to_pr
-                    }
+                    canEscalate={escalateGuard(run, policyCatalogForSource(run.source).can_escalate_to_pr).can}
                   />
                 </div>
               ))}

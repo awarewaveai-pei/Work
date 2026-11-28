@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-28（續1）— Repair Center：分析型告警「升級」後 GitHub Action 不會重跑（留言缺 @claude）
+
+- [根因] `escalateAnalysisOnlyRun` 翻 DB policy 後，靠 `postEscalationComment` 在 issue 留言重跑 `.github/workflows/auto-repair-claude.yml`；該 workflow `issue_comment` 分支要求留言含 `@claude`（yml:26），留言沒有 → Action 不跑、不開 PR。失敗又被 `.catch(() => {})` 吞掉，UI 照樣報成功。同類第二實例（critic M2）：run 沒有 issue（備份／開 issue 失敗停在 `triage_needed`）也能升級，policy 翻了、GitHub 什麼都沒收到。不變量：policy=auto_repair ⇔ GitHub 已收到觸發留言。
+- [步驟]
+  - `next-admin/lib/repair-center/github.ts`：`AUTO_REPAIR_TRIGGER_MENTION`／`AUTO_REPAIR_LABEL` 常數，開 issue 與升級留言共用（留言首行補 mention）
+  - `run-state.ts` `escalateGuard`：要求 `github_issue_number`，否則 `no_github_issue`；`app/(shell)/ops/repairs/page.tsx` 的 `canEscalate` 改用同一個 guard（不再自己重寫條件）
+  - `service.ts` `escalateAnalysisOnlyRun`：留言失敗／丟例外 → 條件式把 policy 退回 `analysis_only`＋audit `escalation_reverted`＋回 `ok:false`，按鈕仍在可重試；退回失敗 → `escalation_comment_failed_revert_failed`
+  - `RepairActions.tsx`：上述三種錯誤碼顯示中文說明
+  - 測試：`__tests__/workflow-trigger-contract.test.ts`（從 workflow yml 讀 label／mention，並照 claude-code-action 的整字 regex 驗）、`__tests__/escalation-revert.test.ts`（成功／失敗／丟例外／無 issue）、`run-state.test.ts` fixture 補 issue 號＋無 issue 案例
+  - `.github/workflows/next-admin-test.yml` paths 加 `auto-repair-claude.yml`
+- [驗證] tsc 綠；`npx vitest run lib/repair-center app/(shell)/ops/repairs app/api/ops/repairs` 16 檔 218 過 1 紅，紅 = `autorepair-gate-contract` env -i PATH，stash 基線同樣紅（雲端容器環境，非本改動）。突變：拿掉升級留言 mention → 契約紅；拿掉退回 → revert 測試 2 紅；拿掉無 issue 守衛 → 2 紅；還原全綠（69/69）。
+- [未驗／剩餘風險] 未在 prod 實按升級（本 session 網路政策擋 app.aware-wave.com；`dogfood-auto-repair.ps1` 無 pwsh 未跑）；audit_log 仍是讀改寫，退回那次會蓋掉同一窗口別人寫的 audit（critic n1，codebase 共通寫法，未修）；全套 vitest 交 CI。範圍外（critic）：workflow 不看 policy label，analysis_only issue 開出來當下 Claude 就會跑、可開 PR → TASKS 新條目。
+- [避免再發生] 契約測試綁 workflow 真實條件；按鈕顯示與 server 守衛同一個 `escalateGuard`。
+- [rollback] revert 本 commit（無 migration、無設定變更）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/repair-center/__tests__/{escalation-revert,run-state,workflow-trigger-contract}.test.ts（69 passed；三組突變各紅）＋npx tsc --noEmit | exit=0 | ms=9000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,.github,runbooks | grep=postEscalationComment | hits=17
+- ORACLE_WAIVED: 雲端 session 無 Codex；critic 一輪（2m 已修、n2 已修、n1 記為剩餘風險）＋三組突變證據（拔守衛 → 指名測試紅 → 還原綠）。
 ## 2026-11-27（續7）— oracle WP：全站頁面改用 wp-bridge Kadence 積木、訂閱表單改 Fluent Forms Pro、工具跟著 Kadence 色盤（已上線）
 
 - [根因] 操作者：首頁「這啥小?」→「要一起重做，都要用 Kadence，訂閱頁用 Fluent Forms Pro」→「要可以被 theme 控制」→「WP-bridge 不是有」。頁面原是監工 wp-cli 寫的短碼＋核心區塊；派工時沒查既有的 `wp-bridge-plugin/includes/Content/BlockLibrary.php`＋`KadenceValidator`（操作者 2026-06-05／06-09 規則），先叫工人手寫 Kadence 標記，經操作者指正後改向。

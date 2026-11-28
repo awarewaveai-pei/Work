@@ -15,6 +15,7 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
       - 'agency-os/systems/registry.json'  # system ownership feeds lib/systems/block-usage.generated.json (blocks.test.ts)
       - '.github/workflows/next-admin-test.yml'
+      - '.github/workflows/auto-repair-claude.yml'  # trigger label/mention pinned by lib/repair-center/__tests__/workflow-trigger-contract.test.ts
   pull_request:
     branches:
       - main
@@ -22,6 +23,7 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
       - 'agency-os/systems/registry.json'  # system ownership feeds lib/systems/block-usage.generated.json (blocks.test.ts)
       - '.github/workflows/next-admin-test.yml'
+      - '.github/workflows/auto-repair-claude.yml'  # trigger label/mention pinned by lib/repair-center/__tests__/workflow-trigger-contract.test.ts
   workflow_dispatch:
 
 concurrency:

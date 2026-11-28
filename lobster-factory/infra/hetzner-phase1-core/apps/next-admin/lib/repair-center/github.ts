@@ -11,6 +11,15 @@ interface GithubIssueResult {
   detail?: unknown;
 }
 
+/**
+ * .github/workflows/auto-repair-claude.yml only runs for issues labelled AUTO_REPAIR_LABEL, and
+ * claude-code-action only acts on an issue body / comment containing AUTO_REPAIR_TRIGGER_MENTION.
+ * Text posted here without them is a silent no-op (escalation comment, 2026-11-28).
+ * Pinned against the workflow by __tests__/workflow-trigger-contract.test.ts.
+ */
+export const AUTO_REPAIR_TRIGGER_MENTION = "@claude";
+export const AUTO_REPAIR_LABEL = "auto-repair";
+
 function env(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
@@ -37,7 +46,7 @@ export async function createRepairIssue(run: RepairRunWithIncident): Promise<Git
   const { owner, repo } = resolveGithubTarget(run);
   const policy = repairPolicyLabel(run.policy);
   const title = `[auto-repair][${run.source}] ${run.incident?.title ?? run.incident_id}`;
-  const labels = ["auto-repair", run.source, run.policy].filter(Boolean);
+  const labels = [AUTO_REPAIR_LABEL, run.source, run.policy].filter(Boolean);
   const body = buildIssueBody(run);
 
   const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
@@ -70,7 +79,7 @@ export async function createRepairIssue(run: RepairRunWithIncident): Promise<Git
     const incidentUrl = `${urlBase.replace(/\/$/, "")}/ops/inbox/${r.incident_id}`;
     const repairUrl = `${urlBase.replace(/\/$/, "")}/ops/repairs`;
     return [
-      "@claude",
+      AUTO_REPAIR_TRIGGER_MENTION,
       "",
       "### Auto-Repair Request",
       "",
@@ -117,6 +126,8 @@ export async function postEscalationComment(args: {
   if (!token) return { ok: false, error: "github_token_not_configured" };
 
   const body = [
+    AUTO_REPAIR_TRIGGER_MENTION,
+    "",
     `🔼 **Escalation by ${args.actor}**`,
     "",
     "This repair run has been escalated from **analysis_only** to **auto_repair**.",
