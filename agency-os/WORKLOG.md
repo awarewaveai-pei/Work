@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-29（續6）— oracle：AI 解讀排版、兩段式解讀（Z1＋Z2）、命盤版面、會員出生資料、表單存檔（外掛 0.5.4）上線
+
+- [根因] 操作者 2026-11-29：① AI 解讀顯示 markdown 原始記號（`components/AiReading.tsx` 原樣輸出 `{text}`）；② 「之前有說要分免付錢和付費可讀進階版」（SPEC §8，WordPress 階段後排）；③ 訂閱後 Fluent Forms 0 筆（0.5.3 刻意不寫入）→「表單裡應該要有我的資料」；④「生日細項乾脆填在會員資料裡」；⑤ 紫微命盤一個畫面看不完、空白太多（`.ziwei-grid { aspect-ratio: 1 }`，2026-11-27 改版把工具框變寬後盤高跟著變大——監工改版造成）。決定：收款用 WooCommerce、先做內容（已寫入 SPEC §8，`eb1c5e139`）。
+- [步驟] 工人與 commit（皆經 `oracle-int` cherry-pick）：R1 `5c8d0b11a`（自寫小解析器＋`ReadingText`，不輸出 HTML）；Z1 `ca2ace275`（`lib/ziwei/deep.ts` 十二類 facts）；Z2 `e49195acd`（`/api/reading` 簡批＋深度、`lib/ai/twoStage/`、購買票 `aud=report` 驗證、事實核對器；只接中文紫微）；R2 `3a663b07a`（命盤列高由內容決定、每宮四層、修英文盤十二宮空白的舊 bug、`scripts/check-ziwei-fit.mjs`）；R3 `0495f2d5d`（嵌入頁向同源父頁取 `awOracleBirth()` 預填）；外掛 P8 `80c815f9c`（`fluentform_keep_entries`，預設關）＋P9 `021dd4af7`（`Members/Me.php`「我自己」、一鍵訂閱、`[aw_oracle_me]`）。外掛 `v0.5.4` 發佈（鏡像 sha `44a13926…`）並裝到 oracle 站，`aworacle_settings.fluentform_keep_entries=true`；引擎 `sg-deploy.sh oracle-web` 兩次（`6787a5697`、`ea84fc6ac`；`DEPLOY_HOLD` 為 Banner 線的，用 `DEPLOY_HOLD_OVERRIDE=1` 只部署 oracle-web）。
+- [驗證] 引擎 `npx tsc --noEmit` exit 0、`npx vitest run` 628 過；外掛 release CI 過。正式站（瀏覽器，`/embed/zh-TW/ziwei`、`/embed/zh-TW/daily`）：命盤 `.ziwei-grid` 896×450、視窗高 695、無橫向溢出；紫微簡批 1,975 字，標題＝命格特質／感情婚姻／事業財富／健康／人際貴人／今年運勢／格局精讀／這張盤還沒說完的事／這張盤的深度報告還會寫到，結尾「深度報告即將開放單次購買。」，markdown 記號 0；每日運勢解讀記號 0。外掛：`wp plugin list` 0.5.4 active、五頁 200、無 PHP Fatal。操作者自己的訂閱已查實成功（`fc_subscribers` #2 subscribed、`aworacle_daily_profiles` confirmed、FluentSMTP #13／#14 sent）。
+- [RISKS 總檢] Z2：核對器不核宮星對應與流月月份（本次由獨立核對者逐句對過，0 錯）；購買票 nonce 驗票即消耗、chartKey 對輸入寫法敏感 → 留給 Z3；只有中文紫微有兩段式；簡批下方三句文案未潤稿。Z1：未與外部排盤逐宮比對（口訣手算對照）；流月標記為本站自訂規則。R2：英文盤四化顯示 A/B/C/D 未加說明；檢查腳本需外部 playwright。P8：Fluent Forms 以明文存出生資料（操作者決定；備份含之）。P9／R3：正式站未以登入會員實點（填我的出生資料、一鍵訂閱、工具預填）。`DEPLOY_HOLD` 被覆寫三次（皆只部署 oracle-web）。
+- [未做] Z3（WooCommerce 購買與保存）；其他十一個工具的兩段式；監工台 `data.mjs` 未更新；手機實機未看。
+- [rollback] 引擎：`oracle-web:rollback-20261128-183545` 映像或 `sg-deploy.sh` 回 `6787a5697`／`d35a34924`；外掛：裝回鏡像 `v0.5.3`，或把 `fluentform_keep_entries` 設回 false。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy.sh oracle-web（smoke all OK）；瀏覽器 /embed/zh-TW/ziwei 排盤＋AI 解讀讀回 DOM | exit=0 | ms=600000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/4m/12n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=fluentform_keep_entries | hits=9
+- ORACLE_WAIVED: 各工人一輪 critic（R1 另有 Codex 兩輪、Z2 擁有權部分 Deep）；三個守衛各一次突變（R1 輸出、Z2 票、P9 擁有權）；監工讀回報、跑合併後全套測試、正式站實測。
 ## 2026-11-29（續5）— meeting-service 本機辨識聽得到小聲說話（發聲門檻跟著環境走）
 
 - 根因：本機辨識的發聲偵測用固定 RMS 0.008（移植自 OwnVoice）。操作者手機錄音說話約 0.004、背景約 0.002：只有 54% 的話被偵測，3–16 秒整段沒辨識。Gemini 不經過這個偵測。`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`。
