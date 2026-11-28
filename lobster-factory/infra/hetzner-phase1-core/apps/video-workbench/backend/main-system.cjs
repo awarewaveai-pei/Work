@@ -287,7 +287,9 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     let payload;
     try {
       const { verifyPermit } = await contract("lib/entitlements/permit.ts");
-      payload = verifyPermit(value.permit, publicKeys(env.ENTITLEMENT_PUBLIC_KEYS), { tenant, product_key: "video", feature_key: feature, actor, on_behalf_of: tenant }, now);
+      // Checked at the time it is checked: the issuer signed after this function started, so `now` from before the
+      // request can be a second older than issued_at and the permit would be refused as "from the future".
+      payload = verifyPermit(value.permit, publicKeys(env.ENTITLEMENT_PUBLIC_KEYS), { tenant, product_key: "video", feature_key: feature, actor, on_behalf_of: tenant }, Math.floor(Date.now() / 1000));
     } catch (e) {
       // The cause goes to the log (it names no secret); the user sees the refusal only.
       console.error("[vw] permit verification failed:", e?.message || e);

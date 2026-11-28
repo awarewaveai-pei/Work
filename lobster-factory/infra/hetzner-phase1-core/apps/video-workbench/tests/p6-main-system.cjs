@@ -69,6 +69,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       const body = JSON.parse(options.body);
       calls.permits.push(body);
       if (permitMode === "refuse") return Response.json({ allowed: false, reason: "no_entitlement" });
+      // "boundary": the issuer answers in the second after the request started (any two clocks a second apart).
+      if (permitMode === "boundary") await new Promise((r) => setTimeout(r, 1005 - (Date.now() % 1000)));
       const now = Math.floor(Date.now() / 1000);
       const permit = signPermit({ format_version: 1, tenant: body.organization_id, product_key: "video", feature_key: body.feature_key, source: "comp", entitlement_id: "ent-1", source_ref: null, limits: {}, max_spend: null, actor: body.actor, on_behalf_of: body.organization_id, issued_at: now, expires_at: now + 600, kid: "k1" }, permitMode === "forged" ? stranger : pair.privateKey);
       return Response.json({ allowed: true, permit });
@@ -234,13 +236,21 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.equal(forged.status, 503, forged.body);
     assert.equal(calls.openai, openaiBefore);
 
+    // 4b. A permit issued in the second after the request started is this request's own permit, not one "from the future".
+    permitMode = "boundary";
+    const late = await generate({ ...imageInput, idempotencyKey: "browser-key-boundary" }, who({ "X-VW-User-Id": "77777777-7777-4777-8777-777777777777" }));
+    assert.ok(late.status < 300, "許可在下一秒才簽出來也要通過：" + late.status + " " + late.body);
+    for (let i = 0; i < 100 && calls.openai === openaiBefore; i++) await new Promise((r) => setTimeout(r, 50)); // the job runs after the 202
+    const openaiAfterBoundary = calls.openai;
+    assert.equal(openaiAfterBoundary, openaiBefore + 1, "通過許可的那一次生成呼叫了供應商一次");
+
     // 5. No billing account header = 403 before anything is asked.
     permitMode = "allow";
     const permitsBefore = calls.permits.length;
     const noBilling = await generate({ ...imageInput }, who({ "X-VW-Billing-Org-Id": "" }));
     assert.equal(noBilling.status, 403);
     assert.equal(calls.permits.length, permitsBefore);
-    assert.equal(calls.openai, openaiBefore);
+    assert.equal(calls.openai, openaiAfterBoundary);
 
     // 6a. Every video ingested carries technical QA in the shape the assets route hands persistAutomaticTechnicalQa.
     {

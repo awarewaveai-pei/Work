@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-29（續4）— 影片工作台：生成的圖與影片全部 503、使用許可偶發失敗（實際開專案走流程查到）
+
+來源：操作者要求「用開專案的方式」實走 video.aware-wave.com（2026-11-27 建專案「實測｜深夜的塔羅牌」，走到生第 1 鏡畫面）。
+
+- A 根因：`scripts/media-cache-sw.js:106` 用 `client.postMessage` 問發出請求的文件「釘在哪個組織」；瀏覽器把這種訊息送到 `navigator.serviceWorker`，`shared/adapters.js:163` 卻聽 `window`，沒有文件會回答，worker 等 3 秒後一律回 503（`media-cache-sw.js:121`）。2026-11-18 `300396496` 加入時就如此。線上實測：同一次請求 `navigator.serviceWorker` 收到 1 次、`window` 收到 0 次，`/generated/*.png` 3.6 秒後 503。
+- A 修法：監聽改掛 `navigator.serviceWorker`（`shared/adapters.js:163-169`）。
+- A 為何測試沒抓到：`tests/media-cache-browser.cjs` 的真實瀏覽器段用一張沒有工作台腳本的純文件、自己掛監聽；`tests/organization-context.cjs` 的假 window 直接呼叫 `listeners.message`。真的頁面監聽從未在真瀏覽器跑過。兩支都改：前者加「真實首頁與 iframe 內的專案頁各讀一個檔＝200」，後者的假環境改成只有 `navigator.serviceWorker` 收得到。
+- B 根因：`backend/main-system.cjs:267` 在向簽發端要許可「之前」取 `now`，`:290` 用這個舊秒數驗證；許可在下一秒簽出時 `issued_at > now`，`permit.ts:92` 判 `expired_or_future`（主機記錄 2026-11-27T10 一筆，同一時刻三個容器時鐘相同）。
+- B 修法：驗證時才取時間（`main-system.cjs:290-292`）。`permit.ts` 未動；另一個呼叫端 `next-admin/lib/entitlements/can.ts:283` 本來就用呼叫當下的時間。
+- 未修（已回報操作者，等她排序）：專案角色視窗「AI 生成參考圖」接到 AI 分鏡的動作（`scripts/projects-0.js:491` `data-action="noAi"` → `:1510`）；AI 輔助成功無可見回饋；AI 分鏡不綁角色；「讓這鏡動起來」無 Gemini 且不用鏡頭時長。
+- 未部署：`DEPLOY_HOLD`（橫幅 R3，`fe2414004`）仍在，`sg-deploy.sh:214-226` 會拒絕所有 app；等操作者決定。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（真實 Edge；修正後 top/framed=200；暫時換回舊監聽 → top/framed=503、exit 1；還原後 exit 0） | exit=0 | ms=41000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p6-main-system.cjs（新案 4b：簽發端在下一秒才回；修正前 503 expired_or_future、修正後通過）；node tests/organization-context.cjs；node tests/gate.cjs = gate ok | exit=0 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-11-29-partialreview-da01ad8e.md`）；1 項屬實已修：新瀏覽器測試只等 controller、沒等頁面腳本（`scripts/app-entry.js:26` 非同步載入 adapters.js）→ 改等 `VideoWorkbenchAdapters.context`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=vw:document-organization | hits=6
+  - 另掃 `verifyPermit(` 呼叫端 2 處、`addEventListener("message"` 搭配 serviceWorker 1 處，無同類
 ## 2026-11-29（續3）— meeting-service C18 即時分講者真人驗收未過（19%），不提供
 
 - 根因：每句 1–5 秒、手機錄的聲音算出的聲紋不穩定。操作者錄音（78 秒，pyannote 整檔判 3 人）：同一人兩句相似度中位數 0.38（合成聲音 0.9）、不同人 0.16（最高 0.45）；門檻 0.75 下 16 句分成 16 人，與整檔結果一致 3/16＝19%；事後挑最好的門檻 0.45 也只 11/16＝69%。卡片規定低於 80% 不上線。`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`。

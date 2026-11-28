@@ -160,7 +160,10 @@
       },
     };
   })();
-  if (connected && window.addEventListener) window.addEventListener("message", async (event) => {
+  // The media worker asks the document that made a request which organization it is pinned to (media-cache-sw.js
+  // documentOrganization). A worker's client.postMessage is delivered to navigator.serviceWorker, never to window:
+  // a listener on window answers nothing, and after 3 s every picture and video is 503.
+  if (connected && navigator.serviceWorker?.addEventListener) navigator.serviceWorker.addEventListener("message", async (event) => {
     if (event.data?.type !== "vw:document-organization" || !event.ports?.[0] || event.source !== navigator.serviceWorker?.controller) return;
     const identity = await context.ready.catch(() => null);
     event.ports[0].postMessage({ organizationId: context.locked ? null : identity?.organizationId || null });
