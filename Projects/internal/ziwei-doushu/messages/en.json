@@ -562,6 +562,9 @@
     "disclaimer": "Note: AI reading is for reference and entertainment only.",
     "share": "Share card",
     "dailyLimit": "You've used today's AI readings. Please try again later.",
-    "dailyLimitUntil": "You've used today's AI readings. You can try again after {time}."
+    "dailyLimitUntil": "You've used today's AI readings. You can try again after {time}.",
+    "paidTitle": "What the in-depth report on this chart covers",
+    "paidSoon": "The in-depth report will soon be available as a one-time purchase.",
+    "checkFailed": "This reading said something the chart does not support, so it was held back. Please try again."
   }
 }

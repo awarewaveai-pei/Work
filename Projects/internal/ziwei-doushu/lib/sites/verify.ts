@@ -16,8 +16,8 @@ export { SITE_SIGNATURE_HEADER } from './headers';
 const WINDOW_SECONDS = 60;
 const NONCE = /^[A-Za-z0-9_-]{16,100}$/;
 const AUTH_FIELDS = ['key_id', 'ts', 'nonce', 'aud'] as const;
-/** 簽過的原文的用途:/api/v1(含 batch)= v1;會員票(lib/sites/ticket.ts)= ticket。 */
-export type SiteAudience = 'v1' | 'ticket';
+/** 簽過的原文的用途:/api/v1(含 batch)= v1;會員票(lib/sites/ticket.ts)= ticket;深度報告購買票(lib/sites/purchase.ts)= report。 */
+export type SiteAudience = 'v1' | 'ticket' | 'report';
 
 const seen = new Map<string, number>(); // <key_id>:<nonce> -> 到期(unix 秒)
 let lastSweep = 0;

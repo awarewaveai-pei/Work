@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import type { AiProviderAdapter, InterpretRequest, Reading } from '../types';
 import { buildPrompt } from '../prompts';
 import { MAX_TOKENS, modelFor } from '../models';
-import { AiCallError } from '../errors';
+import { AiCallError, AiNotConfiguredError } from '../errors';
+import type { Llm } from '../twoStage/types';
 
 /**
  * OpenAI (GPT) provider — 預設家 (PLAN §6,operator 偏好其解說)。
@@ -55,4 +56,40 @@ export const openaiAdapter: AiProviderAdapter = {
       );
     }
   },
+};
+
+let longClient: OpenAI | null = null;
+
+/**
+ * 兩段式解讀(lib/ai/twoStage)的模型呼叫:回文字與 token 用量(成本估算用)。
+ * 深度報告一章推理加輸出可達數萬 token,逾時放寬到 180 秒、不重試(重試會重複計費)。
+ */
+export const openaiComplete: Llm = async (req) => {
+  if (!process.env.OPENAI_API_KEY) throw new AiNotConfiguredError('openai');
+  if (!longClient) longClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 180_000, maxRetries: 0 });
+  try {
+    const res = await longClient.chat.completions.create({
+      model: req.model,
+      max_completion_tokens: req.maxTokens,
+      reasoning_effort: req.effort,
+      messages: [
+        { role: 'system', content: req.system },
+        { role: 'user', content: req.user },
+      ],
+    });
+    const text = res.choices[0]?.message?.content?.trim() ?? '';
+    if (!text) throw new AiCallError('openai', `空回應(finish_reason=${res.choices[0]?.finish_reason ?? '?'})`);
+    return {
+      text,
+      usage: {
+        model: req.model,
+        input: res.usage?.prompt_tokens ?? 0,
+        cachedInput: res.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+        output: res.usage?.completion_tokens ?? 0,
+      },
+    };
+  } catch (err) {
+    if (err instanceof AiCallError) throw err;
+    throw new AiCallError('openai', err instanceof Error ? err.message : String(err));
+  }
 };

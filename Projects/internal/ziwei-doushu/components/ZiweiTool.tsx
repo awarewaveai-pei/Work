@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import BirthForm from '@/components/BirthForm';
 import ZiweiChart from '@/components/ZiweiChart';
 import AiReading from '@/components/AiReading';
+import TwoStageReading from '@/components/TwoStageReading';
 import {
   computeChart,
   computeHoroscope,
@@ -18,6 +19,13 @@ import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /** 今日 YYYY-MM-DD(client island,Date 僅在瀏覽器執行)。 */
+/** 送去 /api/reading 的出生資料:去掉語系(伺服器一律以 zh-TW 排盤)。 */
+function birthInput(req: ChartRequest): Record<string, unknown> {
+  const { locale: _locale, ...rest } = req;
+  void _locale;
+  return rest as Record<string, unknown>;
+}
+
 function todayStr(): string {
   const { year, month, day } = localToday();
   return `${year}-${month}-${day}`;
@@ -271,10 +279,15 @@ export default function ZiweiTool({
             </div>
           ) : null}
 
-          <AiReading
-            context={toContext(result, locale, horoscope ?? undefined, analysis ?? undefined)}
-            ai={dict.ai}
-          />
+          {/* 兩段式解讀(卡 Z2)只有中文:深度計算的 facts 是中文;英文頁維持原本的單段解讀 */}
+          {locale === 'zh-TW' && birthReq ? (
+            <TwoStageReading systemId="ziwei" input={birthInput(birthReq)} today={todayStr()} ai={dict.ai} />
+          ) : (
+            <AiReading
+              context={toContext(result, locale, horoscope ?? undefined, analysis ?? undefined)}
+              ai={dict.ai}
+            />
+          )}
         </section>
       ) : null}
     </>

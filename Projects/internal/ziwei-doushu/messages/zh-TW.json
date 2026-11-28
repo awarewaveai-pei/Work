@@ -562,6 +562,9 @@
     "disclaimer": "※ AI 解讀僅供參考與娛樂。",
     "share": "分享圖卡",
     "dailyLimit": "今天的 AI 解讀次數用完了,請稍後再試。",
-    "dailyLimitUntil": "今天的 AI 解讀次數用完了,{time} 後可以再試。"
+    "dailyLimitUntil": "今天的 AI 解讀次數用完了,{time} 後可以再試。",
+    "paidTitle": "這張盤的深度報告還會寫到",
+    "paidSoon": "深度報告即將開放單次購買。",
+    "checkFailed": "這次產生的解讀有內容對不上命盤，已攔下沒有顯示，請再試一次。"
   }
 }

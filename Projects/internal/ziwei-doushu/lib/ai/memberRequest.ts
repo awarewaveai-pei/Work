@@ -99,3 +99,32 @@ export async function requestInterpretation(
     return { kind: 'error' };
   }
 }
+
+export type BriefOutcome =
+  | { kind: 'ok'; text: string; paidList: string[] }
+  | { kind: 'daily_limit'; retryAfterSec: number | null }
+  | { kind: 'check_failed' }
+  | { kind: 'error' };
+
+/** 呼叫一次 /api/reading 的免費簡批(兩段式解讀,卡 Z2)。會員票同 requestInterpretation;任何失敗只回一次結果。 */
+export async function requestBrief(fetchFn: FetchFn, payload: unknown, ticket: MemberTicket | null): Promise<BriefOutcome> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (ticket) {
+    headers[SITE_TICKET_HEADER] = ticket.ticket;
+    headers[SITE_SIGNATURE_HEADER] = ticket.signature;
+  }
+  try {
+    const res = await fetchFn('/api/reading', { method: 'POST', headers, body: JSON.stringify(payload) });
+    const data = (await res.json().catch(() => null)) as { error?: unknown; text?: unknown; paidList?: unknown } | null;
+    if (res.status === 429 && data?.error === 'daily_limit_reached') {
+      const sec = Number(res.headers.get('Retry-After'));
+      return { kind: 'daily_limit', retryAfterSec: Number.isFinite(sec) && sec > 0 ? sec : null };
+    }
+    if (data?.error === 'unsupported_claims' || data?.error === 'bad_structure') return { kind: 'check_failed' };
+    if (!res.ok || typeof data?.text !== 'string') return { kind: 'error' };
+    const paidList = Array.isArray(data.paidList) ? data.paidList.filter((x): x is string => typeof x === 'string') : [];
+    return { kind: 'ok', text: data.text, paidList };
+  } catch {
+    return { kind: 'error' };
+  }
+}

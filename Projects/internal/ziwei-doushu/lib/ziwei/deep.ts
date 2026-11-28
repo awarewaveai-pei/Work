@@ -2,7 +2,7 @@ import type { IFunctionalAstrolabe } from 'iztro/lib/astro/FunctionalAstrolabe';
 import { Lunar } from 'lunar-javascript';
 import { PALACE_ORDER, type PalaceKey } from './stars';
 import { SIX_LUCKY, SIX_UNLUCKY } from './brightness';
-import { hidden, mod12, opp, surround } from './patterns';
+import { detectPatterns, hidden, mod12, opp, surround } from './patterns';
 
 /**
  * 紫微深度計算(卡 Z1;ORACLE-WP-SPEC §8)— 純計算、不呼叫 AI,輸出是深度報告(Z2)唯一的事實來源。
@@ -26,7 +26,8 @@ export type ZiweiFactCategory =
   | 'yearly_overlay' // 流年十二宮疊本命
   | 'yearly_mutagen' // 流年四化引動
   | 'mutagen_stack' // 本命／大限／流年同一化疊在同宮
-  | 'monthly'; // 流月
+  | 'monthly' // 流月
+  | 'pattern'; // 本命成格的格局(patterns.ts detectPatterns)
 
 export type ZiweiFactScope = 'natal' | 'decadal' | 'yearly' | 'monthly';
 /** favorable=有利、caution=留意、mixed=吉凶並見、neutral=只陳述 */
@@ -83,6 +84,7 @@ export const ZIWEI_RULES = {
   YEARLY: { name: '流年命宮', source: '流年命宮=流年地支所在宮,十二宮由此逆排(iztro 實作)' },
   YEARLY_MUTAGEN: { name: '流年四化', source: '流年天干依十干四化表(iztro 預設表)' },
   MUTAGEN_STACK: { name: '祿忌疊宮', source: '三合派疊宮論法:本命、大限、流年同一化落同宮(雙祿、雙忌、三忌)' },
+  PATTERN: { name: '格局', source: '格局成立條件見 patterns.ts(x-iztro 規則、iztro-docs《格局》、《紫微斗數全書》)' },
   MONTHLY_MARK: { name: '流月與有利／留意標記', source: '流年斗君定正月、逐月順行(iztro);標記=流月化祿／化忌入流月命宮三方四正,門檻為本站約定(monthTone)' },
 } as const;
 
@@ -166,6 +168,7 @@ const BASE_WEIGHT: Record<ZiweiFactCategory, number> = {
   sanhe: 15,
   liuhe: 15,
   decadal_timeline: 10,
+  pattern: 50,
 };
 
 function weightOf(category: ZiweiFactCategory, tone: ZiweiFactTone, extra = 0): number {
@@ -627,6 +630,24 @@ export function computeZiweiDeepFacts(astro: IFunctionalAstrolabe, targetDate: s
   facts.push(...scopeMutagenFacts(astro, 'yearly', yearly));
   facts.push(...stackFacts(astro, decadal, yearly));
   facts.push(...monthlyFacts(astro, lunarYear));
+
+  // 成格的格局:成立條件在 patterns.ts;此處只轉成 fact(涉及的宮星 patterns.ts 未回傳,palaces／stars 留空)
+  for (const p of detectPatterns(astro)) {
+    const tone: ZiweiFactTone = p.kind === 'auspicious' ? 'favorable' : p.kind === 'inauspicious' ? 'caution' : 'neutral';
+    facts.push({
+      id: `pattern:${p.name}`,
+      category: 'pattern',
+      scope: 'natal',
+      palaces: [],
+      stars: [],
+      rule: 'PATTERN',
+      tone,
+      weight: weightOf('pattern', tone),
+      hook: true,
+      text: `本命成${p.name}：${p.desc}`,
+      detail: { kind: p.kind },
+    });
+  }
 
   return { targetDate, lunarYear, facts };
 }
