@@ -14,9 +14,12 @@
  *    calls window.parent.awOracleTicket() right before an AI reading and sends the two values as headers
  *    X-AwareWave-Oracle-Ticket / X-AwareWave-Oracle-Signature (never in a URL). Each call is a fresh,
  *    single-use, 60-second ticket. Not defined for anonymous visitors: the engine then reads anonymously.
+ *  - Own birth data (logged-in visitors only): window.awOracleBirth() resolves to the member's stored birth
+ *    fields from REST aworacle/v1/me, or null; the framed tool uses it to prefill its form.
  *  - Theme fonts: the frame's host-theme font names (Embed\ThemeTokens) get this page's same-origin
  *    @font-face files copied in (copyFonts); colours need no script, they are in the frame URL.
- * Config: window.AWORACLE_SAME ={ rootId, minHeight, pages: { slug: url }, ticket: { url, nonce } | null }.
+ * Config: window.AWORACLE_SAME ={ rootId, minHeight, pages: { slug: url }, ticket: { url, nonce } | null,
+ *   me: { url, nonce } | null }.
  */
 (function () {
   'use strict';
@@ -42,6 +45,28 @@
         })
         .then(function (json) {
           return json && json.ticket && json.signature ? { ticket: json.ticket, signature: json.signature } : null;
+        })
+        .catch(function () {
+          return null;
+        });
+    };
+  }
+
+  // The member's own birth data for the framed tool's form: window.parent.awOracleBirth() resolves to the stored
+  // birth fields (engine BIRTH_FIELDS) or null. Same origin only (a function call, nothing in a URL or message);
+  // fetched on demand, so no birth data sits in the page or its cache.
+  if (cfg.me && cfg.me.url && typeof window.fetch === 'function') {
+    window.awOracleBirth = function () {
+      return fetch(cfg.me.url, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'X-WP-Nonce': cfg.me.nonce, Accept: 'application/json' }
+      })
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .then(function (json) {
+          return (json && json.item && json.item.birth) || null;
         })
         .catch(function () {
           return null;

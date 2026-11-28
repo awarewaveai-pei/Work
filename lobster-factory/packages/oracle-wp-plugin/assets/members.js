@@ -1,8 +1,11 @@
 /**
- * [aw_oracle_my_charts] / [aw_oracle_persons]: list, add, edit and delete the member's entries through
+ * [aw_oracle_me] / [aw_oracle_my_charts] / [aw_oracle_persons]: list, add, edit and delete the member's entries
+ * through
  * REST aworacle/v1 (cookie + X-WP-Nonce). Every piece of member data is written with textContent / value,
  * never as HTML. Choices are visible radios and checkboxes (no dropdowns).
- * Config: window.AWORACLE_MEMBERS = { root, nonce, labels }.
+ * "My birth data" (REST me) is one of the member's charts marked as their own: on top of the charts list, or alone
+ * ([aw_oracle_me]); it can subscribe the daily letter in one click.
+ * Config: window.AWORACLE_MEMBERS = { root, nonce, daily, locale, turnstile, action, labels }.
  */
 (function () {
   'use strict';
@@ -82,21 +85,144 @@
 
   function mount(box) {
     var kind = box.getAttribute('data-aworacle-kind');
-    var state = { items: [], editing: null, error: '' };
+    var withMe = kind === 'me' || kind === 'charts';
+    var listKind = kind === 'persons' ? 'persons' : 'charts';
+    var state = { items: [], editing: null, error: '', me: null, email: '', notice: '' };
     var group = 'aworacle-' + kind + '-' + ++uid;
+
+    function button(text, onClick, type) {
+      return el('button', { type: type || 'button', className: 'button wp-element-button', text: text, on: onClick });
+    }
+
+    function edit(item) {
+      state.editing = item;
+      state.error = '';
+      state.notice = '';
+      render();
+    }
+
+    function mark(id) {
+      return api('PUT', 'me', { id: id }).then(function (r) {
+        state.error = r.ok ? '' : (r.json && r.json.message) || L.error;
+        load();
+      }, fail);
+    }
+
+    function remove(id) {
+      if (!window.confirm(L.confirm)) return;
+      api('DELETE', 'charts/' + id).then(function (r) {
+        state.error = r.ok ? '' : (r.json && r.json.message) || L.error;
+        load();
+      }, fail);
+    }
+
+    // "My birth data": shown first; filled in once, or picked from the charts already saved.
+    function meSection() {
+      var section = el('div', { className: 'aworacle-me' }, [el('h3', { text: L.me }), el('p', { className: 'aworacle-note', text: L.meNote })]);
+      if (state.me) {
+        section.appendChild(el('p', null, [el('strong', { text: state.me.name }), el('span', { text: ' — ' + birthText(state.me.birth) })]));
+        section.appendChild(
+          el('p', null, [
+            button(L.edit, function () {
+              edit({ id: state.me.id, name: state.me.name, birth: state.me.birth, mine: true });
+            }),
+            document.createTextNode(' '),
+            button(L['delete'], function () {
+              remove(state.me.id);
+            })
+          ])
+        );
+        if (cfg.daily) section.appendChild(subscribeBlock());
+        return section;
+      }
+      section.appendChild(el('p', { text: L.meNone }));
+      section.appendChild(
+        el('p', null, [
+          button(L.meNew, function () {
+            edit({ id: 0, name: L.meName, birth: null, mine: true });
+          })
+        ])
+      );
+      var saved = state.items.filter(function (item) {
+        return !item.locked;
+      });
+      if (saved.length) {
+        var picks = el('p', null, [el('span', { text: L.mePick + ' ' })]);
+        saved.forEach(function (item) {
+          picks.appendChild(
+            button(item.name, function () {
+              mark(item.id);
+            })
+          );
+          picks.appendChild(document.createTextNode(' '));
+        });
+        section.appendChild(picks);
+      }
+      return section;
+    }
+
+    function subscribeBlock() {
+      var block = el('div', { className: 'aworacle-me-daily' });
+      var msg = el('p', { role: 'alert', text: state.notice });
+      var slot = el('div', { className: 'aworacle-turnstile' });
+      var widget = null;
+      var go = button(L.subscribe, function () {
+        var token = widget !== null ? window.turnstile.getResponse(widget) || '' : '';
+        if (cfg.turnstile && !token) {
+          msg.textContent = L.captcha;
+          return;
+        }
+        go.disabled = true;
+        msg.textContent = '';
+        function done(text) {
+          go.disabled = false;
+          state.notice = text;
+          msg.textContent = text;
+          if (widget !== null) window.turnstile.reset(widget);
+        }
+        api('POST', 'me/subscribe', { tz: guessZone(), locale: cfg.locale, turnstile: token }).then(
+          function (r) {
+            done((r.json && r.json.message) || L.error);
+          },
+          function () {
+            done(L.error);
+          }
+        );
+      });
+      block.appendChild(el('p', { text: String(L.subscribeTo || '').replace('%s', state.email) }));
+      block.appendChild(slot);
+      block.appendChild(el('p', null, [go]));
+      block.appendChild(msg);
+      if (cfg.turnstile && window.turnstile) {
+        // Rendered once the block is in the page.
+        setTimeout(function () {
+          widget = window.turnstile.render(slot, { sitekey: cfg.turnstile, action: cfg.action });
+        }, 0);
+      }
+      return block;
+    }
 
     function render() {
       box.textContent = '';
-      box.appendChild(el('h3', { text: kind === 'persons' ? L.persons : L.charts }));
+      if (withMe && !state.editing) box.appendChild(meSection());
+      if (kind === 'me') {
+        if (state.error) box.appendChild(el('p', { className: 'aworacle-error', role: 'alert', text: state.error }));
+        if (state.editing) box.appendChild(form(state.editing));
+        return;
+      }
+      box.appendChild(el('h3', { text: kind === 'persons' ? L.persons : L.otherCharts }));
       if (kind === 'persons') box.appendChild(el('p', { className: 'aworacle-note', text: L.personsNote }));
       if (state.error) box.appendChild(el('p', { className: 'aworacle-error', role: 'alert', text: state.error }));
       if (state.editing) {
         box.appendChild(form(state.editing));
         return;
       }
-      if (!state.items.length) box.appendChild(el('p', { text: L.empty }));
+      var items = state.items.filter(function (item) {
+        return !(state.me && item.id === state.me.id);
+      });
+      if (!items.length) box.appendChild(el('p', { text: L.empty }));
       var list = el('ul', { className: 'aworacle-list' });
-      state.items.forEach(function (item) {
+      items.forEach(function (item) {
         var row = el('li');
         if (item.locked) {
           row.appendChild(el('span', { text: L.locked + ' ' }));
@@ -123,7 +249,7 @@
             text: L['delete'],
             on: function () {
               if (!window.confirm(L.confirm)) return;
-              api('DELETE', kind + '/' + item.id).then(function (r) {
+              api('DELETE', listKind + '/' + item.id).then(function (r) {
                 state.error = r.ok ? '' : (r.json && r.json.message) || L.error;
                 load();
               }, fail);
@@ -225,12 +351,14 @@
             dayDivide: picked(divide)
           }
         };
-        var req = item.id ? api('PUT', kind + '/' + item.id, body) : api('POST', kind, body);
+        var req = item.id ? api('PUT', listKind + '/' + item.id, body) : api('POST', listKind, body);
         req.then(function (r) {
           if (r.ok) {
             state.editing = null;
             state.error = '';
-            load();
+            // A new entry filled in as "my birth data" is marked as such.
+            if (item.mine && !item.id) mark(r.json.id);
+            else load();
             return;
           }
           var bad = (r.json && r.json.data && r.json.data.fields) || [];
@@ -262,19 +390,31 @@
       return f;
     }
 
+    function guessZone() {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
     function fail() {
       state.error = L.error;
       render();
     }
 
     function load() {
-      api('GET', kind).then(function (r) {
+      var me = withMe ? api('GET', 'me') : Promise.resolve(null);
+      Promise.all([api('GET', listKind), me]).then(function (all) {
+        var r = all[0];
         if (!r.ok) {
           state.error = (r.json && r.json.message) || L.error;
           state.items = [];
         } else {
           state.items = (r.json && r.json.items) || [];
         }
+        state.me = (all[1] && all[1].ok && all[1].json.item) || null;
+        state.email = (all[1] && all[1].ok && all[1].json.email) || '';
         render();
       }, fail);
     }

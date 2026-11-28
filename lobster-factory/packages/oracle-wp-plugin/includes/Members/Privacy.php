@@ -128,7 +128,12 @@ final class Privacy {
 					'group_id'    => 'aworacle-' . $kind,
 					'group_label' => $label,
 					'item_id'     => 'aworacle-' . $kind . '-' . $row['id'],
-					'data'        => self::fields( $row ),
+					'data'        => array_merge(
+						$kind === 'charts' && Me::id( (int) $user->ID ) === $row['id']
+							? array( array( 'name' => __( 'My own birth data', 'aware-wave-oracle' ), 'value' => __( 'Yes', 'aware-wave-oracle' ) ) )
+							: array(),
+						self::fields( $row )
+					),
 				);
 			}
 		}

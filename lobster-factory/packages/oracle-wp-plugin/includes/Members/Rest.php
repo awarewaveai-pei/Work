@@ -165,6 +165,9 @@ final class Rest {
 		if ( ! Store::delete( (string) $request['kind'], get_current_user_id(), (int) $request['id'] ) ) {
 			return self::notFound();
 		}
+		if ( $request['kind'] === 'charts' && Me::id( get_current_user_id() ) === (int) $request['id'] ) {
+			Me::forget( get_current_user_id() );
+		}
 		return new \WP_REST_Response( array( 'deleted' => true ), 200 );
 	}
 

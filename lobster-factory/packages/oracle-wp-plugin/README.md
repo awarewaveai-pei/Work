@@ -74,6 +74,14 @@
 - 樣式跟佈景：建立時把表單設為 Fluent Forms 的「沿用佈景樣式」（表單 meta `_ff_selected_style`＝`ffs_inherit_theme`），按鈕掛 `button wp-element-button`；單選、核取是看得到的原生控制項（不用 `ff_list_buttons`，它的藍色寫死在 Fluent Forms 基礎 CSS）。所有表單的勾選色取佈景主色（`assets/forms.css`）。仍是 Fluent Forms 自己的：必填星號與錯誤紅字、成功訊息的灰框。
 - 重跑指令：欄位定義（欄位、順序、驗證、選項）由程式重寫；樣式只在第一次建立時寫入，之後保留操作者的：樣式 meta、自訂 CSS、版面設定、表單名稱、送出按鈕整組、各欄的 CSS class 與標籤位置／版型。在後台另外加的欄位或分欄容器會被拿掉。
 
+## 我的出生資料（P9，0.5.4）
+
+會員把自己的一筆命盤標成「我自己」，出生資料只填一次、只存這一處（既有加密命盤表）。標記是每位會員每站一個值（user option `aworacle_self_chart`＝命盤 ID），不改資料表、不動已存資料；刪該筆、清除個人資料、刪帳號時一起清掉。
+
+- 版位：`[aw_oracle_me]` 只有這一段（可掛進任何頁，例如日後 WooCommerce「我的帳號」）；`[aw_oracle_my_charts]` 把它放在最上面。舊會員可直接從已存命盤挑一筆。
+- 一鍵訂閱：`POST aworacle/v1/me/subscribe`（登入＋nonce）以帳號信箱和「我自己」走 `Daily\Rest::accept`（同樣的限流、人機驗證、確認信）。
+- 工具預填：同網域父頁腳本替登入會員定義 `window.awOracleBirth()`，回傳 `Promise<出生欄位 | null>`（`calendar, year, month, day, hour, minute, isLeapMonth, gender, place{label,lat,lon,zone}, trueSolar, dayDivide`）；框內引擎呼叫 `window.parent.awOracleBirth()`。資料不進網址、不進頁面快取。**引擎端呼叫它的程式尚未做（另卡）。**
+
 ## 每日運勢信（P3′）
 
 訂閱並確認後，每天在訂閱者當地 07:00 之後第一次排程寄一封，內容只用引擎 `daily` 系統算出的結果（分數、幸運色／數字／方位、宜忌；不含 AI 文字）。
@@ -139,7 +147,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 設定驗證（不依賴 WordPress） | `includes/Settings/Normalize.php`；儲存 `includes/Settings/Options.php` |
 | 金鑰與簽章 | `includes/Crypto/SiteKey.php` |
 | 嵌入 | `includes/Embed/{Renderer,EmbedUrl,LocaleMap,Shortcode,Block}.php`、`assets/{embed-same-origin,embed,block}.js`；佈景 → 引擎主題代碼 `includes/Embed/ThemeTokens.php`（代碼＝Kadence 色盤九格＋內文／標題字體＋按鈕圓角，Kadence 一格對一格；其他佈景由 theme.json 對到九格；設定「Theme colour map」`paletteN=色盤 slug` 逐格覆寫；九格用途表在引擎 `deploy/DEPLOY.md`「宿主主題代碼」） |
-| 會員存檔 | `includes/Members/{Store,Rest,Shortcodes,Privacy,Record}.php`、`includes/Crypto/Vault.php`、`assets/members.js` |
+| 會員存檔 | `includes/Members/{Store,Rest,Me,Shortcodes,Privacy,Record}.php`、`includes/Crypto/Vault.php`、`assets/members.js` |
 | 會員票 | `includes/Members/Ticket.php` |
 | 每日運勢信 | `includes/Daily/{Schedule,Letter,Svix}.php`（不依賴 WordPress）、`includes/Daily/{Store,Crm,Runner,Rest,Confirm,Signup,Hooks,Lang}.php`、`assets/daily.js` |
 | 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；每日批次 `POST /api/v1/batch`；不跟隨轉址、回應上限 1 MB／批次 8 MB） |

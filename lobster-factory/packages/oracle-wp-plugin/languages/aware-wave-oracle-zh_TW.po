@@ -255,10 +255,6 @@ msgstr "AwareWave 命理：會員目前無法存命盤——wp-config.php 還沒
 msgid "Member data"
 msgstr "會員資料"
 
-#: includes/Admin/SettingsPage.php:347
-msgid "Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
-msgstr "會員可以存自己的命盤，以及為別人排盤時輸入的對象（[aw_oracle_my_charts]、[aw_oracle_persons]）。名字與出生資料用 wp-config.php 裡的金鑰加密，金鑰不進資料庫，所以資料庫備份裡只有密文。"
-
 #: includes/Admin/SettingsPage.php:349
 msgid "Saving is on."
 msgstr "存檔功能已開啟。"
@@ -295,36 +291,36 @@ msgstr "已存的命盤"
 msgid "Saved people (private compatibility readings)"
 msgstr "已存的對象（私人合盤）"
 
-#: includes/Members/Privacy.php:268
-#: includes/Members/Privacy.php:297
+#: includes/Members/Privacy.php:273
+#: includes/Members/Privacy.php:302
 msgid "Saved at (UTC)"
 msgstr "儲存時間（UTC）"
 
-#: includes/Members/Privacy.php:303
+#: includes/Members/Privacy.php:308
 msgid "Content"
 msgstr "內容"
 
-#: includes/Members/Privacy.php:311
-#: includes/Members/Shortcodes.php:80
+#: includes/Members/Privacy.php:316
+#: includes/Members/Shortcodes.php:107
 msgid "Name"
 msgstr "名字"
 
-#: includes/Members/Privacy.php:315
+#: includes/Members/Privacy.php:320
 msgid "Birth (local clock time)"
 msgstr "出生（當地鐘錶時間）"
 
 #: includes/Daily/FluentFormsDefinition.php:100
 #: includes/Daily/Signup.php:95
-#: includes/Members/Privacy.php:328
-#: includes/Members/Shortcodes.php:92
+#: includes/Members/Privacy.php:333
+#: includes/Members/Shortcodes.php:119
 msgid "Gender"
 msgstr "性別"
 
 #: includes/Daily/FluentFormsDefinition.php:101
 #: includes/Daily/FluentFormsDefinition.php:372
 #: includes/Daily/Signup.php:98
-#: includes/Members/Privacy.php:332
-#: includes/Members/Shortcodes.php:95
+#: includes/Members/Privacy.php:337
+#: includes/Members/Shortcodes.php:122
 msgid "Birthplace"
 msgstr "出生地"
 
@@ -342,69 +338,70 @@ msgstr "登入狀態已過期，請重新整理頁面再試一次。"
 msgid "You can keep up to %d entries here. Delete one first."
 msgstr "這裡最多存 %d 筆，請先刪掉一筆。"
 
-#: includes/Members/Rest.php:175
-#: includes/Members/Shortcodes.php:46
+#: includes/Members/Rest.php:178
+#: includes/Members/Shortcodes.php:50
 msgid "Saving is not available on this site yet."
 msgstr "本站目前還不能存檔。"
 
 #: includes/Daily/Rest.php:205
-#: includes/Members/Rest.php:187
+#: includes/Members/Rest.php:190
 msgid "Some fields are missing or not valid."
 msgstr "有欄位沒填或格式不對。"
 
-#: includes/Members/Rest.php:198
+#: includes/Members/Me.php:119
+#: includes/Members/Rest.php:201
 msgid "Not found."
 msgstr "找不到。"
 
-#: includes/Members/Shortcodes.php:43
+#: includes/Members/Shortcodes.php:47
 msgid "Log in to save"
 msgstr "登入以儲存"
 
-#: includes/Members/Shortcodes.php:48
+#: includes/Members/Shortcodes.php:52
 msgid "Administrators: set the member-data key in Settings → AwareWave Oracle."
 msgstr "管理員：請到「設定 → AwareWave 命理」設定會員資料金鑰。"
 
-#: includes/Members/Shortcodes.php:67
+#: includes/Members/Shortcodes.php:94
 msgid "My charts"
 msgstr "我的命盤"
 
-#: includes/Members/Shortcodes.php:68
+#: includes/Members/Shortcodes.php:95
 msgid "People I saved"
 msgstr "我存的對象"
 
-#: includes/Members/Shortcodes.php:69
+#: includes/Members/Shortcodes.php:96
 msgid "Only you can see these. Nobody is told that you saved them."
 msgstr "只有你看得到。不會通知任何人你存了他們。"
 
-#: includes/Members/Shortcodes.php:70
+#: includes/Members/Shortcodes.php:97
 msgid "Nothing saved yet."
 msgstr "還沒有存任何資料。"
 
-#: includes/Members/Shortcodes.php:71
+#: includes/Members/Shortcodes.php:98
 msgid "Add"
 msgstr "新增"
 
-#: includes/Members/Shortcodes.php:72
+#: includes/Members/Shortcodes.php:99
 msgid "Edit"
 msgstr "編輯"
 
-#: includes/Members/Shortcodes.php:73
+#: includes/Members/Shortcodes.php:100
 msgid "Delete"
 msgstr "刪除"
 
-#: includes/Members/Shortcodes.php:74
+#: includes/Members/Shortcodes.php:101
 msgid "Delete this entry?"
 msgstr "要刪除這一筆嗎？"
 
-#: includes/Members/Shortcodes.php:75
+#: includes/Members/Shortcodes.php:102
 msgid "Save"
 msgstr "儲存"
 
-#: includes/Members/Shortcodes.php:76
+#: includes/Members/Shortcodes.php:103
 msgid "Cancel"
 msgstr "取消"
 
-#: includes/Members/Shortcodes.php:77
+#: includes/Members/Shortcodes.php:104
 msgid "This entry cannot be opened with the site’s current key. You can delete it."
 msgstr "這一筆無法用本站目前的金鑰開啟，可以刪除。"
 
@@ -413,103 +410,103 @@ msgstr "這一筆無法用本站目前的金鑰開啟，可以刪除。"
 #: includes/Daily/Rest.php:118
 #: includes/Daily/Signup.php:107
 #: includes/Members/Rest.php:129
-#: includes/Members/Shortcodes.php:78
+#: includes/Members/Shortcodes.php:105
 msgid "Something went wrong. Reload the page and try again."
 msgstr "出了點問題，請重新整理頁面再試一次。"
 
-#: includes/Members/Shortcodes.php:79
+#: includes/Members/Shortcodes.php:106
 msgid "Check the highlighted fields."
 msgstr "請檢查標出的欄位。"
 
 #: includes/Daily/FluentFormsDefinition.php:93
 #: includes/Daily/Signup.php:84
-#: includes/Members/Shortcodes.php:81
+#: includes/Members/Shortcodes.php:108
 msgid "Calendar"
 msgstr "曆法"
 
 #: includes/Daily/FluentFormsDefinition.php:110
 #: includes/Daily/Signup.php:85
-#: includes/Members/Shortcodes.php:82
+#: includes/Members/Shortcodes.php:109
 msgid "Solar (Gregorian)"
 msgstr "國曆"
 
 #: includes/Daily/Confirm.php:87
 #: includes/Daily/FluentFormsDefinition.php:111
 #: includes/Daily/Signup.php:86
-#: includes/Members/Shortcodes.php:83
+#: includes/Members/Shortcodes.php:110
 msgid "Lunar"
 msgstr "農曆"
 
 #: includes/Daily/FluentFormsDefinition.php:94
 #: includes/Daily/FluentFormsDefinition.php:117
 #: includes/Daily/Signup.php:87
-#: includes/Members/Shortcodes.php:84
+#: includes/Members/Shortcodes.php:111
 msgid "Leap month"
 msgstr "閏月"
 
 #: includes/Daily/Signup.php:88
-#: includes/Members/Shortcodes.php:85
+#: includes/Members/Shortcodes.php:112
 msgid "Birth date (year, month, day)"
 msgstr "出生日期（年、月、日）"
 
 #: includes/Daily/Signup.php:89
-#: includes/Members/Shortcodes.php:86
+#: includes/Members/Shortcodes.php:113
 msgid "Birth time, local clock (hour, minute)"
 msgstr "出生時間，當地鐘錶時間（時、分）"
 
 #: includes/Daily/Signup.php:90
-#: includes/Members/Shortcodes.php:87
+#: includes/Members/Shortcodes.php:114
 msgid "Year"
 msgstr "年"
 
 #: includes/Daily/Signup.php:91
-#: includes/Members/Shortcodes.php:88
+#: includes/Members/Shortcodes.php:115
 msgid "Month"
 msgstr "月"
 
 #: includes/Daily/Signup.php:92
-#: includes/Members/Shortcodes.php:89
+#: includes/Members/Shortcodes.php:116
 msgid "Day"
 msgstr "日"
 
 #: includes/Daily/Signup.php:93
-#: includes/Members/Shortcodes.php:90
+#: includes/Members/Shortcodes.php:117
 msgid "Hour"
 msgstr "時"
 
 #: includes/Daily/Signup.php:94
-#: includes/Members/Shortcodes.php:91
+#: includes/Members/Shortcodes.php:118
 msgid "Minute"
 msgstr "分"
 
 #: includes/Daily/FluentFormsDefinition.php:114
 #: includes/Daily/Signup.php:96
-#: includes/Members/Shortcodes.php:93
+#: includes/Members/Shortcodes.php:120
 msgid "Male"
 msgstr "男"
 
 #: includes/Daily/FluentFormsDefinition.php:115
 #: includes/Daily/Signup.php:97
-#: includes/Members/Shortcodes.php:94
+#: includes/Members/Shortcodes.php:121
 msgid "Female"
 msgstr "女"
 
 #: includes/Daily/FluentFormsDefinition.php:102
 #: includes/Daily/FluentFormsDefinition.php:118
 #: includes/Daily/Signup.php:99
-#: includes/Members/Shortcodes.php:96
+#: includes/Members/Shortcodes.php:123
 msgid "Use true solar time"
 msgstr "使用真太陽時"
 
-#: includes/Members/Shortcodes.php:97
+#: includes/Members/Shortcodes.php:124
 msgid "Births 23:00–24:00 count as"
 msgstr "23:00–24:00 出生算作"
 
-#: includes/Members/Shortcodes.php:98
+#: includes/Members/Shortcodes.php:125
 msgid "the same day"
 msgstr "當天"
 
-#: includes/Members/Shortcodes.php:99
+#: includes/Members/Shortcodes.php:126
 msgid "the next day"
 msgstr "隔天"
 
@@ -517,7 +514,7 @@ msgstr "隔天"
 msgid "AwareWave Oracle: this member has saved charts, but AWORACLE_DATA_KEY is missing or invalid in wp-config.php, so they cannot be exported."
 msgstr "AwareWave 命理：這位會員有已存的命盤，但 wp-config.php 的 AWORACLE_DATA_KEY 沒設或無效，所以無法匯出。"
 
-#: includes/Members/Privacy.php:304
+#: includes/Members/Privacy.php:309
 msgid "Encrypted; this site’s current key cannot open it (it was saved under another key)."
 msgstr "已加密；本站目前的金鑰無法開啟（這筆是用別的金鑰存的）。"
 
@@ -527,7 +524,7 @@ msgstr "存檔只開放給本站會員。"
 
 #: includes/Admin/SettingsPage.php:447
 #: includes/Daily/Confirm.php:65
-#: includes/Members/Privacy.php:138
+#: includes/Members/Privacy.php:143
 msgid "Daily fortune letter"
 msgstr "每日運勢信"
 
@@ -596,6 +593,7 @@ msgid "Subscribing is not available on this site yet."
 msgstr "本站目前還不能訂閱。"
 
 #: includes/Daily/Rest.php:68
+#: includes/Members/Me.php:156
 msgid "Almost done: check your inbox and confirm your e-mail address."
 msgstr "快完成了：請到信箱收信，確認您的 email。"
 
@@ -691,23 +689,23 @@ msgstr "訂閱"
 msgid "The signup form appears here on the published page (only when the daily letter is on in Settings → AwareWave Oracle)."
 msgstr "發佈後的頁面會在這裡顯示訂閱表單（需在「設定 → AwareWave 命理」開啟每日運勢信）。"
 
-#: includes/Members/Privacy.php:256
+#: includes/Members/Privacy.php:261
 msgid "Status"
 msgstr "狀態"
 
-#: includes/Members/Privacy.php:260
+#: includes/Members/Privacy.php:265
 msgid "Time zone"
 msgstr "時區"
 
-#: includes/Members/Privacy.php:264
+#: includes/Members/Privacy.php:269
 msgid "Language"
 msgstr "語言"
 
-#: includes/Members/Privacy.php:279
+#: includes/Members/Privacy.php:284
 msgid "Daily letter"
 msgstr "每日運勢信"
 
-#: includes/Members/Privacy.php:279
+#: includes/Members/Privacy.php:284
 msgid "Daily letter (waiting for confirmation)"
 msgstr "每日運勢信（等待確認）"
 
@@ -810,6 +808,7 @@ msgid "The human check did not pass. Try it again."
 msgstr "人機驗證沒有通過，請再試一次。"
 
 #: includes/Daily/Signup.php:105
+#: includes/Members/Shortcodes.php:92
 msgid "Complete the human check above the button first."
 msgstr "請先完成按鈕上方的人機驗證。"
 
@@ -894,10 +893,12 @@ msgid "One more step: check your inbox and confirm your e-mail address."
 msgstr "還差一步：到信箱按確認。"
 
 #: includes/Daily/FluentFormsEntry.php:239
+#: includes/Members/Me.php:152
 msgid "The confirmation mail could not be sent. Try again later."
 msgstr "確認信寄不出去，請稍後再試。"
 
 #: includes/Daily/FluentFormsEntry.php:241
+#: includes/Members/Me.php:151
 msgid "Today’s confirmation mails are used up. Try again tomorrow."
 msgstr "今天的確認信已寄完，請明天再試。"
 
@@ -941,3 +942,57 @@ msgstr "每日運勢信訂閱表單紀錄"
 #: includes/Admin/SettingsPage.php:488
 msgid "On: what the visitor sent, including birth date, birth time and birthplace, is stored in Fluent Forms without encryption. Site administrators can read it, and it is in database backups. Off: nothing more is stored; entries already stored stay until you delete them in Fluent Forms. Erasing personal data or unsubscribing removes that person’s entries either way."
 msgstr "開：訪客送出的內容（含生日、出生時間、出生地）以明文存在 Fluent Forms，網站管理員看得到，資料庫備份裡也會有。關：之後不再存；已經存下的會保留，要到 Fluent Forms 後台刪除。無論開關，清除個人資料或退訂都會刪掉當事人的紀錄。"
+
+#: includes/Admin/SettingsPage.php:347
+msgid "Members can save their own birth data, charts and the people they read for ([aw_oracle_me], [aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
+msgstr "會員可以存自己的出生資料、命盤和幫忙算的對象（[aw_oracle_me]、[aw_oracle_my_charts]、[aw_oracle_persons]）。姓名與出生資料以放在 wp-config.php 的金鑰加密，金鑰不進資料庫，所以資料庫備份裡只有密文。"
+
+#: includes/Members/Me.php:129
+msgid "Fill in your birth data first."
+msgstr "請先填你的出生資料。"
+
+#: includes/Members/Privacy.php:133
+msgid "My own birth data"
+msgstr "這是我自己的出生資料"
+
+#: includes/Members/Privacy.php:133
+msgid "Yes"
+msgstr "是"
+
+#: includes/Members/Shortcodes.php:83
+msgid "My birth data"
+msgstr "我的出生資料"
+
+#: includes/Members/Shortcodes.php:84
+msgid "Fill it in once. The tools start with it, and you can subscribe to the daily letter with it."
+msgstr "填一次就好。算命工具會直接帶入，也可以用它訂閱每日運勢信。"
+
+#: includes/Members/Shortcodes.php:85
+msgid "You have not filled it in yet."
+msgstr "你還沒有填。"
+
+#: includes/Members/Shortcodes.php:86
+msgid "Fill in my birth data"
+msgstr "填我的出生資料"
+
+#: includes/Members/Shortcodes.php:87
+msgid "Or use a chart you already saved:"
+msgstr "或直接用你存過的命盤："
+
+#: includes/Members/Shortcodes.php:88
+msgid "Me"
+msgstr "我"
+
+#: includes/Members/Shortcodes.php:89
+msgid "Subscribe the daily letter with my birth data"
+msgstr "用我的出生資料訂閱每日運勢信"
+
+#. translators: %s: the member's e-mail address
+#: includes/Members/Shortcodes.php:91
+#, php-format
+msgid "The letter goes to %s. We send a confirmation mail first."
+msgstr "運勢信會寄到 %s。我們先寄一封確認信給你。"
+
+#: includes/Members/Shortcodes.php:93
+msgid "My other charts"
+msgstr "我的其他命盤"

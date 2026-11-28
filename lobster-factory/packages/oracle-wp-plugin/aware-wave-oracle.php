@@ -86,6 +86,8 @@ add_action( 'plugins_loaded', array( Seo\TranslatedTitles::class, 'register' ), 
 ( new Members\Privacy() )->register();
 // Member ticket for AI readings: POST aworacle/v1/ticket (login + nonce), handed to the frame by embed-same-origin.js.
 ( new Members\Ticket() )->register();
+// "Me": the member's own birth data (one saved chart), its one-click daily subscription and tool prefill.
+( new Members\Me() )->register();
 
 // Daily fortune letter (mailer = fluentcrm): signup [aw_oracle_daily] / block, REST daily/subscribe, Resend
 // bounce/complaint webhook, own confirmation link for already-subscribed contacts, hourly run, FluentCRM events.

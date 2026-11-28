@@ -89,6 +89,14 @@ final class Renderer {
 					'nonce' => wp_create_nonce( 'wp_rest' ),
 				)
 				: null,
+			// Logged-in members only: the framed tool may ask the parent for the member's own birth data. Only the
+			// address of the request is in the page; the data is fetched when asked (Members\Me).
+			'me'        => is_user_logged_in()
+				? array(
+					'url'   => esc_url_raw( rest_url( \AwareWave\Oracle\Members\Rest::NS . '/me' ) ),
+					'nonce' => wp_create_nonce( 'wp_rest' ),
+				)
+				: null,
 		);
 		wp_add_inline_script( self::SCRIPT_SAME, 'window.AWORACLE_SAME=' . wp_json_encode( $config ) . ';', 'before' );
 	}

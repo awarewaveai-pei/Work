@@ -246,6 +246,7 @@ final class Store {
 		if ( $userId <= 0 ) {
 			return 0;
 		}
+		Me::forget( $userId );
 		$removed = 0;
 		foreach ( array_keys( self::KINDS ) as $kind ) {
 			if ( self::tableExists( $kind ) ) {

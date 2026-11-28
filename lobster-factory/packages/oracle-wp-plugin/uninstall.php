@@ -1,7 +1,7 @@
 <?php
 /**
  * Removes the plugin's options (settings, site key, pseudonym salt, Turnstile secret), the tool-list cache and the member
- * tables (saved charts and persons), the daily-letter tables and schedules, and the ticket rate counters —
+ * tables (saved charts and persons) and the "me" marks, the daily-letter tables and schedules, and the ticket rate counters —
  * on every site of a multisite network (the plugin may have been active on any of them).
  * FluentCRM contacts and campaigns stay: they belong to FluentCRM.
  *
@@ -28,6 +28,8 @@ function aworacle_uninstall_site(): void {
 	delete_option( 'aworacle_daily_last_run' );
 	delete_option( 'aworacle_daily_confirm_count' );
 	delete_option( 'aworacle_ff_unpublished' ); // the Fluent Forms signup form stays, unpublished
+	// Members' "this chart is me" marks: left behind, a reinstall's new ids could point them at another chart.
+	delete_metadata( 'user', 0, $GLOBALS['wpdb']->get_blog_prefix() . 'aworacle_self_chart', '', true );
 	\AwareWave\Oracle\Members\Store::drop();
 }
 

@@ -12,6 +12,8 @@
 namespace AwareWave\Oracle\Members;
 
 use AwareWave\Oracle\Admin\SettingsPage;
+use AwareWave\Oracle\Daily\Runner;
+use AwareWave\Oracle\Daily\Turnstile;
 use AwareWave\Oracle\Embed\Renderer;
 use AwareWave\Oracle\Places\Birthplace;
 use AwareWave\Oracle\Settings\Options;
@@ -19,7 +21,9 @@ use AwareWave\Oracle\Settings\Options;
 final class Shortcodes {
 
 	const SCRIPT = 'aworacle-members';
+	// "me" is the member's own birth data alone, to place anywhere (an account page); "charts" shows it on top.
 	const TAGS   = array(
+		'aw_oracle_me'        => 'me',
 		'aw_oracle_my_charts' => 'charts',
 		'aw_oracle_persons'   => 'persons',
 	);
@@ -54,7 +58,15 @@ final class Shortcodes {
 	}
 
 	private static function enqueue(): void {
-		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/members.js', array( Birthplace::enqueue() ), AWORACLE_VERSION, true );
+		// The one-click subscription: only while the daily letter is on, with its human check when set up.
+		$daily     = Runner::offReason() === '';
+		$turnstile = $daily ? Turnstile::siteKey() : '';
+		$deps      = array( Birthplace::enqueue() );
+		if ( $turnstile !== '' ) {
+			wp_enqueue_script( 'aworacle-turnstile', Turnstile::SCRIPT_URL, array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
+			$deps[] = 'aworacle-turnstile';
+		}
+		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/members.js', $deps, AWORACLE_VERSION, true );
 		Renderer::enqueueFormStyle();
 		if ( self::$configured ) {
 			return;
@@ -63,7 +75,22 @@ final class Shortcodes {
 		$config = array(
 			'root'   => esc_url_raw( rest_url( Rest::NS . '/' ) ),
 			'nonce'  => wp_create_nonce( 'wp_rest' ),
+			'daily'  => $daily,
+			'locale' => Renderer::locale(),
+			'turnstile' => $turnstile,
+			'action' => Turnstile::ACTION,
 			'labels' => array(
+				'me'          => __( 'My birth data', 'aware-wave-oracle' ),
+				'meNote'      => __( 'Fill it in once. The tools start with it, and you can subscribe to the daily letter with it.', 'aware-wave-oracle' ),
+				'meNone'      => __( 'You have not filled it in yet.', 'aware-wave-oracle' ),
+				'meNew'       => __( 'Fill in my birth data', 'aware-wave-oracle' ),
+				'mePick'      => __( 'Or use a chart you already saved:', 'aware-wave-oracle' ),
+				'meName'      => __( 'Me', 'aware-wave-oracle' ),
+				'subscribe'   => __( 'Subscribe the daily letter with my birth data', 'aware-wave-oracle' ),
+				/* translators: %s: the member's e-mail address */
+				'subscribeTo' => __( 'The letter goes to %s. We send a confirmation mail first.', 'aware-wave-oracle' ),
+				'captcha'     => __( 'Complete the human check above the button first.', 'aware-wave-oracle' ),
+				'otherCharts' => __( 'My other charts', 'aware-wave-oracle' ),
 				'charts'      => __( 'My charts', 'aware-wave-oracle' ),
 				'persons'     => __( 'People I saved', 'aware-wave-oracle' ),
 				'personsNote' => __( 'Only you can see these. Nobody is told that you saved them.', 'aware-wave-oracle' ),

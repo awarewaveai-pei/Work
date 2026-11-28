@@ -344,7 +344,7 @@ final class SettingsPage {
 	 */
 	private function storageSection(): void {
 		echo '<h2>' . esc_html__( 'Member data', 'aware-wave-oracle' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext.', 'aware-wave-oracle' ) . '</p>';
+		echo '<p>' . esc_html__( 'Members can save their own birth data, charts and the people they read for ([aw_oracle_me], [aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext.', 'aware-wave-oracle' ) . '</p>';
 		if ( Options::dataKeyStatus() === 'ok' ) {
 			echo '<p><strong>' . esc_html__( 'Saving is on.', 'aware-wave-oracle' ) . '</strong> ' . esc_html__( 'Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read.', 'aware-wave-oracle' ) . '</p>';
 			return;
