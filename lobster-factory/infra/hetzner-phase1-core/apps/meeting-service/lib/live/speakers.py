@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import gc
 import json
+import math
 import os
 import threading
 import uuid
@@ -292,7 +293,8 @@ class Voices:
         if not isinstance(data, list):
             raise VoicesUnreadable(f"聲音檔 {self.path} 的內容不是清單，沒有動它；請檢查或移走這個檔案")
         return [v for v in data if isinstance(v, dict) and {"id", "name", "vector"} <= v.keys()
-                and isinstance(v["vector"], list) and len(v["vector"]) == DIM]
+                and isinstance(v["vector"], list) and len(v["vector"]) == DIM
+                and all(isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in v["vector"])]
 
     @contextlib.contextmanager
     def _locked(self):
@@ -316,9 +318,14 @@ class Voices:
 
     def _write(self, items: list) -> None:
         tmp = f"{self.path}.{uuid.uuid4().hex}.tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(items, f, ensure_ascii=False)
-        os.replace(tmp, self.path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(items, f, ensure_ascii=False)
+            os.replace(tmp, self.path)
+        finally:
+            # A replace that failed must not leave vectors behind in a temp file (a later delete would miss them).
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
 
     def save(self, name: str, vector) -> dict:
         with self._locked():

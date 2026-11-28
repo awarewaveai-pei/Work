@@ -57,6 +57,14 @@ class Grouping(unittest.TestCase):
         self.assertEqual(c.add(2, near(B), 3.0)[0], "講者 1")
 
 
+    def test_a_listening_of_only_short_lines_stays_one_speaker_after_the_regroup(self):
+        # Codex 2026-11-29 said each vector-less line becomes its own speaker at stop; it does not.
+        c = speakers.Clusters()
+        for i in range(3):
+            c.add(i, None, 0.6)
+        self.assertEqual({who for who, _ in c.regroup().values()}, {"講者 1"})
+
+
 class SavedVoices(unittest.TestCase):
     def test_a_deleted_voice_is_never_matched_again_and_no_longer_names_anyone(self):
         with tempfile.TemporaryDirectory() as d:
@@ -83,6 +91,23 @@ class SavedVoices(unittest.TestCase):
                 voices.save("王經理", B)
             with open(path, encoding="utf-8") as f:
                 self.assertIn("林經理", f.read(), "the saved voices are still there to repair")
+
+    def test_a_saved_vector_that_is_not_all_numbers_is_left_out(self):
+        # Codex 2026-11-29: 256 strings passed the length check and broke starting to listen.
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "voices.json")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write('[{"id": "a1", "name": "x", "vector": ' + str(["0.1"] * speakers.DIM).replace("'", '"') + '}]')
+            self.assertEqual(speakers.Voices(path).load(), [])
+
+    def test_a_failed_save_leaves_no_temp_file_holding_vectors(self):
+        # Codex 2026-11-29: the temp file of a failed replace kept the vectors after a later delete.
+        with tempfile.TemporaryDirectory() as d:
+            voices = speakers.Voices(os.path.join(d, "voices.json"))
+            with mock.patch.object(speakers.os, "replace", side_effect=PermissionError("busy")):
+                with self.assertRaises(PermissionError):
+                    voices.save("林經理", A)
+            self.assertEqual([n for n in os.listdir(d) if n.endswith(".tmp")], [])
 
     def test_the_voices_file_is_never_inside_the_repository(self):
         repo = speakers.HERE

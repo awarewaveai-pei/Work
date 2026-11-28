@@ -491,6 +491,10 @@ class Archive:
             except OSError as e:
                 self._lose_audio(e)
 
+    def write_again(self) -> None:
+        """After end(): the transcript files once more (lines or labels that arrived late); the recording is closed."""
+        self._write_quietly(tries=2)
+
     def end(self) -> str:
         """Stop saving: close the recording and write the transcript one last time. Returns the folder."""
         if not self.ended:

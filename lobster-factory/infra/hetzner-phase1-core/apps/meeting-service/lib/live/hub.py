@@ -494,6 +494,10 @@ class Hub:
                 pass
             if archive is not None:
                 archive.end()
+                if self.closing is not None and not self.closing.done():
+                    # Saved now so nothing waits longer; the labels the closing still produces follow.
+                    closing = self.closing
+                    closing.add_done_callback(lambda _: archive.write_again())
         finally:
             if archive_task is not None:
                 archive_task.cancel()
@@ -612,6 +616,8 @@ class Hub:
     def _speaker_command(self, kind: str, cmd: dict) -> None:
         """Renames are for this listening (until it is saved the last time); saved voices outlive it."""
         s, t = self._session(), self.tracker
+        if t is not None and t.regrouping:
+            return s.status("正在重新分出講者，幾秒後再改")
         if kind == "voice-delete":
             try:
                 speakers.delete_voice(speakers.Voices(), t.clusters if t is not None else None, str(cmd.get("id", "")))
@@ -625,8 +631,6 @@ class Hub:
             return self.emit(self._speakers_view())
         if t is None or not (self.listening or self.finalizing is not None):
             return s.status("要在開了「即時分講者」的聆聽中（或剛停止、還在存檔時）才能改名或記住聲音")
-        if t.regrouping:
-            return s.status("正在重新分出講者，幾秒後再改")
         name = clean_text(str(cmd.get("name", ""))).strip()[:NAME_MAX].strip()
         if not name:
             return s.status("名字不能是空的")
