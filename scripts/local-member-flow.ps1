@@ -36,13 +36,19 @@
 .PARAMETER KeepRunning
   結束時不關 php -S 與 stub（除錯用）。
 
+.PARAMETER Theme
+  啟用這個佈景（目錄須已在本機 wp-content\themes；正式站預演時放正式站同版本的佈景）。不給 = 不動佈景。
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\scripts\local-member-flow.ps1
+.EXAMPLE
+  powershell -ExecutionPolicy Bypass -File .\scripts\local-member-flow.ps1 -Theme twentytwentyfive
 #>
 param(
     [int]$Port = 18770,
     [int]$StubPort = 18771,
-    [switch]$KeepRunning
+    [switch]$KeepRunning,
+    [string]$Theme = ""
 )
 
 Set-StrictMode -Version Latest
@@ -118,6 +124,7 @@ $null = Invoke-WpOk "set home" option update home $base
 $null = Invoke-WpOk "set siteurl" option update siteurl $base
 # permalink_structure stays empty (plain ?page_id= URLs): the fresh install default, and php -S needs no rewrite router
 $null = Invoke-Wp config set DISABLE_WP_CRON true --raw --type=constant   # no loopback request: php -S is single-threaded
+if ($Theme) { $null = Invoke-WpOk "activate theme $Theme" theme activate $Theme }
 
 # 2) WooCommerce, then this repo's plugin (copied, so the run always tests the working tree)
 if ((Invoke-Wp plugin is-installed woocommerce).Code -ne 0) { $null = Invoke-WpOk "install woocommerce" plugin install woocommerce }
@@ -322,6 +329,15 @@ try {
         $fails++
         $results += [pscustomobject]@{ Scenario = "member-deleted"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($delReqs.Count) member_deleted events for user $goneId (expected 1, signed, stamped)" }
     }
+
+    # 邀請落地頁 (W6 checklist): a signed-out visitor opening /?aw_invite=<code> lands on My Account (200 after the redirect)
+    try {
+        $land = Invoke-WebRequest -UseBasicParsing -Uri "$base/?aw_invite=$(New-Secret 43)" -TimeoutSec 30
+        $ok = $land.StatusCode -eq 200 -and $land.BaseResponse.ResponseUri.AbsoluteUri -notmatch "aw_invite="
+        $why = if ($ok) { "" } else { "status $($land.StatusCode), ended at $($land.BaseResponse.ResponseUri.AbsoluteUri)" }
+    } catch { $ok = $false; $why = "request failed: $($_.Exception.Message)" }
+    if ($ok) { $results += [pscustomobject]@{ Scenario = "invite-landing"; Verdict = "PASS"; Screenshot = "-"; Problems = "" } }
+    else { $fails++; $results += [pscustomobject]@{ Scenario = "invite-landing"; Verdict = "FAIL"; Screenshot = "-"; Problems = $why } }
 
     # the stub saw only well-formed, correctly signed, fresh requests (signature + body shape + no wp-handoff body)
     $reqs = if (Test-Path -LiteralPath $stubLog) { @(Get-Content -LiteralPath $stubLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
