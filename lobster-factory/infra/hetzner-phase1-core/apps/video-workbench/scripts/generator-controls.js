@@ -104,6 +104,16 @@ function generatorModelForAudio(audio) {
   if (vm.audio === want && vm.available !== false) return vm;
   return VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).find((m) => m.audio === want && m.available !== false && !m.requiresImage) || null;
 }
+// How many pictures one run of this model takes (the server's per-model maxImages; an older server = the top-level number).
+function generatorMaxImages(vm) {
+  return Number.isInteger(vm?.maxImages) ? vm.maxImages : VideoWorkbench.capabilities?.maxVideoImages ?? 1;
+}
+// The one sentence about pictures under the prompt and on each model button.
+function generatorImageLimitText(vm) {
+  const n = generatorMaxImages(vm);
+  if (n === 1) return vm.requiresImage ? "必須放 1 張參考圖（當第一格）" : "只能放 1 張參考圖";
+  return "最多 " + n + " 張參考圖" + (vm.firstFrame ? "（1 張當第一格，2 張以上當角色參考）" : "") + (vm.multiImageDurations ? "，2 張以上只能 " + vm.multiImageDurations.join("／") + " 秒" : "");
+}
 function generatorReferences() {
   const groups = state.refs[state.mode] || {};
   const keys = state.mode === "reference"
@@ -222,8 +232,8 @@ function generatorSyncPrompt() {
     const serviceKind = state.mode === "image" ? "image" : state.mode === "spoken" ? "audio" : "video";
     status.textContent = !c[serviceKind] ? "此生成服務尚未設定；草稿、素材與設定可正常保存。" : state.mode === "spoken"
       ? "目前輸出配音音檔。人物對嘴與聲音複製尚未接入；送出依服務用量計費。"
-      : ["reference", "cartoon", "director", "product"].includes(state.mode) && c.maxVideoImages === 1
-        ? (() => { const vm = generatorVideoModel(); return generatorVideoBlock() || `目前影片模型 ${vm.label}：${vm.requiresImage ? "必須一張" : "單張"}參考圖、${vm.ratios.join("／")}、720p、${vm.durations.join("／")} 秒；影片、音訊及尾幀控制尚未接入。可先保存完整草稿。`; })()
+      : ["reference", "cartoon", "director", "product"].includes(state.mode)
+        ? (() => { const vm = generatorVideoModel(); return generatorVideoBlock() || `目前影片模型 ${vm.label}：${generatorImageLimitText(vm)}、${vm.ratios.join("／")}、720p、${vm.durations.join("／")} 秒；影片、音訊及尾幀控制尚未接入。可先保存完整草稿。`; })()
         : "送出依服務實際用量計費；可從歷史紀錄查看任務與成果。";
   }
 }
@@ -247,7 +257,9 @@ function generatorValidation(input) {
     if (settings.watermark !== "不套用" && !caps.generationWatermark) throw Error("請使用應用工具中的影片浮水印，生成服務尚未支援此選項。");
     const refs = Object.values(input.references || {}).flat();
     if (!caps.multiModalReferences && refs.some((r) => /^(video|audio)\//.test(r.type || "") || ["video", "audio"].includes(r.kind))) throw Error("目前影片服務只接受圖片參考；影片及音訊參考需要其他服務。");
-    if (caps.maxVideoImages != null && refs.length > caps.maxVideoImages) throw Error(`目前影片服務最多接受 ${caps.maxVideoImages} 張參考圖。`);
+    const maxImages = generatorMaxImages(vm);
+    if (refs.length > maxImages) throw Error(maxImages === 1 ? vm.label + " 只能放 1 張參考圖；請移除其他圖片，或換成能放多張的模型。" : vm.label + " 最多放 " + maxImages + " 張參考圖；請移除多餘圖片。");
+    if (refs.length > 1 && vm.multiImageDurations && !vm.multiImageDurations.includes(Number(settings.duration))) throw Error(vm.label + " 放 2 張以上參考圖時只能做 " + vm.multiImageDurations.join("、") + " 秒；請調整影片長度。");
     if (vm.requiresImage && !refs.length) throw Error(vm.label + " 需要一張參考圖當第一格畫面；請先加入圖片。");
   }
 }

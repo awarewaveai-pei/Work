@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-29（續1）— 筆電對齊遠端 71 個提交；影片工作台「多張參考圖」收尾提交
+
+- 根因：2026-11-27 額度用完時「影片模型可放多張參考圖」寫完未提交；之後操作者用手機推了 71 個提交，筆電 `main` 落後且 94 個 tracked 檔 dirty，`ao-resume.ps1 -FullMainlineParity` 被 `agency-os/TASKS.md` 一處衝突擋住（平台監工那行兩邊都改）。
+- 步驟：
+  - 對齊：`TASKS.md` 三方合併（`git merge-file`），衝突行採 origin（第 12 批已上線），本機的 2026-10-30 歸檔搬移保留；暫還原 `TASKS.md` → `python scripts/git-parity-merge.py --root . --target origin/main`（40 檔帶過、14 個相同的 untracked 轉 tracked）→ 放回合併結果。`VW` = `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`。
+  - 功能：每個影片模型帶供應商自己的張數上限（Veo 3.1＝3 張走 `reference_images`、限 8 秒、不與第一格同送；Gemini Omni＝6 張走 `task: reference_to_video`；Runway／Veo 3.1 Fast／Luma＝1 張）。`VW/backend/generation-policy.cjs` `checkVideoImages` 一個檢查，`validate` 與實際送出都呼叫；頁面讀 `/capabilities` 每個模型的 `maxImages`。
+  - Codex 第一輪 2 條（皆屬實、已修）：① 沒有 `url` 的參考圖會被默默丟掉 → `generation-policy.cjs` `referenceList` 成為 validate 與 `api.cjs` 共用的唯一清單，沒檔案的直接拒絕；② `referenceMode: "first"` 加第二張圖會失去首幀 → `checkVideoImages` 拒絕。
+  - Codex 第二輪 1 條不採納：「Veo 3.1 多圖限 16:9」。Replicate `google/veo-3.1` 規格頁現行版本（created_at 2026-11-18）的 `reference_images` 說明只寫 8 秒；16:9 是 2025-10-15 舊版本的文字。
+  - 4 份 `agency-os/docs/CODEX_HANDOFF_*_2026-08-3x.md` 在工作樹是刪除狀態（至少自 2026-10-24；對話紀錄無刪除指令、WORKLOG 無紀錄、仍被 `GOVERNED_SYSTEM_BUILD_SOP.md` 與 `systems/registry.json` 引用）→ `git show HEAD:<檔>` 還原。
+- 驗證：
+  - `node tests/replicate-video.cjs` 8 段 PASS（新增：多張參考圖、無檔案拒絕、首幀模式第二張拒絕、Omni 3 張送出與第 7 張拒絕）
+  - 其餘不開瀏覽器且含 `references` 的 24 支測試 PASS；next-admin `npx vitest run lib/ai/__tests__/video-motion-models.test.ts` 3/3、`npx tsc --noEmit` 0
+  - 對齊後 `git rev-list --left-right --count main...origin/main` → `0 0`
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/replicate-video.cjs; npx vitest run lib/ai/__tests__/video-motion-models.test.ts; npx tsc --noEmit | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=checkVideoImages|referenceList|maxReferenceImages|referenceImageUrls|maxVideoImages|multiImageDurations | hits=43
+- ORACLE: Codex `agency-os/reports/oracle/2026-11-29-partialreview-d92f98a7.md`（2 條皆修）、`agency-os/reports/oracle/2026-11-29-partialreview-de615367.md`（1 條不採納，理由如上）
+- 與本次無關的既有失敗：`VW/tests/privacy.cjs`（筆電未裝 `onnxruntime-node`）、`VW/tests/director-conversation.cjs`（還原成 HEAD 一樣逾時）
+- 剩餘風險：多張參考圖沒有對真實供應商跑過（要花錢）；Veo 3.1 多圖 9:16 依現行規格放行，若供應商實際拒絕，任務會在送出後失敗。未部署（`DEPLOY_HOLD` 仍在；video-workbench 需手動部署）。
+- 未收：11-23／11-24／11-26 三次 AO-CLOSE 留下的記憶日記、同步時間戳、狀態報告仍未提交——健康檢查卡在 `audit-detector-contract.ps1`（`detector-contract-legacy.txt` 有 2 行過期：`cf-iprefresh-LATEST.json`、`monthly-LATEST.json`）。
+- rollback：`git revert <本提交>`；新欄位 `maxImages`／`multiImageDurations` 舊頁面不讀。
 ## 2026-11-28（續2）— next-admin CI 紅：site-flow 測試寫死 bridge 0.22.0，main 釘到 0.23.0 後 10 案紅（擋夜間自動部署）
 
 - [根因] `ff49d498`（11-27）把 `lib/wp-plugin-stack-catalog.ts` bridge `releaseVersion` 0.22.0→0.23.0；`lib/site-flow/__tests__/integration-steps.test.ts:219` 假站版本寫死 `"0.22.0"` → bridge 步驟 verify「需要至少 0.23.0」→ 10 案紅。origin/main 臨時 worktree 重現同樣 10 紅，非 PR #34 引入。CI 紅時 `sg-deploy.sh` step 1.87 拒絕部署 → 夜間自動部署卡住。

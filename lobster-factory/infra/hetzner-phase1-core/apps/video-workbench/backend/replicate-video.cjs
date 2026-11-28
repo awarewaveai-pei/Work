@@ -28,10 +28,10 @@ async function call(fetchImpl, env, url, init = {}) {
   return r.json();
 }
 
-/** Starts one prediction; returns its id. imageUrl = data URL or omitted. */
-async function create({ model, prompt, imageUrl, ratio, seconds, env, fetchImpl, signal }) {
+/** Starts one prediction; returns its id. imageUrl = one data URL (the first frame); referenceImageUrls = two or more (subject references). */
+async function create({ model, prompt, imageUrl, referenceImageUrls, ratio, seconds, env, fetchImpl, signal }) {
   const config = MOTION_MODELS[model];
-  const input = config.buildInput({ imageUrl, prompt, aspectRatio: ratio, durationSec: seconds, resolution: "720p" });
+  const input = config.buildInput({ imageUrl, referenceImageUrls, prompt, aspectRatio: ratio, durationSec: seconds, resolution: "720p" });
   const prediction = await call(fetchImpl, env, API + "/models/" + config.slug + "/predictions", { method: "POST", body: JSON.stringify({ input }), signal });
   if (typeof prediction.id !== "string") throw Error("Replicate 沒有回傳任務編號");
   return prediction.id;

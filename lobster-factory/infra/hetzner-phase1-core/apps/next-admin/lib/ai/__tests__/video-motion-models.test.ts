@@ -26,6 +26,11 @@ describe("video-motion-models", () => {
     expect(MOTION_MODELS["veo-3-1-fast"].buildInput(base)).not.toHaveProperty("image");
     expect(MOTION_MODELS["veo-3-1-fast"].buildInput({ ...base, imageUrl: "u", resolution: "720p" })).toMatchObject({ image: "u", resolution: "720p", generate_audio: false });
     expect(MOTION_MODELS["luma-ray-3-2"].buildInput({ ...base, imageUrl: "u" })).toMatchObject({ start_image: "u", resolution: "720p" });
+    // Subject references: only Veo 3.1 has the field; they replace the first frame, and the others ignore them.
+    expect(MOTION_MODELS["veo-3-1"].buildInput({ ...base, imageUrl: "u", referenceImageUrls: ["a", "b"] })).toMatchObject({ reference_images: ["a", "b"] });
+    expect(MOTION_MODELS["veo-3-1"].buildInput({ ...base, imageUrl: "u", referenceImageUrls: ["a", "b"] })).not.toHaveProperty("image");
+    expect(MOTION_MODELS["veo-3-1-fast"].buildInput({ ...base, referenceImageUrls: ["a", "b"] })).not.toHaveProperty("reference_images");
+    expect(Object.fromEntries(Object.entries(MOTION_MODELS).map(([id, m]) => [id, m.maxReferenceImages]))).toEqual({ "runway-gen4-turbo": 1, "veo-3-1-fast": 1, "veo-3-1": 3, "luma-ray-3-2": 1 });
     expect(isVideoMotionModel("sora-2")).toBe(false);
     expect(isVideoMotionModel("toString")).toBe(false);
   });

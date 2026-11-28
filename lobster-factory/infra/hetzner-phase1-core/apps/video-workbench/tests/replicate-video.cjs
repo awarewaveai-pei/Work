@@ -58,6 +58,10 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
       assert.equal(m.available, true);
     }
     assert.equal(caps.videoModels.find((m) => m.id === OMNI).available, false);
+    // Each model carries its vendor's own picture limit; the top-level number is the default model's.
+    assert.deepEqual(Object.fromEntries(caps.videoModels.map((m) => [m.id, m.maxImages])), { "veo-3-1-fast": 1, [OMNI]: 6, "runway-gen4-turbo": 1, "veo-3-1": 3, "luma-ray-3-2": 1 });
+    assert.deepEqual(caps.videoModels.find((m) => m.id === "veo-3-1").multiImageDurations, [8]);
+    assert.equal(caps.maxVideoImages, 1);
     console.log("PASS capabilities（無 Gemini 金鑰）：預設 Veo 3.1 Fast，Omni 列出但不可用，價格出自 cost-model.ts");
   }
   // 2. Each Replicate model: request body = next-admin buildInput; result saved; origin and cost = rate x seconds.
@@ -113,6 +117,43 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
     assert.equal(fake.calls.length, 0, "被拒的任務呼叫了供應商");
   }
   console.log("PASS 送出前就拒：Runway 沒圖、Luma 8 秒、沒有 Replicate 金鑰，皆未呼叫供應商");
+  // 4b. More than one picture: each model takes what its vendor takes. Veo 3.1 sends 2-3 as reference_images (8 s only,
+  // no first frame beside them); a model with one picture refuses a second before any call.
+  {
+    const fake = fakeProviders();
+    const { base } = await isolatedServer("vw-rv-multi-", { fetchImpl: fake.fetchImpl, env });
+    const call = api(base);
+    const ref = "data:image/png;base64," + png.toString("base64");
+    const pictures = (n) => ({ references: { images: Array.from({ length: n }, () => ({ url: ref, type: "image/png" })) } });
+    for (const id of ["runway-gen4-turbo", "veo-3-1-fast", "luma-ray-3-2"]) {
+      const refused = await call("/generations", video(id, { duration: MOTION_MODELS[id].defaultDurationSec, input: pictures(2) }));
+      assert.equal(refused.status, 400, id);
+      assert.match(refused.body.error.message, /只能放 1 張參考圖/, id);
+    }
+    const four = await call("/generations", video("veo-3-1", { duration: 8, input: pictures(4) }));
+    assert.equal(four.status, 400);
+    assert.match(four.body.error.message, /最多放 3 張/);
+    const short = await call("/generations", video("veo-3-1", { duration: 4, input: pictures(2) }));
+    assert.equal(short.status, 400);
+    assert.match(short.body.error.message, /只能做 8 秒/);
+    // What validate counts is what the run sends: a picture with no file is refused, not dropped.
+    const empty = await call("/generations", video("veo-3-1", { duration: 8, input: { references: { images: [{ url: ref, type: "image/png" }, { url: ref, type: "image/png" }, { url: "", type: "image/png" }] } } }));
+    assert.equal(empty.status, 400);
+    assert.match(empty.body.error.message, /沒有檔案/);
+    // A first-frame run keeps its first frame: a second picture is refused instead of turning both into references.
+    const framed = await call("/generations", video("veo-3-1", { duration: 8, input: { referenceMode: "first", references: { firstFrame: [{ url: ref, type: "image/png" }], images: [{ url: ref, type: "image/png" }] } } }));
+    assert.equal(framed.status, 400);
+    assert.match(framed.body.error.message, /首幀參考只能放 1 張/);
+    assert.equal(fake.calls.length, 0, "被拒的任務呼叫了供應商");
+    const sent = await call("/generations", video("veo-3-1", { duration: 8, input: pictures(3) }));
+    assert.equal(sent.status, 202, JSON.stringify(sent.body));
+    assert.equal((await settle(call, sent.body.id)).status, "succeeded");
+    const body = JSON.parse(fake.calls.find((c) => c.url.includes("/v1/models/")).body).input;
+    assert.deepEqual(body.reference_images, [ref, ref, ref]);
+    assert.equal("image" in body, false, "角色參考圖與第一格同時送出");
+    assert.equal(body.duration, 8);
+  }
+  console.log("PASS 多張參考圖：只收 1 張的模型送出前就拒；Veo 3.1 收 2-3 張（限 8 秒）送 reference_images");
   // 5. Restart keeps polling the same prediction; cancel stops Replicate billing.
   {
     const fake = fakeProviders({ replicateStatus: "processing" });
@@ -213,6 +254,18 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
     assert.equal((await call("/generations/" + second.body.id + "/cancel", {})).status, 200);
     assert.ok(calls.some((c) => c.url.endsWith("/v1_omni/cancel") && c.method === "POST"), "取消沒有呼叫 Google cancel");
     assert.equal(calls.some((c) => /replicate|openai/.test(c.url)), false, "Omni 任務呼叫了別家");
+    // Several pictures: every one is sent, in order, before the text, as subject references; a 7th is refused.
+    const many = (n) => video(OMNI, { duration: 8, input: { references: { images: Array.from({ length: n }, () => ({ url: ref, type: "image/png" })) } } });
+    const posts = () => calls.filter((c) => c.method === "POST" && c.url.endsWith("/interactions"));
+    const count = posts().length;
+    assert.equal((await call("/generations", many(3))).status, 202);
+    for (let i = 0; i < 50 && posts().length === count; i++) await new Promise((r) => setTimeout(r, 50));
+    const multi = JSON.parse(posts().at(-1).body), picture = { type: "image", data: png.toString("base64"), mime_type: "image/png" };
+    assert.deepEqual(multi.input, [picture, picture, picture, { type: "text", text: "海邊日出，鏡頭慢慢推近" }]);
+    assert.deepEqual(multi.generation_config, { video_config: { task: "reference_to_video" } });
+    const tooMany = await call("/generations", many(7));
+    assert.equal(tooMany.status, 400);
+    assert.match(tooMany.body.error.message, /最多放 6 張/);
     // A length Omni is not offered at is refused before any call.
     const before = calls.length;
     assert.equal((await call("/generations", video(OMNI, { duration: 5 }))).status, 400);

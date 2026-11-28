@@ -619,7 +619,7 @@ async function panel(p) {
           VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).map((vm) => {
             const s = vm.durations.includes(seconds) ? seconds : vm.defaultDurationSec || vm.durations[0];
             const off = vm.available === false ? "尚未設定服務金鑰" : "";
-            return `<button class="option ${vm.id === generatorVideoModel().id ? "on" : ""}" data-model="${safe(vm.id)}" aria-pressed="${vm.id === generatorVideoModel().id}" ${off ? `disabled title="${off}"` : ""}><b>${safe(vm.label)}</b> · ${VideoWorkbenchVideoModels.priceText(vm, s, count)}（${s} 秒）<small>${safe(vm.vendor || vm.provider)}${vm.requiresImage ? " · 需要一張參考圖" : ""}${off ? " · " + off : ""}</small>${vm.note ? `<small class="model-note">${safe(vm.note)}</small>` : ""}</button>`;
+            return `<button class="option ${vm.id === generatorVideoModel().id ? "on" : ""}" data-model="${safe(vm.id)}" aria-pressed="${vm.id === generatorVideoModel().id}" ${off ? `disabled title="${off}"` : ""}><b>${safe(vm.label)}</b> · ${VideoWorkbenchVideoModels.priceText(vm, s, count)}（${s} 秒）<small>${safe(vm.vendor || vm.provider)} · ${generatorImageLimitText(vm)}${off ? " · " + off : ""}</small>${vm.note ? `<small class="model-note">${safe(vm.note)}</small>` : ""}</button>`;
           }).join(""),
       );
     }

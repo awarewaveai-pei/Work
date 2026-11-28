@@ -5,8 +5,11 @@ const API = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024; // same cap as replicate-video.cjs
 
 // Omni takes any whole second 3-15 (default 10) and 16:9 or 9:16; output always has native audio (no way to turn it off).
+// Pictures (aistudio.google.com/docs/omni "Image inputs", read 2026-11-27): "up to 6 reference images per request (up to
+// 3 images per character for up to 2 characters)". The model reads one picture by the prompt; two could also be read as
+// first and last frame, so two or more go with task "reference_to_video" (the workbench has no last-frame control).
 const MODELS = Object.freeze({
-  "gemini-omni-1.2-flash": Object.freeze({ defaultDurationSec: 8, durations: Object.freeze([4, 6, 8, 10, 15]), ratios: Object.freeze(["16:9", "9:16"]), requiresImage: false, audio: true }),
+  "gemini-omni-1.2-flash": Object.freeze({ defaultDurationSec: 8, durations: Object.freeze([4, 6, 8, 10, 15]), ratios: Object.freeze(["16:9", "9:16"]), requiresImage: false, maxReferenceImages: 6, audio: true }),
 });
 
 // 503 = nothing was sent (shared/runtime.js treats it as a safe rejection).
@@ -26,16 +29,21 @@ async function call(fetchImpl, env, url, init = {}) {
   return value;
 }
 
-/** Starts one background interaction; returns its id. imageUrl = data URL or omitted. */
-async function create({ model, prompt, imageUrl, ratio, seconds, env, fetchImpl, signal }) {
-  const image = imageUrl && /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(imageUrl);
-  if (imageUrl && !image) throw Error("參考圖格式無效");
+/** Starts one background interaction; returns its id. imageUrl = one data URL; referenceImageUrls = two or more (subject references). */
+async function create({ model, prompt, imageUrl, referenceImageUrls, ratio, seconds, env, fetchImpl, signal }) {
+  const urls = referenceImageUrls?.length ? [...referenceImageUrls] : imageUrl ? [imageUrl] : [];
+  const images = urls.map((url) => {
+    const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(url);
+    if (!m) throw Error("參考圖格式無效");
+    return { type: "image", data: m[2], mime_type: m[1] };
+  });
   const value = await call(fetchImpl, env, API, {
     method: "POST",
     body: JSON.stringify({
       model,
-      input: image ? [{ type: "image", data: image[2], mime_type: image[1] }, { type: "text", text: prompt }] : prompt,
+      input: images.length ? [...images, { type: "text", text: prompt }] : prompt,
       response_format: { type: "video", aspect_ratio: ratio, duration: seconds + "s", resolution: "720p" },
+      ...(images.length > 1 ? { generation_config: { video_config: { task: "reference_to_video" } } } : {}),
       background: true,
     }),
     signal,

@@ -9,6 +9,10 @@
  *     per output second by audio variant only, not resolution); generate_audio off (narration is made separately)
  *   - Luma Ray 3.2: first frame "start_image" (only with 5 s; aspect_ratio then follows the image); priced per video
  *     by resolution x duration, rate pinned for 720p 5 s
+ *
+ * Reference images (schemas read 2026-11-27): only Veo 3.1 has "reference_images" (1-3 subject references, 8 s only;
+ * "Last frame is ignored if reference images are provided"). Veo 3.1 Fast, Runway and Luma take one image, the first
+ * frame. So: imageUrl = the first frame; referenceImageUrls = subject references, sent instead of it, never with it.
  */
 
 export type VideoMotionModel =
@@ -19,6 +23,8 @@ export type VideoMotionModel =
 
 export interface MotionInputOptions {
   imageUrl?: string;
+  /** Subject references (2 or more pictures of the characters and props). Only a model with maxReferenceImages > 1 reads it. */
+  referenceImageUrls?: readonly string[];
   prompt: string;
   aspectRatio: "16:9" | "9:16";
   durationSec: number;
@@ -33,6 +39,10 @@ export interface MotionConfig {
   durations: readonly number[];
   ratios: readonly ("16:9" | "9:16")[];
   requiresImage: boolean;
+  /** Most pictures one run takes. 1 = the first frame only. */
+  maxReferenceImages: number;
+  /** Lengths allowed when more than one picture is sent (absent = every length in durations). */
+  multiImageDurations?: readonly number[];
   /** The output has a sound track. All four are silent: Veo is sent generate_audio:false, Runway and Luma make none. */
   audio: boolean;
   buildInput: (opts: MotionInputOptions) => Record<string, unknown>;
@@ -45,6 +55,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [5, 10],
     ratios: ["16:9", "9:16"],
     requiresImage: true,
+    maxReferenceImages: 1,
     audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
@@ -56,6 +67,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [4, 6, 8],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    maxReferenceImages: 1,
     audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec, resolution }) => ({
       ...(imageUrl ? { image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
@@ -68,9 +80,11 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [4, 6, 8],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    maxReferenceImages: 3,
+    multiImageDurations: [8],
     audio: false,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec, resolution }) => ({
-      ...(imageUrl ? { image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
+    buildInput: ({ imageUrl, referenceImageUrls, prompt, aspectRatio, durationSec, resolution }) => ({
+      ...(referenceImageUrls?.length ? { reference_images: [...referenceImageUrls] } : imageUrl ? { image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
       ...(resolution ? { resolution } : {}),
     }),
   },
@@ -80,6 +94,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [5],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    maxReferenceImages: 1,
     audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       ...(imageUrl ? { start_image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, resolution: "720p",

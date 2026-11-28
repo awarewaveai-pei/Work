@@ -414,10 +414,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }),
     );
   }
-  const flatten = (input) =>
-    Object.values(input.references || {})
-      .flatMap((v) => (Array.isArray(v) ? v : [v]))
-      .filter((v) => v && typeof v === "object" && v.url);
+  const flatten = generationPolicy.referenceList;
   function imageReference(url) {
     if (/^data:image\/(png|jpeg|webp);base64,/.test(url)) return url;
     const file = localFile(url, { assets: true });
@@ -999,20 +996,20 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           )
         )
           throw Error(
-            "目前影片服務僅支援單張圖片參考，影片／音訊參考需要專用服務。",
+            "目前影片服務只接受圖片參考，影片／音訊參考需要專用服務。",
           );
-        if (refs.length > 1)
-          throw Error("目前影片服務僅支援單張參考圖，請移除其他圖片。");
         const ratio = input.settings?.ratio || input.ratio || "16:9";
         if (!["16:9", "9:16"].includes(ratio))
           throw Error("目前影片服務支援 16:9 或 9:16");
         const vm = generationPolicy.videoModelOf(input, env),
           seconds = Number(input.duration || input.settings?.duration || 8);
+        generationPolicy.checkVideoImages(vm, refs.length, seconds, input.referenceMode);
         // Recorded before the call: refresh prices, labels and polls by what was sent, not by later settings.
         job.video = { id: vm.id, provider: vm.provider, model: vm.model, seconds };
         job.providerId = await generationPolicy.videoVendor(vm.provider).create({
           model: vm.id, prompt, ratio, seconds, env, fetchImpl, signal,
-          ...(refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
+          // One picture = imageUrl (the first frame where the model has one); more = subject references, all of them.
+          ...(refs.length > 1 ? { referenceImageUrls: refs.map((r) => imageReference(r.url)) } : refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
         });
         job.status = "queued";
         job.progress = 0;

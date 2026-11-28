@@ -39,7 +39,9 @@ const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDE
 // usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses). estimate = billed by the
 // finished run's token usage (GEMINI_VIDEO_RATES), so the button price is only an estimate: pages put 約 before it.
 function videoModels(env) {
-  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, firstFrame: FIRST_FRAME_MODELS.has(id), audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), estimate: Object.hasOwn(GEMINI_VIDEO_RATES, id), free: false, ...extra });
+  // maxImages = the most pictures one run of this model takes (the vendor's own limit, next-admin video-motion-models.ts
+  // and gemini-video.cjs MODELS); multiImageDurations = the lengths allowed with more than one (null = any of durations).
+  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, maxImages: m.maxReferenceImages, multiImageDurations: m.multiImageDurations ? [...m.multiImageDurations] : null, firstFrame: FIRST_FRAME_MODELS.has(id), audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), estimate: Object.hasOwn(GEMINI_VIDEO_RATES, id), free: false, ...extra });
   const rows = [
     ...Object.entries(geminiVideo.MODELS).map(([id, m]) => row(id, m, { label: GEMINI_VIDEO_RATES[id].label, vendor: "Google", provider: "Google", model: id, keyName: "GEMINI_API_KEY", available: !!env.GEMINI_API_KEY })),
     ...Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === "veo-3-1-fast") - (a === "veo-3-1-fast")).map(([id, m]) =>
@@ -52,6 +54,13 @@ function videoModels(env) {
 function videoModelOf(input, env) {
   const list = videoModels(env), id = input?.settings?.model ?? input?.model;
   return list.find((m) => m.id === id) || list[0];
+}
+// The one check of how many pictures a video run may carry; validate (before the job exists) and the run itself call it.
+// A first-frame run sends one picture as the frame; a second would turn every picture into a subject reference.
+function checkVideoImages(vm, count, seconds, referenceMode) {
+  if (referenceMode === "first" && count > 1) throw Error("首幀參考只能放 1 張圖（當第一格）；要放多張角色參考，請改用圖片參考。");
+  if (count > vm.maxImages) throw Error(vm.maxImages === 1 ? vm.label + " 只能放 1 張參考圖；請移除其他圖片，或換成能放多張的模型。" : vm.label + " 最多放 " + vm.maxImages + " 張參考圖；請移除多餘圖片。");
+  if (count > 1 && vm.multiImageDurations && !vm.multiImageDurations.includes(seconds)) throw Error(vm.label + " 放 2 張以上參考圖時只能做 " + vm.multiImageDurations.join("、") + " 秒；請調整影片長度。");
 }
 function capabilities(env, localTools) {
   return {
@@ -66,7 +75,8 @@ function capabilities(env, localTools) {
     videoModels: videoModels(env), retiredVideoModels: RETIRED_VIDEO_MODELS,
     // Top-level video limits = the default model; per-model limits are in videoModels.
     videoDurations: videoModels(env)[0].durations, videoRatios: videoModels(env)[0].ratios, videoQualities: ["720p"],
-    maxVideoImages: 1, maxImageReferences: 4, multiModalReferences: false,
+    // Top-level = the default model, like videoDurations; pages read each model's own maxImages.
+    maxVideoImages: videoModels(env)[0].maxImages, maxImageReferences: 4, multiModalReferences: false,
     imageQualities: Object.keys(imageOutputs), imageOutputs, imageExactOutput: true,
     removeBackground: !!env.REPLICATE_API_TOKEN, toolCosts,
     // Pages show prices in NT$ at next-admin's one rate (image-models.js TWD_RATE); prices stay USD everywhere else.
@@ -75,9 +85,13 @@ function capabilities(env, localTools) {
     spokespersonVideo: false, reshoot: false, advancedMedia: false, localTools,
   };
 }
+// The pictures and clips a job carries: the one list validate counts and the run sends.
+const allReferences = (input) => (Array.isArray(input.references) ? input.references : Object.values(input.references || {}).flat());
+const referenceList = (input) => allReferences(input).filter((v) => v && typeof v === "object" && v.url);
 function validate(input, type, env = process.env) {
   const settings = input.settings || {};
-  const refs = Array.isArray(input.references) ? input.references : Object.values(input.references || {}).flat();
+  const refs = referenceList(input);
+  if (refs.length !== allReferences(input).length) throw Error("有參考素材沒有檔案；請移除後重新加入。");
   if (type === "image" && refs.length > 4) throw Error("目前圖片服務最多接受 4 張參考圖；請移除多餘圖片。");
   if (type === "image" && settings.imageLayout) {
     if (settings.imageLayout === "region-preserve" && input.operation !== "region") throw Error("圖片編輯輸出設定無效");
@@ -88,8 +102,8 @@ function validate(input, type, env = process.env) {
   if (input.referenceMode === "motion") throw Error("動作參考需要專用服務，尚未接入。");
   if (input.references?.lastFrame?.length) throw Error("尾幀控制需要專用服務，尚未接入。");
   if (refs.some((r) => /^(audio|video)\//.test(r?.type || "") || ["audio", "video"].includes(r?.kind))) throw Error("目前影片服務僅支援圖片參考，影片／音訊參考需要專用服務。");
-  if (refs.length > 1) throw Error("目前影片服務僅支援單張參考圖，請移除其他圖片。");
   const vm = videoModelOf(input, env), seconds = Number(input.duration || settings.duration || 8), ratio = settings.ratio || input.ratio || "16:9";
+  checkVideoImages(vm, refs.length, seconds, input.referenceMode);
   if (!vm.durations.includes(seconds)) throw Error(vm.label + " 支援 " + vm.durations.join("、") + " 秒；請調整影片長度後送出。");
   if (!vm.ratios.includes(ratio)) throw Error("目前影片服務支援 16:9 或 9:16");
   if (vm.requiresImage && !refs.length) throw Error(vm.label + " 需要一張參考圖當第一格畫面；請先加入圖片。");
@@ -108,4 +122,4 @@ function imageDimensions(settings) {
   const dimensions = imageOutputs[settings.quality]?.[settings.ratio];
   if (settings.imageLayout !== 'center-crop' || !Array.isArray(dimensions)) throw Error('圖片輸出設定無效'); return dimensions;
 }
-module.exports = { provider, models, videoModels, videoVendor, RETIRED_VIDEO_MODELS, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };
+module.exports = { provider, models, videoModels, videoVendor, checkVideoImages, referenceList,RETIRED_VIDEO_MODELS, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };
