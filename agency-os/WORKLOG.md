@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-29（續5）— meeting-service 本機辨識聽得到小聲說話（發聲門檻跟著環境走）
+
+- 根因：本機辨識的發聲偵測用固定 RMS 0.008（移植自 OwnVoice）。操作者手機錄音說話約 0.004、背景約 0.002：只有 54% 的話被偵測，3–16 秒整段沒辨識。Gemini 不經過這個偵測。`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`。
+- 步驟：`MS/lib/live/vad.py` 新 `Level`：門檻＝最近 10 秒第 20 與第 90 百分位音量的幾何平均，至少是安靜音量的 2 倍（穩定嗡聲不算說話，Codex 抓到），上限仍 0.008（乾淨環境不變），下限 0.003；前 1 秒用 0.008。同一個 `Segmenter` 也供 `speech_regions`（Gemini 時間對齊）使用。commit `ccd7c0c7f`、`45856c31d`，推 main `246af1788`，8420 重啟。
+- 驗證：
+  - 模擬：操作者錄音說話覆蓋 54%→87%；三段乾淨錄音發聲區段數不變、邊界差 ≤ 0.12 秒
+  - `python -m pytest tests -q` → 198 passed（新：安靜環境兩句小聲話各成一段；30 秒穩定 0.004 嗡聲不成段）；突變：改回固定門檻 → 小聲測試紅，還原綠
+  - 真實（8434 本機辨識）：操作者錄音 41→65 秒、236→306 字、3–16 秒出現句子；兩種聲音乾淨檔 6 句、時間相同
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py rec3.wav local 8434 save listen=auto target=none; python -m pytest tests -q | exit=0 | ms=160000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=RMS_THRESHOLD|Level\(|speech_regions | hits=10
+- ORACLE: Codex `agency-os/reports/oracle/2026-11-29-partialreview-cac46bc7.md`（2m：嗡聲修；一開口就小聲的第一句＝能量偵測的已知限制，寫在常數旁）
+- rollback：`git revert 45856c31d ccd7c0c7f`
 ## 2026-11-29（續3）— meeting-service C18 即時分講者真人驗收未過（19%），不提供
 
 - 根因：每句 1–5 秒、手機錄的聲音算出的聲紋不穩定。操作者錄音（78 秒，pyannote 整檔判 3 人）：同一人兩句相似度中位數 0.38（合成聲音 0.9）、不同人 0.16（最高 0.45）；門檻 0.75 下 16 句分成 16 人，與整檔結果一致 3/16＝19%；事後挑最好的門檻 0.45 也只 11/16＝69%。卡片規定低於 80% 不上線。`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`。
