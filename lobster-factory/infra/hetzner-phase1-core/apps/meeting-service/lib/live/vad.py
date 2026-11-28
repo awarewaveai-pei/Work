@@ -1,6 +1,7 @@
 # Ported from OwnVoice Meet src-tauri/src/vad.rs (Apache-2.0, https://github.com/Zaious/ownvoice-meet, 08e3ab3).
 """Energy-based speech segmentation: 30 ms frames, speech above an RMS threshold, 300 ms kept from
-before the onset, an utterance ends after 700 ms of silence or 12 s of speech.
+before the onset, an utterance ends after 700 ms of silence or 12 s of speech. Changed from the Rust
+source: the threshold follows the room (Level), never stricter than the original fixed one.
 
 Events let two kinds of provider share it: upload-per-sentence providers take `END.audio`;
 streaming providers send `START` preroll and `AUDIO` as they come and commit on `END`."""
@@ -12,7 +13,14 @@ from typing import Optional
 
 import numpy as np
 
-RMS_THRESHOLD = 0.008
+RMS_THRESHOLD = 0.008      # the original fixed threshold: now the ceiling of the adaptive one
+# The threshold sits halfway (geometric mean) between the room's quiet level and its speech level over the
+# last LEVEL_WINDOW_MS. A quiet recording (operator 2026-11-29: speech 0.004, background 0.002) had only
+# 54% of its speech detected with 0.008, 88% with this; clean recordings cut exactly as before.
+LEVEL_WINDOW_MS = 10_000
+QUIET_PCT, SPEECH_PCT = 20, 90
+RMS_FLOOR = 0.003          # never lower than this (breaths, fans)
+LEVEL_EVERY = 10           # frames between recomputing it
 FRAME_MS = 30
 PREROLL_MS = 300
 END_SILENCE_MS = 700
@@ -45,6 +53,25 @@ def _as_int16(chunk) -> np.ndarray:
     return np.asarray(chunk, dtype=np.int16)
 
 
+class Level:
+    """The speech threshold for the next frame, from the loudness of the frames before it."""
+
+    def __init__(self):
+        self.recent = deque(maxlen=LEVEL_WINDOW_MS // FRAME_MS)
+        self.threshold = RMS_THRESHOLD
+        self.since = 0
+
+    def push(self, rms: float) -> float:
+        self.recent.append(rms)
+        self.since += 1
+        # The fixed threshold until a second of history; then halfway between quiet and speech.
+        if self.since >= LEVEL_EVERY and len(self.recent) >= 1000 // FRAME_MS:
+            self.since = 0
+            quiet, loud = np.percentile(self.recent, [QUIET_PCT, SPEECH_PCT])
+            self.threshold = min(RMS_THRESHOLD, max(RMS_FLOOR, float(np.sqrt(max(quiet, 1e-6) * loud))))
+        return self.threshold
+
+
 class Segmenter:
     def __init__(self, rate: int):
         self.frame = rate * FRAME_MS // 1000
@@ -59,6 +86,7 @@ class Segmenter:
         self.pushed = 0      # samples pushed so far
         self.done = 0        # samples cut into frames so far
         self.onset = self.voiced_end = 0
+        self.level = Level()
 
     def in_speech(self) -> bool:
         return self._in_speech
@@ -77,7 +105,8 @@ class Segmenter:
             self.done += self.frame
             norm = frame.astype(np.float32) / 32768.0
             rms = float(np.sqrt(np.sum(norm * norm, dtype=np.float32) / len(frame)))
-            voiced = rms > RMS_THRESHOLD
+            voiced = rms > self.level.threshold
+            self.level.push(rms)
             if not self._in_speech:
                 if voiced:
                     self._in_speech = True

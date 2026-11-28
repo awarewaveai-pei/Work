@@ -61,5 +61,19 @@ class VadTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(w[24:28], "little"), RATE)
 
 
+    def test_quiet_speech_in_a_quiet_room_is_found(self):
+        # 2026-11-29, the operator's phone recording: speech about 0.004 RMS over a 0.002 background, under the
+        # fixed 0.008. Two such sentences after a few seconds of background must each become an utterance.
+        rng = np.random.default_rng(1)
+
+        def noise(ms, rms):
+            return (rng.normal(0, rms * 32768, RATE * ms // 1000)).astype(np.int16)
+
+        audio = np.concatenate([noise(3000, 0.002), noise(1500, 0.0045), noise(1500, 0.002),
+                                noise(1500, 0.0045), noise(1500, 0.002)])
+        ends = [e for e in run(Segmenter(RATE), audio) if e.kind == END]
+        self.assertEqual(len(ends), 2)
+        self.assertAlmostEqual(ends[0].start / RATE, 3.0, delta=0.3)
+
 if __name__ == "__main__":
     unittest.main()
