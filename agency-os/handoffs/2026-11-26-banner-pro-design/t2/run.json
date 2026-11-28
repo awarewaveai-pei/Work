@@ -1,0 +1,233 @@
+{
+  "prompt": "Scene: a sunlit wooden table in a calm home art studio, watercolor palettes and brushes, dried lavender sprigs, small ceramic jars, soft window light, shallow depth of field. Composite the provided product photo INTO this scene as the hero subject. Place the product in the column x 64%-80% of the picture, centred in it, the WHOLE product inside that column and between y 0% and 100% (the part of the picture that is shown), never cropped by an edge; the product about 50% of the picture height tall -- about half of the shown height, not bigger. Physically PLACE it resting on a real surface that belongs to the scene -- a table, counter or shelf -- standing upright with its base actually touching the surface (a grounded contact shadow beneath it), NOT floating, NOT pasted flat over the background. Match the scene's camera perspective, depth of field, lighting direction and color temperature; add soft contact shadows and subtle surface reflection so it looks physically present. Keep the product's exact shape, label, colors, text and proportions unchanged -- do not distort, recolor, relabel or redraw it. Keep the whole column x 5%-52%, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.",
+  "usage": {
+    "total_tokens": 4084,
+    "total_input_tokens": 1402,
+    "input_tokens_by_modality": [
+      {
+        "modality": "text",
+        "tokens": 282
+      },
+      {
+        "modality": "image",
+        "tokens": 1120
+      }
+    ],
+    "total_cached_tokens": 0,
+    "total_output_tokens": 2083,
+    "output_tokens_by_modality": [
+      {
+        "modality": "image",
+        "tokens": 1680
+      }
+    ],
+    "total_tool_use_tokens": 0,
+    "total_thought_tokens": 599,
+    "initial_input_tokens": 1402
+  },
+  "generateMs": 34242,
+  "master": {
+    "W": 2752,
+    "H": 1536
+  },
+  "productBox": {
+    "x": 1791.5520000000001,
+    "y": 225.79199999999997,
+    "w": 363.264,
+    "h": 1050.624
+  },
+  "crops": [
+    {
+      "key": "r9x16",
+      "ok": true,
+      "crop": {
+        "x": 1541,
+        "y": 0,
+        "w": 864,
+        "h": 1536
+      },
+      "out": {
+        "w": 1080,
+        "h": 1920
+      },
+      "upscale": 1.25,
+      "upscaled": true,
+      "kb": 135
+    },
+    {
+      "key": "r2x3",
+      "ok": true,
+      "crop": {
+        "x": 1461,
+        "y": 0,
+        "w": 1024,
+        "h": 1536
+      },
+      "out": {
+        "w": 1000,
+        "h": 1500
+      },
+      "upscale": 0.98,
+      "upscaled": false,
+      "kb": 110
+    },
+    {
+      "key": "r3x4",
+      "ok": true,
+      "crop": {
+        "x": 1397,
+        "y": 0,
+        "w": 1152,
+        "h": 1536
+      },
+      "out": {
+        "w": 1080,
+        "h": 1440
+      },
+      "upscale": 0.94,
+      "upscaled": false,
+      "kb": 116
+    },
+    {
+      "key": "r4x5",
+      "ok": true,
+      "crop": {
+        "x": 1359,
+        "y": 0,
+        "w": 1229,
+        "h": 1536
+      },
+      "out": {
+        "w": 1080,
+        "h": 1350
+      },
+      "upscale": 0.88,
+      "upscaled": false,
+      "kb": 113
+    },
+    {
+      "key": "r1x1",
+      "ok": true,
+      "crop": {
+        "x": 1205,
+        "y": 0,
+        "w": 1536,
+        "h": 1536
+      },
+      "out": {
+        "w": 1080,
+        "h": 1080
+      },
+      "upscale": 0.7,
+      "upscaled": false,
+      "kb": 106
+    },
+    {
+      "key": "r4x3",
+      "ok": true,
+      "crop": {
+        "x": 704,
+        "y": 0,
+        "w": 2048,
+        "h": 1536
+      },
+      "out": {
+        "w": 1200,
+        "h": 900
+      },
+      "upscale": 0.59,
+      "upscaled": false,
+      "kb": 98
+    },
+    {
+      "key": "r3x2",
+      "ok": true,
+      "crop": {
+        "x": 448,
+        "y": 0,
+        "w": 2304,
+        "h": 1536
+      },
+      "out": {
+        "w": 1200,
+        "h": 800
+      },
+      "upscale": 0.52,
+      "upscaled": false,
+      "kb": 93
+    },
+    {
+      "key": "r16x9",
+      "ok": true,
+      "crop": {
+        "x": 21,
+        "y": 0,
+        "w": 2731,
+        "h": 1536
+      },
+      "out": {
+        "w": 1920,
+        "h": 1080
+      },
+      "upscale": 0.7,
+      "upscaled": false,
+      "kb": 150
+    },
+    {
+      "key": "r16x9hero",
+      "ok": true,
+      "crop": {
+        "x": 21,
+        "y": 0,
+        "w": 2731,
+        "h": 1536
+      },
+      "out": {
+        "w": 1920,
+        "h": 1080
+      },
+      "upscale": 0.7,
+      "upscaled": false,
+      "kb": 150
+    },
+    {
+      "key": "r191x1",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 29,
+        "w": 2752,
+        "h": 1445
+      },
+      "out": {
+        "w": 1200,
+        "h": 630
+      },
+      "upscale": 0.44,
+      "upscaled": false,
+      "kb": 80
+    },
+    {
+      "key": "r2x1",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 63,
+        "w": 2752,
+        "h": 1376
+      },
+      "out": {
+        "w": 1200,
+        "h": 600
+      },
+      "upscale": 0.44,
+      "upscaled": false,
+      "kb": 77
+    },
+    {
+      "key": "r3x1",
+      "ok": false,
+      "reason": "product_too_tall"
+    }
+  ]
+}

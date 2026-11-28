@@ -34,11 +34,26 @@
 3. 「AI 一鍵設計」與畫面步驟「AI 合成進場景」共用同一個流程模組（候選 N 張標價 → 挑一張 → 按鈕生成其他尺寸標價），程式一份。
 4. R4-C 驗收時「延伸」與「重新生成」各實打一次比較一致性與商品完整度，依結果定預設（理由寫進 PLAN）。
 
+### R4-E 一張底圖裁全部尺寸，事後可改（操作者 2026-11-29「做進工具,但還是要維持可以事後改」）— Opus 5.5，worker banner-r4e
+證據：`t2/run2/`（run.json、crops-sheet.jpg、before-after.jpg、mock-vertical-sheet.jpg、mock-916-reels.jpg）。實測：AI 畫的商品高是要求的 2～2.4 倍（T1；run1 32%→68%、run2 35%→84%），所以位置一律量、不信要求。
+不變量：
+1. 一組場景一張 16:9 底圖；每個尺寸的背景＝同一張底圖＋該尺寸的 bgImgScale／bgImgX／bgImgY（由裁切框換算，畫法同 `B/banner-layers.ts:300`、`B/banner-state.ts:810`），不存裁好的圖 → 每個尺寸事後可拖／縮放；文字、商品、徽章、Logo 圖層照舊每個尺寸可改。
+2. 商品框在圖上量（新 route，Gemini flash box_2d，約 NT$0.1 內，記帳），不用要求區。
+3. 底圖框在商品 x 75%／y 57%／高 45%（`B/master-crop.ts` MASTER_TARGET）；框超出圖 → bria-expand（既有 `app/api/tools/studio/genfill/route.ts` 擴圖）往外補，標價。寬尺寸商品中心 x：16:9 75%、3:2 73%、4:3 70%（WIDE_PRODUCT_X）；直式／方形置中。
+4. 9:16 限時動態＋Reels 共用一張：商品約 30% 高、在 33～63%，文字 14～31%，下方 35% 不放字／按鈕；做法＝底圖取商品那一條往上下擴（標價），該尺寸自己的背景（`withSizeBackgrounds`），同樣可拖／縮放。
+5. 裁不進的尺寸（masterCrop ok:false）→ 該尺寸用 R4-D 的延伸單獨畫，標價。
+6. 花錢只在標價按鈕；新步驟全在 `B/scene-flow.ts` 的 paid() 同一筆裡（R4-D 不變量）。
+檔案：`B/master-crop.ts`（已在 main，4 個測試）＋ placementOf（裁切框 → bgImgScale/X/Y，欄位範圍 `B/field-ranges.ts:20`）、新 locate-product route、`B/scene-flow.ts`（候選改畫 16:9；點選＝免費預覽；按鈕「套用到所有尺寸（約 NT$x）」＝量＋必要的擴圖＋9:16 擴圖＋寫入各尺寸位置）、`B/steps/SceneFlow.tsx`、`B/banner-state.ts`（寫入位置的單一函式）、`B/composition.ts`（9:16 safe 已有 top .14／bottom .35，排版要守）、對應測試。
+舊資料：已存的設計（各尺寸自己的背景、位置欄位 1/0/0）照舊載入、畫面不變——寫舊設計測試。
+點名測試：placementOf 畫出來的範圍＝裁切框（±1px）；每個尺寸的商品框完整在畫面內；9:16 商品與文字都在 14～65%；量不到商品／擴圖失敗＝不扣第二次、說明已計費；舊設計載入不變；付費中拒絕第二筆（沿用 R4-D 測試形狀）。
+實打驗收（併入 R4-C）：同 t2 素材從「AI 一鍵設計」與「AI 合成進場景」各走一次，12 尺寸截圖＋每尺寸事後拖一次背景確認可改；記花費。
+
 ## 3. 狀態
 
 | 卡 | 狀態 | worker | commit |
 |---|---|---|---|
 | R4-A | 已合併 886160b54；Codex 修正中 | banner-r2a | b863443c4 |
 | R4-B | 已合併 5d6fd3407；Codex 修正 1058130aa 待合併 | banner-r2b1 | bc298e469 |
-| R4-C | 可開跑（R4-A、R4-B、R4-D 都已合併）；banner-r2b1 那個帳號額度用完，由監工接手 | 監工 | — |
+| R4-E | 派工中（監工 2026-11-29） | banner-r4e | — |
+| R4-C | 等 R4-E；可開跑（R4-A、R4-B、R4-D 都已合併）；banner-r2b1 那個帳號額度用完，由監工接手 | 監工 | — |
 | R4-D | 已合併 bf434bd19（ff368f78b＋Codex 7 輪修正：付費同一時間只一筆直到套用、AI 一鍵設計整段在同一筆、復原不動進行中旗標、復原紀錄以整張圖雜湊比對；最後一輪誤報） | banner-r2b1 → 監工 | d26ad5929 |

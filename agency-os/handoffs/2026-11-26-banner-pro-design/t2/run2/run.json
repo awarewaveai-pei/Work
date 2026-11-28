@@ -1,0 +1,230 @@
+{
+  "productOnGenerated": {
+    "hShare": "83.5%",
+    "cx": "70.8%",
+    "cy": "47.6%",
+    "asked": "h 35%, cx 75%, cy 57%"
+  },
+  "outpainted": true,
+  "master": {
+    "W": 5097,
+    "H": 2867,
+    "product": {
+      "cx": "75%",
+      "cy": "56.9%",
+      "h": "45.1%"
+    },
+    "target": {
+      "cx": 0.75,
+      "cy": 0.57,
+      "h": 0.45
+    }
+  },
+  "crops": [
+    {
+      "key": "r9x16",
+      "ok": true,
+      "crop": {
+        "x": 3014,
+        "y": 0,
+        "w": 1613,
+        "h": 2867
+      },
+      "upscale": 0.67,
+      "upscaled": false,
+      "kb": 102,
+      "productCx": "50%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r2x3",
+      "ok": true,
+      "crop": {
+        "x": 2865,
+        "y": 0,
+        "w": 1911,
+        "h": 2867
+      },
+      "upscale": 0.52,
+      "upscaled": false,
+      "kb": 90,
+      "productCx": "50%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r3x4",
+      "ok": true,
+      "crop": {
+        "x": 2745,
+        "y": 0,
+        "w": 2150,
+        "h": 2867
+      },
+      "upscale": 0.5,
+      "upscaled": false,
+      "kb": 96,
+      "productCx": "50%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r4x5",
+      "ok": true,
+      "crop": {
+        "x": 2673,
+        "y": 0,
+        "w": 2294,
+        "h": 2867
+      },
+      "upscale": 0.47,
+      "upscaled": false,
+      "kb": 94,
+      "productCx": "50%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r1x1",
+      "ok": true,
+      "crop": {
+        "x": 2230,
+        "y": 0,
+        "w": 2867,
+        "h": 2867
+      },
+      "upscale": 0.38,
+      "upscaled": false,
+      "kb": 87,
+      "productCx": "55.5%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r4x3",
+      "ok": true,
+      "crop": {
+        "x": 1144,
+        "y": 0,
+        "w": 3823,
+        "h": 2867
+      },
+      "upscale": 0.31,
+      "upscaled": false,
+      "kb": 77,
+      "productCx": "70%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r3x2",
+      "ok": true,
+      "crop": {
+        "x": 681,
+        "y": 0,
+        "w": 4301,
+        "h": 2867
+      },
+      "upscale": 0.28,
+      "upscaled": false,
+      "kb": 70,
+      "productCx": "73%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r16x9",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "w": 5097,
+        "h": 2867
+      },
+      "upscale": 0.38,
+      "upscaled": false,
+      "kb": 106,
+      "productCx": "75%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r16x9hero",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "w": 5097,
+        "h": 2867
+      },
+      "upscale": 0.38,
+      "upscaled": false,
+      "kb": 106,
+      "productCx": "75%",
+      "productCy": "56.9%",
+      "productH": "45.1%",
+      "spaceAboveProduct": "34.3%"
+    },
+    {
+      "key": "r191x1",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 191,
+        "w": 5097,
+        "h": 2676
+      },
+      "upscale": 0.24,
+      "upscaled": false,
+      "kb": 62,
+      "productCx": "75%",
+      "productCy": "53.8%",
+      "productH": "48.3%",
+      "spaceAboveProduct": "29.6%"
+    },
+    {
+      "key": "r2x1",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 318,
+        "w": 5097,
+        "h": 2549
+      },
+      "upscale": 0.24,
+      "upscaled": false,
+      "kb": 60,
+      "productCx": "75%",
+      "productCy": "51.5%",
+      "productH": "50.7%",
+      "spaceAboveProduct": "26.1%"
+    },
+    {
+      "key": "r3x1",
+      "ok": true,
+      "crop": {
+        "x": 0,
+        "y": 780,
+        "w": 5097,
+        "h": 1699
+      },
+      "upscale": 0.38,
+      "upscaled": false,
+      "kb": 81,
+      "productCx": "75%",
+      "productCy": "50%",
+      "productH": "76.1%",
+      "spaceAboveProduct": "12%"
+    }
+  ],
+  "prompt": "(resumed from saved master)"
+}
