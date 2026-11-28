@@ -98,7 +98,7 @@ export default function HehunTool({ dict, locale }: { dict: Dictionary; locale: 
           ] as const).map(([label, set]) => (
             <section key={label}>
               <h2 className="label-dark mb-2" style={{ fontSize: '1rem' }}>{label}</h2>
-              <BirthForm dict={dict} locale={locale} onChange={set} />
+              <BirthForm dict={dict} locale={locale} onChange={set} prefill={set === setReqA} />
             </section>
           ))}
       </div>

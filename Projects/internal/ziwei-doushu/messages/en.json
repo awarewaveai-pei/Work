@@ -67,6 +67,8 @@
     "timeZoneHint": "Use an IANA time zone name such as Europe/Paris, America/Chicago or Australia/Perth; coordinates in decimal degrees, South and West negative.",
     "timeZoneInvalid": "Unknown time zone name. Check the spelling (e.g. Europe/Paris).",
     "placeRequired": "Choose your birthplace first (search for a city, or enter a time zone and coordinates under \"Other\").",
+    "prefilled": "Filled in with your saved birth details",
+    "prefillClear": "Clear",
     "lateRatHour": "Late Rat hour (born 23:00–23:59)",
     "lateRatCurrent": "23:00 still counts as the same day (default)",
     "lateRatForward": "23:00 counts as the next day"

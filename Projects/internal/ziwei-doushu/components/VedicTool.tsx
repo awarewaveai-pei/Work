@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import PlaceField, { defaultPlace } from '@/components/PlaceField';
+import { PrefillNotice, useBirthPrefill } from '@/components/BirthPrefill';
+import { solarDateText, timeText } from '@/lib/member/birthPrefill';
 import { degInSign } from '@/lib/astrologyView';
 import {
   currentDasha,
@@ -27,6 +29,16 @@ export default function VedicTool({ dict, locale }: { dict: Dictionary; locale: 
   const [time, setTime] = useState('12:00');
   const [place, setPlace] = useState<BirthPlace | null>(() => defaultPlace(locale));
   const [placeMissing, setPlaceMissing] = useState(false);
+  /** 出生地欄位重掛鍵與初始值:會員預填、清除時換(components/BirthPrefill.tsx) */
+  const [placeInit, setPlaceInit] = useState<{ key: number; place: BirthPlace | null }>(() => ({ key: 0, place: defaultPlace(locale) }));
+  function fill(d: string, tm: string, p: BirthPlace | null) {
+    setDate(d);
+    setTime(tm);
+    setPlace(p);
+    setPlaceMissing(false);
+    setPlaceInit((v) => ({ key: v.key + 1, place: p }));
+  }
+  const member = useBirthPrefill((b) => fill(solarDateText(b), timeText(b), b.place));
   const [chart, setChart] = useState<VedicChart | null>(null);
   /** 排盤當下的「今天」:目前大運與 AI 事實用同一天 */
   const [today, setToday] = useState<Ymd | null>(null);
@@ -72,15 +84,28 @@ export default function VedicTool({ dict, locale }: { dict: Dictionary; locale: 
 
   return (
     <>
-      <form onSubmit={submit} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={submit} onInputCapture={member.markTouched} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
+        {member.prefilled ? (
+          <PrefillNotice
+            dict={dict}
+            onClear={() => {
+              member.markTouched();
+              member.hide();
+              fill('2000-01-01', '12:00', defaultPlace(locale));
+            }}
+          />
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
-          {field(t.birthDate, <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field-dark" required />)}
-          {field(t.birthTime, <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="field-dark" required />)}
+          {field(t.birthDate, <input type="date" value={date} onChange={(e) => { member.markTouched(); setDate(e.target.value); }} className="field-dark" required />)}
+          {field(t.birthTime, <input type="time" value={time} onChange={(e) => { member.markTouched(); setTime(e.target.value); }} className="field-dark" required />)}
           <div className="sm:col-span-2">
             <PlaceField
+              key={placeInit.key}
+              initial={placeInit.place}
               dict={dict}
               locale={locale}
               onChange={(p) => {
+                member.markTouched();
                 setPlace(p);
                 if (p) setPlaceMissing(false);
               }}

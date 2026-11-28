@@ -36,14 +36,17 @@ export default function PlaceField({
   dict,
   locale,
   onChange,
+  initial,
 }: {
   dict: Dictionary;
   locale: Locale;
   /** 選定或輸入完整時給 BirthPlace,未選或手動欄位不合法時給 null */
   onChange: (place: BirthPlace | null) => void;
+  /** 一開始顯示的出生地(會員預填;改了要換 key 重掛);不給 = 語言預設 */
+  initial?: BirthPlace | null;
 }) {
   const t = dict.form;
-  const [picked, setPicked] = useState<BirthPlace | null>(() => defaultPlace(locale));
+  const [picked, setPicked] = useState<BirthPlace | null>(() => (initial !== undefined ? initial : defaultPlace(locale)));
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<BirthPlace[] | null>(null);
   const [searching, setSearching] = useState(false);

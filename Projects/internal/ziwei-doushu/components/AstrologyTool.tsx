@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import PlaceField, { defaultPlace } from '@/components/PlaceField';
+import { PrefillNotice, useBirthPrefill } from '@/components/BirthPrefill';
+import { solarDateText, timeText } from '@/lib/member/birthPrefill';
+import { XALEN_YEAR_MAX, XALEN_YEAR_MIN } from '@/lib/divination/fields';
 import {
   astrologyContext,
   aspectDetail,
@@ -44,6 +47,16 @@ export default function AstrologyTool({
 }) {
   const t = dict.astrology;
   const [form, setForm] = useState<BirthForm>(() => defaultBirth(locale));
+  /** 本命表單的出生地重掛鍵:會員預填、清除時換(components/BirthPrefill.tsx;合盤對象不預填) */
+  const [placeKey, setPlaceKey] = useState(0);
+  const member = useBirthPrefill((b) => {
+    const date = solarDateText(b);
+    const year = Number(date.slice(0, 4));
+    if (year < XALEN_YEAR_MIN || year > XALEN_YEAR_MAX) return false; // 星曆算不到的年份:不帶入
+    setForm({ date, time: timeText(b), place: b.place });
+    setPlaceMissing(false);
+    setPlaceKey((k) => k + 1);
+  });
   const [placeMissing, setPlaceMissing] = useState(false);
   const [chart, setChart] = useState<WesternChart | null>(null);
   /** 排盤當下的生辰(小限、行運、合盤都用它;表單之後被改不影響已排的盤) */
@@ -71,8 +84,25 @@ export default function AstrologyTool({
 
   return (
     <>
-      <form onSubmit={submit} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
-        <BirthFields value={form} onChange={(v) => { setForm(v); if (v.place) setPlaceMissing(false); }} dict={dict} locale={locale} />
+      <form onSubmit={submit} onInputCapture={member.markTouched} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
+        {member.prefilled ? (
+          <PrefillNotice
+            dict={dict}
+            onClear={() => {
+              member.markTouched();
+              member.hide();
+              setForm(defaultBirth(locale));
+              setPlaceKey((k) => k + 1);
+            }}
+          />
+        ) : null}
+        <BirthFields
+          value={form}
+          placeKey={placeKey}
+          onChange={(v) => { member.markTouched(); setForm(v); if (v.place) setPlaceMissing(false); }}
+          dict={dict}
+          locale={locale}
+        />
         {placeMissing ? <div className="error-banner">{dict.form.placeRequired}</div> : null}
         <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
           {loading ? t.computing : t.submit}
@@ -227,11 +257,14 @@ type AstroDict = Dictionary['astrology'];
 
 function BirthFields({
   value,
+  placeKey = 0,
   onChange,
   dict,
   locale,
 }: {
   value: BirthForm;
+  /** 換值 = 出生地欄位以 value.place 重新開始(預填、清除) */
+  placeKey?: number;
   onChange: (v: BirthForm) => void;
   dict: Dictionary;
   locale: Locale;
@@ -252,7 +285,7 @@ function BirthFields({
         <input type="time" value={value.time} onChange={(e) => set('time', e.target.value)} className="field-dark" required />
       </label>
       <div className="sm:col-span-2">
-        <PlaceField dict={dict} locale={locale} onChange={(p) => set('place', p)} />
+        <PlaceField key={placeKey} initial={value.place} dict={dict} locale={locale} onChange={(p) => set('place', p)} />
       </div>
     </div>
   );

@@ -67,6 +67,8 @@
     "timeZoneHint": "時區請填 IANA 名稱,如 Europe/Paris、America/Chicago、Australia/Perth;經緯度用十進位,南緯、西經為負。",
     "timeZoneInvalid": "找不到這個時區名稱,請確認拼寫(如 Europe/Paris)。",
     "placeRequired": "請先選擇出生地(搜尋城市,或在「其他」輸入時區與經緯度)。",
+    "prefilled": "已帶入你存的出生資料",
+    "prefillClear": "清除",
     "lateRatHour": "晚子時(23:00–23:59 出生)",
     "lateRatCurrent": "23 點仍算當天(預設)",
     "lateRatForward": "23 點算隔天"
