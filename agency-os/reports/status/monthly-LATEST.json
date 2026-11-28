@@ -1,8 +1,11 @@
 ﻿{
-    "supabase_memory":  "PASS (33.26%)",
+    "overall":  "PASS",
+    "measured":  5,
+    "generated_utc":  "2026-11-12T11:38:24Z",
+    "supabase_memory":  "PASS (22.04%)",
     "system_review":  "PASS",
     "governance_drift":  "PASS",
     "cf_ip_refresh":  "PASS",
-    "generated":  "2026-10-13 11:31:58",
-    "impact_matrix_drift":  "WARN"
+    "generated":  "2026-11-12 19:38:23",
+    "impact_matrix_drift":  "PASS"
 }
