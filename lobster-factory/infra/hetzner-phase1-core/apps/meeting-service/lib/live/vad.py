@@ -17,6 +17,7 @@ RMS_THRESHOLD = 0.008      # the original fixed threshold: now the ceiling of th
 # The threshold sits halfway (geometric mean) between the room's quiet level and its speech level over the
 # last LEVEL_WINDOW_MS. A quiet recording (operator 2026-11-29: speech 0.004, background 0.002) had only
 # 54% of its speech detected with 0.008, 88% with this; clean recordings cut exactly as before.
+# Known limit: a quiet sentence at the very start, before any quieter moment, has nothing to compare with.
 LEVEL_WINDOW_MS = 10_000
 QUIET_PCT, SPEECH_PCT = 20, 90
 RMS_FLOOR = 0.003          # never lower than this (breaths, fans)
@@ -68,7 +69,8 @@ class Level:
         if self.since >= LEVEL_EVERY and len(self.recent) >= 1000 // FRAME_MS:
             self.since = 0
             quiet, loud = np.percentile(self.recent, [QUIET_PCT, SPEECH_PCT])
-            self.threshold = min(RMS_THRESHOLD, max(RMS_FLOOR, float(np.sqrt(max(quiet, 1e-6) * loud))))
+            # At least twice the quiet level: a steady hum (quiet == loud) is never taken for speech.
+            self.threshold = min(RMS_THRESHOLD, max(RMS_FLOOR, 2 * quiet, float(np.sqrt(max(quiet, 1e-6) * loud))))
         return self.threshold
 
 

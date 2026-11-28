@@ -75,5 +75,11 @@ class VadTests(unittest.TestCase):
         self.assertEqual(len(ends), 2)
         self.assertAlmostEqual(ends[0].start / RATE, 3.0, delta=0.3)
 
+    def test_a_steady_hum_is_not_taken_for_speech(self):
+        # Codex 2026-11-29: 30 s of steady 0.004 background became two 12 s utterances for the recogniser.
+        rng = np.random.default_rng(2)
+        hum = rng.normal(0, 0.004 * 32768, RATE * 30).astype(np.int16)
+        self.assertEqual([e for e in run(Segmenter(RATE), hum) if e.kind == END], [])
+
 if __name__ == "__main__":
     unittest.main()
