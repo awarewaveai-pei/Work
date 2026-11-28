@@ -152,7 +152,7 @@ WordPress 頁面（Kadence，可排版）
 - 禁止：暗示 facts 沒有的事；恐嚇或以災禍促購（「今年有大劫，付費化解」）；對健康、法律、投資下斷言。理由：對不上的懸念帶來退款與負評，買不到第二份。
 - 中文文案語感照 `feedback_chinese_page_copy_register`（文案由 GPT 寫、看實際畫面）。
 
-待定（到 Z3 開卡時一次問一件）：收款方式（WooCommerce 或其他）、定價、退款規則。梅花易數（`muyen/meihua-yishu` 為 CC BY-NC-SA，只參考做法不取程式與文字）另列，未排。
+已定（操作者 2026-11-29）：收款用 **WooCommerce**；先做內容（Z1、Z2），Z3 的購買流程後做。待定（Z3 開卡時一次問一件）：定價、退款規則。同日另定：訂閱表單的送出內容可照常存在 Fluent Forms、含出生資料（站長選擇，卡 P8，外掛 0.5.4，預設仍不存）；AI 解讀要排版好再顯示（卡 R1）。未釐清：操作者要「會員可以儲存自己的內容，Soulful 有外掛有這個功能」（Soulful 啟用的是 `ultimate-member`＋`um-user-bookmarks`／`um-private-content`）——要存的是哪一種內容尚待她回答，現有的是 `/my-charts/` 存命盤與對象。梅花易數（`muyen/meihua-yishu` 為 CC BY-NC-SA，只參考做法不取程式與文字）另列，未排。
 
 ## §9 梅花易數（操作者 2026-11-22「我也想要梅花易數,而且要比〔muyen/meihua-yishu〕好1萬倍」；卡 M1–M3，排在 §8 之後或並行，未派工）
 
