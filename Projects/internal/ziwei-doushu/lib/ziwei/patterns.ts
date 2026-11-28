@@ -35,7 +35,7 @@ const DARK = ['陷', '不'];
 
 // ---------- 盤面輔助(純讀,不改盤) ----------
 
-const mod12 = (i: number) => ((i % 12) + 12) % 12;
+export const mod12 = (i: number) => ((i % 12) + 12) % 12;
 const at = (a: Astro, i: number) => a.palaces[mod12(i)];
 const allStars = (a: Astro, i: number): Star[] => {
   const p = at(a, i);
@@ -49,10 +49,10 @@ const soulAndBody = (a: Astro): number[] => {
   const b = a.palaces.findIndex((p) => p.isBodyPalace);
   return b < 0 || b === s ? [s] : [s, b];
 };
-const opp = (i: number) => mod12(i + 6);
-const surround = (i: number) => [mod12(i), opp(i), mod12(i + 4), mod12(i + 8)];
+export const opp = (i: number) => mod12(i + 6);
+export const surround = (i: number) => [mod12(i), opp(i), mod12(i + 4), mod12(i + 8)];
 /** 暗合宮(六合):寅亥、卯戌、辰酉、巳申、午未、子丑;以 0=寅 的索引即 9-i。 */
-const hidden = (i: number) => mod12(9 - i);
+export const hidden = (i: number) => mod12(9 - i);
 
 const find = (a: Astro, i: number, name: string) => allStars(a, i).find((s) => s.name === name);
 const has = (a: Astro, i: number, name: string) => !!find(a, i, name);

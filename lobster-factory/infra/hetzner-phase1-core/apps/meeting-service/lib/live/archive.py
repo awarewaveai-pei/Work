@@ -423,6 +423,13 @@ class Archive:
                 self.failed.pop(id, None)
             self.dirty = True
 
+    def line_label(self, id: int, speaker: str, guess: bool) -> None:
+        """Its speaker, decided while listening or at the regroup at stop (lib/live/speakers.py)."""
+        if id in self.by_id:
+            line = self.lines[self.by_id[id]]
+            line.speaker, line.guess = speaker, guess
+            self.dirty = True
+
     def drop_line(self, id: int) -> None:
         """A line that came to nothing never enters the transcript."""
         self.failed.pop(id, None)
@@ -483,6 +490,10 @@ class Archive:
                 self.wav.sync_header()
             except OSError as e:
                 self._lose_audio(e)
+
+    def write_again(self) -> None:
+        """After end(): the transcript files once more (lines or labels that arrived late); the recording is closed."""
+        self._write_quietly(tries=2)
 
     def end(self) -> str:
         """Stop saving: close the recording and write the transcript one last time. Returns the folder."""

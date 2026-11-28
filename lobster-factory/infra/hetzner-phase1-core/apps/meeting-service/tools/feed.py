@@ -2,7 +2,7 @@
 pace and print caption timings, each final line with its start..end in the recording (= seconds into
 the WAV, comparable with where the speech really is). A stereo WAV is sent as two channels (proto 2):
 left = 我 (recognised by me=, default local), right = 對方 (recognised by the second argument).
-usage: python tools/feed.py <wav> <gemini|local> [port] [save] [listen=<code>] [target=<code>|none] [me=<gemini|local>]
+usage: python tools/feed.py <wav> <gemini|local> [port] [save] [listen=<code>] [target=<code>|none] [me=<gemini|local>] [speakers]
 (default port 8431, listen en-US, target zh-TW: lib/live/langs.py codes; never point it at 8420 while in use)
 `save` keeps the session (recording, transcript.md, session.json) in the server's OWNVOICE_SESSIONS_DIR:
 only against a server started with that pointed at a temp folder."""
@@ -18,7 +18,7 @@ from websockets.asyncio.client import connect
 RATE = 16000
 
 
-async def main(wav_path: str, stt: str, port: str, save: bool, listen: str, target: str, me: str) -> None:
+async def main(wav_path: str, stt: str, port: str, save: bool, listen: str, target: str, me: str, speakers: bool) -> None:
     with wave.open(wav_path, "rb") as w:
         assert (w.getframerate(), w.getsampwidth()) == (RATE, 2) and w.getnchannels() in (1, 2), w.getparams()
         frames = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).reshape(-1, w.getnchannels())
@@ -45,14 +45,14 @@ async def main(wav_path: str, stt: str, port: str, save: bool, listen: str, targ
                     if ev["final"] and ev["tr"]:
                         marks["tr"][ev["id"]] = rel
                     print(f"{rel:6.2f} cap#{ev['id']} {ev['who']} final={ev['final']} [{ev['start']:.2f}..{ev['end']:.2f}] "
-                          f"text={ev['text'][:70]!r} tr={ev['tr'][:40]!r}")
+                          f"text={ev['text'][:70]!r} tr={ev['tr'][:40]!r} speaker={ev['speaker']!r}{'?' if ev.get('guess') else ''}")
                 elif ev["type"] in ("status", "listening"):
                     print(f"{rel:6.2f} {ev}")
                 elif ev["type"] == "usage":
                     marks["usage"] = ev
 
         r = asyncio.ensure_future(reader())
-        start = {"type": "start", "stt": stt, "listen": listen, "target": target, "save": save}
+        start = {"type": "start", "stt": stt, "listen": listen, "target": target, "save": save, "speakers": speakers}
         await ws.send(json.dumps({**start, "proto": 2, "stt_me": me} if two else start))
         await asyncio.sleep(3.0 if stt == "gemini" else 1.0)
         t0 = time.monotonic()
@@ -90,4 +90,4 @@ if __name__ == "__main__":
     extra = sys.argv[4:]
     opts = dict(a.split("=", 1) for a in extra if "=" in a)
     asyncio.run(main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "8431", "save" in extra,
-                     opts.get("listen", "en-US"), opts.get("target", "zh-TW"), opts.get("me", "local")))
+                     opts.get("listen", "en-US"), opts.get("target", "zh-TW"), opts.get("me", "local"), "speakers" in extra))

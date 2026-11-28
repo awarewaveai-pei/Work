@@ -420,6 +420,48 @@ input[type="checkbox"].field-check {
   text-shadow: 0 0 12px var(--violet-glow);
 }
 
+/* ─── AI 解讀排版 (components/ReadingText.tsx) ─────────────────────────────── */
+.ai-reading {
+  color: var(--text-body);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.ai-reading > * + * { margin-top: 0.85em; }
+.ai-reading h3,
+.ai-reading h4 {
+  color: var(--text-heading);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.ai-reading h3 { font-size: 1.125rem; margin-top: 1.4em; }
+.ai-reading h4 { font-size: 1rem; margin-top: 1.2em; color: var(--gold-400); }
+.ai-reading h4 { font-family: var(--font-heading), "PingFang TC", "Microsoft JhengHei", serif; }
+.ai-reading > :first-child { margin-top: 0; }
+.ai-reading strong { color: var(--text-heading); font-weight: 700; }
+.ai-reading em { font-style: italic; }
+.ai-reading ul,
+.ai-reading ol { padding-left: 1.4em; }
+.ai-reading ul { list-style: disc; }
+.ai-reading ol { list-style: decimal; }
+.ai-reading li + li { margin-top: 0.35em; }
+.ai-reading li::marker { color: var(--gold-400); }
+.ai-reading blockquote {
+  border-left: 3px solid var(--glass-border);
+  padding-left: 0.9em;
+  color: var(--text-caption);
+}
+.ai-reading hr { border: none; height: 1px; background: var(--divider); margin: 1.4em 0; }
+.ai-reading pre {
+  white-space: pre-wrap;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85em;
+  padding: 0.75em 1em;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
 /* ─── Mutagen colors (deep-sky compatible) ──────────────────────────────────── */
 .mutagen-lu  { color: var(--jade-400); }
 .mutagen-quan { color: var(--amber-400); }

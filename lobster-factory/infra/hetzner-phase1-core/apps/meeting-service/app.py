@@ -4,7 +4,7 @@
   這台筆電：`.\\start_server.ps1`（實際跑在 WSL2，因為 Windows 的 Smart App
     Control 封鎖 av 套件的 .pyd —— 見 README「執行環境」與 lib/transcribe.py）
   其他環境：`python app.py`
-開啟 http://127.0.0.1:8420
+開啟 http://127.0.0.1:8420/workspace（首頁 / 只剩指向它的入口）
 
 不部署到 SG/EU（無 GPU，見 README.md）。
 """
@@ -526,7 +526,6 @@ def get_settings():
 
 
 @app.put("/api/settings")
-@app.post("/api/settings")      # 舊頁面用 POST 存 key，同一個函式
 def save_settings(body: dict = Body(...)):
     """部分更新：只送要改的欄位；未知欄位、型別或長度不對回 400，整包不寫。金鑰空字串＝清除。"""
     try:

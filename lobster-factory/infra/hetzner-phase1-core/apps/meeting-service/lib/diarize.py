@@ -71,7 +71,15 @@ def _hf_token() -> str:
     return mod.key("hf_token")
 
 
+def no_telemetry() -> None:
+    """pyannote 4 sends a usage ping to otel.pyannote.ai on every model load unless this is off (its
+    telemetry/metrics.py reads the variable on every call and only defaults it to on when unset).
+    Called before pyannote is imported, here and in lib/live/speakers.py."""
+    os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
+
+
 def _run_pyannote(media_path: str, log=print, channel: int = None):
+    no_telemetry()
     import torch
     hf = _hf_token()
     if not hf:

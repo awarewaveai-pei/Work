@@ -23,7 +23,7 @@
 ```powershell
 # 一樣雙擊桌面捷徑，或直接跑（會自動偵測並啟動 WSL2 內的服務）
 .\start_server.ps1
-# 一樣開 http://127.0.0.1:8420
+# 一樣開 http://127.0.0.1:8420/workspace
 ```
 
 WSL2 的 `localhostForwarding` 預設開啟，服務綁在 WSL2 內的 `127.0.0.1:8420`，
@@ -77,8 +77,8 @@ GPU 仍快 3 倍以上且講者分離差 20 倍以上，所以有 GPU 時仍應�
 
 ## 使用方式
 
-**本機（這台筆電）**：雙擊桌面捷徑，或跑 `.\start_server.ps1`，然後開
-`http://127.0.0.1:8420`。實際執行在 WSL2，原因見上方「執行環境」章節。
+**本機（這台筆電）**：雙擊桌面捷徑，或跑 `.\start_server.ps1`（會自動開
+`http://127.0.0.1:8420/workspace`，首頁 `/` 只剩指向它的入口）。實際執行在 WSL2，原因見上方「執行環境」章節。
 
 **其他機器 / 未來有 GPU 的環境**（SAC 不擋的環境可直接原生跑）：
 ```bash
@@ -87,17 +87,15 @@ pip install -r requirements.txt
 # torch 預設裝 CPU 版，要手動換 CUDA 版（見下方「安裝細節」）；
 # 不裝 torch/pyannote 也能跑，只是沒有講者分離
 python app.py
-# 開啟 http://127.0.0.1:8420
+# 開啟 http://127.0.0.1:8420/workspace
 ```
 
 需要的環境變數（在 `mcp/user-env.ps1`，不要問使用者要）：
 - `HF_TOKEN` — 講者分離需要；沒設定會自動跳過講者分離，其他階段照跑
-- `MEETING_DRIVE_BASE` — Google Drive 同步目的地（例：`H:\我的雲端硬碟\ECT\會議記錄`）；
-  沒設定就安全停用同步功能，不影響其他功能。**刻意不寫死在程式碼裡**——這支
-  服務可能被複製給別人（例如給家人自己電腦裝一份），寫死路徑等於把操作者的
-  客戶名稱、帳號路徑帶去別人的機器。別人拿到這份程式碼時這裡天生是空的，
-  勾選同步選項只會安全回報「未設定」，**不會觸發任何登入畫面、不會用到操作者
-  的任何帳號**——這功能全程只是檢查本機檔案路徑，從來不呼叫 Google 的登入 API。
+- `MEETING_DRIVE_BASE` — 舊的 Google Drive 同步資料夾；第一次讀設定時轉成「設定」面板的一個輸出目的地，
+  之後不再讀（`lib/settings.py`）。輸出目的地與錄音資料夾都在會議工作區的「設定」面板設，**不寫死在程式碼裡**——
+  這支服務可能被複製給別人，寫死路徑等於把操作者的客戶名稱、帳號路徑帶去別人的機器；同步只是複製本機檔案，
+  從來不呼叫 Google 的登入 API。
 
 **摘要階段預設不需要 API key**（人工回路模式）。想用 API 自動處理見下方「摘要階段二：API 自動處理」。
 
@@ -112,7 +110,7 @@ python app.py
 | 即時字幕＋中文 | 字幕面板按「聆聽」。聲音來源「麥克風／電腦聲音」可同開。辨識二選一：「Gemini（計費）」說話中就有灰字，約 NT$17／小時；「本機（免費）」用這台的顯卡，講完一句才出字 | `lib/live/`、`WebSocket /api/live/ws` |
 | 閒置暫停 | Gemini 連線中靜音也計費：沒有新字幕 3 分鐘先斷線不計費，有聲音自動接回；30 分鐘自動結束。兩個數字在面板底列可改，0 = 不啟用 | `lib/live/idle.py` |
 | 查詢 | 頁面內反白 ≥ 2 個字 → 查詢面板自動搜尋網路（Serper，每次約 NT$0.03）。「問 AI（計費）」按了才呼叫：先搜尋一次，再把結果與這場會議的字幕交給模型整理，答案下方列出被引用的來源（每次約 NT$0.05、3–6 秒；理由與實測見 `lib/lookup.py` 檔頭）。「心智圖」按了才呼叫 | `lib/lookup.py`、`POST /api/lookup/ask` |
-| 存檔 | 字幕面板的「存檔」（預設開，聆聽中不能改）：錄音（16 kHz 單聲道）與逐字稿存到 `文件 › OwnVoice Meet › YYYY-MM-DD HHMM`，格式與 OwnVoice 相同，首頁「OwnVoice 會議」卡的「會後整理」可直接用。「新段落」開新的一段（新錄音檔、新逐字稿段落），點段名可改名；閒置暫停期間錄音不停；剩餘空間不到 1 GB 就這場不存檔（照常聆聽） | `lib/live/archive.py` |
+| 存檔 | 字幕面板的「存檔」（預設開，聆聽中不能改）：錄音（16 kHz 單聲道）與逐字稿存到 `文件 › OwnVoice Meet › YYYY-MM-DD HHMM`，格式與 OwnVoice 相同，「會後整理」面板可直接用。「新段落」開新的一段（新錄音檔、新逐字稿段落），點段名可改名；閒置暫停期間錄音不停；剩餘空間不到 1 GB 就這場不存檔（照常聆聽） | `lib/live/archive.py` |
 | 會議中摘要 | 摘要面板打開「會議中摘要（計費）」（預設關，聆聽中不能改），每 N 分鐘（預設 5）且至少 3 句新字幕才呼叫一次模型，停止時補最後一批；有存檔就寫 `summary.md` | `lib/live/summary.py` |
 
 - 金鑰都在伺服器端：Gemini 讀環境變數 `GEMINI_API_KEY`；翻譯用設定頁的 Anthropic key（Claude Haiku），沒填就用同一把 Gemini key（Flash-Lite）。
@@ -130,13 +128,13 @@ OwnVoice 設定的存檔模式要選「錄音與逐字稿」才有錄音可做�
 
 | 功能 | 怎麼用 | 程式 |
 |---|---|---|
-| 會後整理 | 首頁「OwnVoice 會議」卡 →「會後整理」：各段錄音接成一檔，走跟上傳相同的流程；語言跟 OwnVoice 設定 | `lib/ownvoice.py`、`POST /api/ownvoice/import` |
+| 會後整理 | 會議工作區「會後整理」面板的場次清單：各段錄音接成一檔，走跟上傳相同的流程；語言跟 OwnVoice 設定 | `lib/ownvoice.py`、`POST /api/ownvoice/import` |
 | 心智圖 | 從**逐字稿**產生：會議中 `/mindmap?session=latest`（OwnVoice 目前為止的 transcript.md）；會後 `/mindmap?job=<id>`（diarized.txt，沒有就 merged.txt）。預設「複製 prompt → 貼回 AI 的 JSON」零費用；有 API key 可直接產生（計費）。結果存 `jobs/<id>/mindmap.json` 或 `jobs/ownvoice-mindmaps/` | `lib/mindmap.py`、`templates/mindmap.html` |
 
 - OwnVoice Meet.exe 沒有簽章，SAC 偶爾會暫時擋它（2026-11-23 10:45 擋、16:00 放行，檔案未變）；這不是本工具能處理的，等它放行。
 - 搜尋用環境變數 `SERPER_API_KEY`。搜尋與問 AI 都會把反白的文字送出這台電腦。
   問 AI 另外會附上這場會議逐字稿的最後一段當上下文（工作區這場的字幕；沒有才取 OwnVoice 30 分鐘內還在更新的那一場）。
-- 只在 Windows 原生模式可用；伺服器退到 WSL2 時讀不到 OwnVoice 的資料夾，首頁不顯示該卡。
+- 只在 Windows 原生模式可用；伺服器退到 WSL2 時讀不到 OwnVoice 的資料夾，「會後整理」面板的場次清單是空的。
 - 會議還在錄音時不能做會後整理（`lib/ownvoice.py` join_wavs 會拒絕），先在 OwnVoice 按停止。
 - 為什麼不改 OwnVoice：SAC 擋本機建出的未簽章執行檔（`cargo build` 在 build script 就 os error 4551）。
 
@@ -173,7 +171,7 @@ OwnVoice 設定的存檔模式要選「錄音與逐字稿」才有錄音可做�
 
 API 呼叫失敗（key 失效、額度用完、網路問題）時**不會判定整個工作失敗**——自動退回
 人工回路，`prompt.txt` 已經寫好，頁面照樣顯示貼上步驟，轉錄/講者分離的成果不會浪費。
-`GET/POST /api/settings` 管理 key（`lib/settings.py`）；`summarize.summarize_via_api()`
+`GET/PUT /api/settings` 管理 key（`lib/settings.py`）；`summarize.summarize_via_api()`
 用同一份 `validate()` 把關，驗證失敗會自動重試一次帶錯誤訊息的修正 prompt。
 
 **真的會計費**，跟人工回路（用訂閱額度）不同，是兩條路並存，不是取代關係。
@@ -213,14 +211,15 @@ lib/
   archive.py      選擇性同步交付物到 Google Drive（不含音檔）
 start_server.ps1  Windows 端啟動器（呼叫 WSL2）
 start_server.sh   WSL2 端實際啟動邏輯
-templates/index.html   單頁：拖拉上傳 + 進度 + 下載
+templates/workspace.html  會議工作區：聆聽、會後整理（上傳、場次、工作清單、貼上摘要、下載）、設定等面板
+templates/index.html   首頁：只有指向會議工作區的入口
 jobs/<job_id>/    執行期輸出，.gitignore 排除
 ```
 
 **新增輸出格式時要一起改的地方**（2026-08-27 加 Word 時漏掉 `archive.py`，
 同步結果少一個檔且不會報錯）：
 `lib/<new>.py` → `pipeline.py` `_finalize_from_minutes()` → `app.py` `DOWNLOADS` →
-`templates/index.html` 的 `STAGES` + `DOWNLOAD_LABELS` → `lib/archive.py` 的 `plan`
+`templates/workspace.html` 會後整理面板的 `STAGES` + `DOWNLOAD_LABELS` → `lib/archive.py` 的 `plan`
 → `requirements.txt`。
 
 ## 已知限制（誠實列出，不要粉飾）

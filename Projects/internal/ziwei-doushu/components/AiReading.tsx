@@ -5,6 +5,7 @@ import type { InterpretationContext } from '@/lib/divination/types';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 import { ogCardUrl, ogParamsFromContext } from '@/lib/og';
 import { readParentTicket, requestInterpretation } from '@/lib/ai/memberRequest';
+import ReadingText from '@/components/ReadingText';
 
 /**
  * 可重用的 AI 解讀區塊 (Phase A — AI 問答入口)。
@@ -84,16 +85,8 @@ export default function AiReading({
       ) : null}
 
       {text ? (
-        <div
-          className="glass-card p-6 mt-4"
-          style={{
-            whiteSpace: 'pre-wrap',
-            lineHeight: 1.8,
-            color: 'var(--text-body)',
-            fontSize: '0.9375rem',
-          }}
-        >
-          {text}
+        <div className="glass-card p-6 mt-4">
+          <ReadingText text={text} />
           <div
             style={{
               marginTop: '1rem',
