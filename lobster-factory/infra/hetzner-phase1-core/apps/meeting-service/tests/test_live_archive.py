@@ -254,7 +254,7 @@ class FolderCompatibility(TempDir):
         a.line_translated(3, "〔翻譯失敗：逾時〕", True)
         a.dropped_sec = 0.4
         a.end()
-        line = {"start": 0.0, "end": 0.0, "seg": 0, "who": "them", "speaker": None, "lang": "", "final": True}
+        line = {"start": 0.0, "end": 0.0, "seg": 0, "who": "them", "speaker": None, "lang": "", "final": True, "guess": False}
         self.assertEqual(ownvoice.session_lines("latest"), {
             "version": 1, **META,
             "lines": [{**line, "id": 1, "start": 0.25, "end": 1.5, "text": "Hello everyone.", "tr": "大家好。"},
