@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-29（續3）— meeting-service C18 即時分講者真人驗收未過（19%），不提供
+
+- 根因：每句 1–5 秒、手機錄的聲音算出的聲紋不穩定。操作者錄音（78 秒，pyannote 整檔判 3 人）：同一人兩句相似度中位數 0.38（合成聲音 0.9）、不同人 0.16（最高 0.45）；門檻 0.75 下 16 句分成 16 人，與整檔結果一致 3/16＝19%；事後挑最好的門檻 0.45 也只 11/16＝69%。卡片規定低於 80% 不上線。`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`。
+- 步驟：`MS/lib/live/speakers.py` `READY = False`（量測寫在旁邊）；`MS/lib/live/hub.py` `start()` 在未就緒時忽略 `live_speakers`；`MS/templates/workspace.html` 按鈕隱藏；會後整理照舊用 pyannote 整檔分講者（不變）；程式留著給通過驗收的新方法。commit `4559f05d1`，推 main `f842a7ae5`，8420 重啟。
+- 同一錄音另一發現：本機辨識的發聲門檻固定（`MS/lib/live/vad.py` `RMS_THRESHOLD` 0.008），3–16 秒只有 3% 音框超過（最大 0.018、中位數 0.0025），那 13 秒沒辨識。Gemini 不經過此門檻。已寫進計畫待辦。
+- 驗證：
+  - `python -m pytest tests -q` → 196 passed（新：要求即時分講者的 Gemini 聆聽只出字幕、沒有追蹤器、不佔顯卡）
+  - 真實：錄音轉 16 kHz 送 8434（本機辨識＋即時分講者）；比對與門檻掃描腳本在 scratchpad（錄音不進 repo）
+  - 8420：`/workspace` 200、按鈕 `hidden`、`speakers.READY` False
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py rec3.wav local 8434 save listen=auto target=none speakers; python compare.py; python sweep.py; python -m pytest tests -q | exit=0 | ms=240000
+- REVIEW_WAIVED: NA -- 改動是關閉功能的一個開關與一個測試；驗收量測即證據
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=speakers\.READY|READY = False | hits=3
+- ORACLE_WAIVED: 只關閉功能，沒有新邏輯
+- rollback：`git revert 4559f05d1`（重新提供未過驗收的功能，不建議）
 ## 2026-11-29（續2）— meeting-service 段 4 批 4：C18 即時分講者、C19 舊首頁退休（上線 8420；C18 待真人錄音驗收）
 
 - 根因：聆聽只分得出我／對方，對方多人分不開，會後還要再跑 pyannote；舊首頁一套流程、工作區一套，重複。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
