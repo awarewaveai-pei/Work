@@ -63,8 +63,10 @@ function Start-OnWsl2 {
     # 模型快取指向 Windows 既有的（large-v3 2.9GB / medium 1.5GB 已下載完成），
     # 避免在 WSL2 內重下一份。模型檔是資料不是可執行碼，SAC 不擋。
     $env:HF_HOME = "/mnt/c/Users/$env:USERNAME/.cache/huggingface"
-    # WSLENV 控制哪些變數跨界；不加 /p 因為值已經是 WSL 路徑格式，不需再轉換
-    $env:WSLENV = "MEETING_HF_TOKEN:MEETING_DRIVE_BASE:HF_HOME"
+    # WSLENV 控制哪些變數跨界；前三個不加 /p 因為值已經是 WSL 路徑格式，不需再轉換。
+    # LOCALAPPDATA/p：Windows 路徑由 WSL 換成 /mnt/c/...，兩種伺服器才會用同一個聲音檔
+    # （lib/live/speakers.py voices_location）。
+    $env:WSLENV = "MEETING_HF_TOKEN:MEETING_DRIVE_BASE:HF_HOME:LOCALAPPDATA/p"
 
     $sh = "$APPDIR/start_server.sh"
     # 先確認 WSL 那側看得到這個檔案。否則 -WindowStyle Hidden 會吞掉 bash 的
@@ -78,8 +80,8 @@ function Start-OnWsl2 {
 }
 
 if (Test-ServerListening) {
-    Write-Host "已經在跑了：http://127.0.0.1:8420" -ForegroundColor Green
-    Start-Process "http://127.0.0.1:8420"
+    Write-Host "已經在跑了：http://127.0.0.1:8420/workspace" -ForegroundColor Green
+    Start-Process "http://127.0.0.1:8420/workspace"
     exit
 }
 
@@ -124,8 +126,8 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 
 if ($ok) {
-    Write-Host "啟動成功（$mode）-> http://127.0.0.1:8420" -ForegroundColor Green
-    Start-Process "http://127.0.0.1:8420"
+    Write-Host "啟動成功（$mode）-> http://127.0.0.1:8420/workspace" -ForegroundColor Green
+    Start-Process "http://127.0.0.1:8420/workspace"
 } else {
     Write-Host "15 秒內沒有偵測到 8420 在監聽。查看 log：" -ForegroundColor Red
     if ($winOk) {

@@ -127,21 +127,24 @@ class CrossSiteWriteTests(_TempSettings):
         super().setUp()
         self.client = TestClient(app_module.app, base_url="http://127.0.0.1:8420")
 
+    # POST: the settings panel's 檢查 (POST /api/settings is gone with the old home page, C19).
+    WRITES = (("post", "/api/settings/check", {"path": "Z:\\nowhere", "recording": False}), ("put", "/api/settings", {"save": False}))
+
     def test_foreign_origin_cannot_write(self):
-        for method in ("post", "put"):
+        for method, url, body in self.WRITES:
             for headers in ({"origin": "https://evil.example"}, {"origin": "http://127.0.0.1:9999"},
                             {"sec-fetch-site": "cross-site"}, {"sec-fetch-site": "same-site"}):
                 with self.subTest(method=method, headers=headers):
-                    r = getattr(self.client, method)("/api/settings", json={"save": False}, headers=headers)
+                    r = getattr(self.client, method)(url, json=body, headers=headers)
                     self.assertEqual(r.status_code, 403)
         self.assertFalse(os.path.exists(self.path))
 
     def test_same_origin_and_headerless_requests_pass(self):
         same = {"origin": "http://127.0.0.1:8420", "sec-fetch-site": "same-origin"}
         self.assertEqual(self.client.put("/api/settings", json={"save": False}, headers=same).status_code, 200)
-        self.assertEqual(self.client.post("/api/settings", json={"pause_min": 7}, headers=same).status_code, 200)
+        self.assertEqual(self.client.post("/api/settings/check", json={"path": os.path.dirname(self.path)}, headers=same).status_code, 200)
         self.assertEqual(self.client.put("/api/settings", json={"end_min": 9}).status_code, 200)
-        self.assertEqual(self.stored(), {"save": False, "pause_min": 7, "end_min": 9})
+        self.assertEqual(self.stored(), {"save": False, "end_min": 9})
         self.assertEqual(self.client.put("/api/settings", json={"nope": 1}, headers=same).status_code, 400)
 
 

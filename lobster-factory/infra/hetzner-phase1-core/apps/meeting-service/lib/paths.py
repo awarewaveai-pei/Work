@@ -4,7 +4,7 @@
 import os
 import re
 import sys
-import tempfile
+import uuid
 
 MAX_LEN = 260
 _DRIVE = re.compile(r"^([A-Za-z]):[\\/]")
@@ -146,8 +146,10 @@ def check(path: str, recording: bool) -> dict:
     if not os.path.isdir(where):
         return {"ok": False, "path": p, "message": "找不到這個資料夾（請先建立，或檢查磁碟代號）"}
     try:
-        fd, probe = tempfile.mkstemp(prefix=".write-check-", dir=where)
-        os.close(fd)
+        # One exclusive create, not tempfile.mkstemp: on Windows mkstemp reads "access denied" as a name clash
+        # and retries thousands of times, so 檢查 on a folder it cannot write (the C: root) hung the request.
+        probe = os.path.join(where, f".write-check-{uuid.uuid4().hex}")
+        os.close(os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL))
         os.remove(probe)
     except OSError as e:
         return {"ok": False, "path": p, "message": f"這個資料夾不能寫入：{e.strerror or type(e).__name__}"}

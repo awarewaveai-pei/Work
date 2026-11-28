@@ -54,6 +54,10 @@ class Ring:
         while self.chunks and self.chunks[0][0] < at - KEEP_SEC * RATE:
             self.chunks.popleft()
 
+    def covers(self, start: int) -> bool:
+        """Is the stretch from `start` still kept (not already dropped off the front)?"""
+        return bool(self.chunks) and self.chunks[0][0] <= start
+
     def slice(self, start: int, end: int) -> np.ndarray:
         """Samples start..end; silence where nothing came."""
         out = np.zeros(max(end - start, 0), dtype=np.int16)
