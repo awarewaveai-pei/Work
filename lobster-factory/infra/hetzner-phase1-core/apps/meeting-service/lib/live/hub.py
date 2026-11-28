@@ -58,7 +58,8 @@ ARCHIVE_TICK = 1.0
 DRAIN_TIMEOUT, SUMMARY_TIMEOUT = 15.0, 20.0
 # At the end of listening: how long the last save waits for the recognizer and the speakers to close (a model
 # still loading, the regroup); the closing itself is never cut short (the GPU claim goes after both unload).
-CLOSE_TIMEOUT = 60.0
+# A cold first load of the local recognizer took 73 s (2026-11-27), the speakers model loads after it.
+CLOSE_TIMEOUT = 300.0
 NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
 # proto 2: the first byte of every audio frame says which channel it is.
 SOURCES = {0: "me", 1: "them"}
@@ -480,6 +481,10 @@ class Hub:
         summary its last update, then write the last version of every file.
         Nothing here may fail the next listening."""
         try:
+            if self.closing is not None:
+                # First what still makes lines: sentences queued while a model loaded, and the speakers'
+                # regroup. Their translations start only then, so they are drained after this.
+                await asyncio.wait({self.closing}, timeout=CLOSE_TIMEOUT)
             running = set(self._session()._tasks)
             if running:
                 await asyncio.wait(running, timeout=DRAIN_TIMEOUT)
@@ -487,9 +492,6 @@ class Hub:
                 await asyncio.wait_for(asyncio.shield(self.summary.finish()), SUMMARY_TIMEOUT)
             except asyncio.TimeoutError:
                 pass
-            if self.closing is not None:
-                # The regrouped speakers go into the last save.
-                await asyncio.wait({self.closing}, timeout=CLOSE_TIMEOUT)
             if archive is not None:
                 archive.end()
         finally:
