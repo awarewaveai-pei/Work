@@ -81,7 +81,7 @@
 | U24 | 最近使用／常用 | 新 NA `app/portal/api/recent/route.ts`（索引已有 0011:98，不加 migration） | Medium | Opus | U8 | 13 | 已併 |
 | U26 | 登記表匯出 `catalog.json` | 新腳本＋test | Low | Sonnet | U25 | 14 | 已併 |
 | U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | 14 | 已併 |
-| W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 | 進行中（操作者 2026-11-27 go） |
+| W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 | 已併（2026-11-28 正式站開啟，store 1.4.0） |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
 | M7 | 既有客戶逐一代辦成會員（G2） | 無程式；操作紀錄 | **High** | Opus＋操作者 | M5、M6、W6 | P2 | |
@@ -230,7 +230,7 @@ P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；
 | K13 | A §2 F12 標「已關」 |
 | W2 | C §3 G13 列標「已關（W2）」；B §2A.2「缺口」列與 §17.4 `heldProducts()` 列改為已完成；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） |
 | W5 | C §3 G9 標「已關（W5）」；補：本機 WordPress 實看 W2 的「我的帳號」畫面（持有／未開通／退場）；另修客戶欄「共 N 個客戶」多算 1（`ClientRail.tsx` 把內部組織加了兩次，2026-11-23 正式站實看） |
-| W6 | 進行中（操作者 2026-11-27 go） |
+| W6 | 已併（2026-11-28 正式站開啟，store 1.4.0） |
 | M1 | C §2 三層表「`test` 值未存在，G12」改為「已加（M1）」；C §3 G12 標「已關」；B §9.3 類別表 TEST 列改「是」 |
 | M2、M3 | C §3 G3 標「部分已關（M2、M3）」；B §9.3 代操、經銷列改「是」；B 一頁結論 Q1 列補「代操／經銷已算得出」 |
 | M4 | C §3 G3 標「已關」 |

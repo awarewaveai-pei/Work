@@ -62,7 +62,7 @@ export const PROGRESS = {
   U24: 'done',
   U26: 'done',
   U18: 'done',
-  W6: 'doing',
+  W6: 'done',
 };
 export const COMMITS = {
   K1: 'd2201ecf7',
@@ -109,6 +109,7 @@ export const COMMITS = {
   U24: 'e2fa33ce7',
   U26: '1289bc7bc',
   U18: '94fa67469',
+  W6: 'f13e9e7f2',
   M6: '71b50a370',
   M8: '3a721e688',
   U13: '1eff89930',
@@ -348,6 +349,11 @@ export const RISKS = [
   { card: 'U18', said: '產品入口那一頁本機量不到（本機沒有網域分流）。', handling: '部署後監工在正式站量（與員工外框共用同一個搜尋列元件）。' },
   { card: 'U18', said: '每頁多帶約 93 KB 的搜尋索引。', handling: '記下：在員工頁之間換頁不重送；功能多到影響載入時再改成按需載入。' },
   { card: 'U18', said: '功能沒有自己的網址，搜尋結果只到產品首頁；權益標籤、已開通加分、無結果回報表單、搜尋埋點都沒做。', handling: '記下：都需要另外的資料或後端，另開卡。' },
+  { card: 'W6', said: 'aware-wave.com 店面外掛 1.4.0 已啟用；登入交接、會員事件、付款通知三條路都開了。', handling: '已驗證：不帶簽章一律擋下；外掛在 WordPress 上對三個使用者送真簽章，測試會員進得去、另外兩人回「不是會員」；邀請連結落到「我的帳號」；付款紀錄前後都是 2 筆，舊的 #46 註冊禮訂單沒有重送。' },
+  { card: 'W6', said: '派工單兩處寫錯：外掛安裝腳本要求 app 端先把 aware-wave.com 標成啟用中；app 的密鑰放在主機 .env，不在 compose 檔。', handling: '已處理：監工改順序（先標啟用中，那時密鑰還空、門仍關）；.env 用安全修改工具的「改檔案」模式寫入，再用 compose 原檔重開 app，健康檢查通過。' },
+  { card: 'W6', said: '付款通知已開，但 aware-wave.com 目前沒有真的金流外掛，只有 0 元註冊禮。', handling: '記下：真實收款（店面設定 4b-6、真實付款演練）不在本卡。' },
+  { card: 'W6', said: 'aware-wave.com 仍允許訪客結帳，但程式假設結帳一定已登入。', handling: '下一張 M9 關掉訪客結帳。' },
+  { card: 'W6', said: '兩把新密鑰只存在這台筆電的密鑰庫與主機。', handling: '記下：換機時照密鑰庫匯入流程搬。' },
 ];
 
 // 已有預設、沒答就照做的題目（DISPATCH §8）。
