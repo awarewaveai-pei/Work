@@ -12,8 +12,8 @@ const BRIGHTNESS_SCORE: Record<string, number> = {
   廟: 100, 旺: 85, 得: 75, 利: 65, 平: 50, 不: 40, 陷: 25,
 };
 
-const SIX_LUCKY = ['文昌', '文曲', '左輔', '右弼', '天魁', '天鉞'] as const;
-const SIX_UNLUCKY = ['擎羊', '陀羅', '火星', '鈴星', '地空', '地劫'] as const;
+export const SIX_LUCKY = ['文昌', '文曲', '左輔', '右弼', '天魁', '天鉞'] as const;
+export const SIX_UNLUCKY = ['擎羊', '陀羅', '火星', '鈴星', '地空', '地劫'] as const;
 
 export interface StarBrightness {
   name: string;
