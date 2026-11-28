@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-28（續2）— next-admin CI 紅：site-flow 測試寫死 bridge 0.22.0，main 釘到 0.23.0 後 10 案紅（擋夜間自動部署）
+
+- [根因] `ff49d498`（11-27）把 `lib/wp-plugin-stack-catalog.ts` bridge `releaseVersion` 0.22.0→0.23.0；`lib/site-flow/__tests__/integration-steps.test.ts:219` 假站版本寫死 `"0.22.0"` → bridge 步驟 verify「需要至少 0.23.0」→ 10 案紅。origin/main 臨時 worktree 重現同樣 10 紅，非 PR #34 引入。CI 紅時 `sg-deploy.sh` step 1.87 拒絕部署 → 夜間自動部署卡住。
+- [步驟] 假站版本改用 `expectedBridgeVersion()`（`lib/site-flow/steps/bridge.ts:45`，讀同一份目錄），兩處（:220、:578）；以後升版不再改測試。
+- [驗證] `npx vitest run lib/site-flow` 9 檔 128 過；tsc 綠。
+- [避免再發生] 測試不寫死目錄釘選版本，讀目錄本身。
+- [rollback] revert 本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/site-flow（改前 origin/main 10 failed；改後 128 passed） | exit=0 | ms=1804
+- REVIEW_WAIVED: NA -- 測試 fixture 兩行改讀既有匯出函式，讀回 diff 確認
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep="0.22.0" | hits=4
+- ORACLE_WAIVED: 僅測試 fixture，無 source 邏輯改動
 ## 2026-11-28（續1）— Repair Center：分析型告警「升級」後 GitHub Action 不會重跑（留言缺 @claude）
 
 - [根因] `escalateAnalysisOnlyRun` 翻 DB policy 後，靠 `postEscalationComment` 在 issue 留言重跑 `.github/workflows/auto-repair-claude.yml`；該 workflow `issue_comment` 分支要求留言含 `@claude`（yml:26），留言沒有 → Action 不跑、不開 PR。失敗又被 `.catch(() => {})` 吞掉，UI 照樣報成功。同類第二實例（critic M2）：run 沒有 issue（備份／開 issue 失敗停在 `triage_needed`）也能升級，policy 翻了、GitHub 什麼都沒收到。不變量：policy=auto_repair ⇔ GitHub 已收到觸發留言。
