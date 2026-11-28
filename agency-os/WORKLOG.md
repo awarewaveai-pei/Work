@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-29（續2）— meeting-service 段 4 批 4：C18 即時分講者、C19 舊首頁退休（上線 8420；C18 待真人錄音驗收）
+
+- 根因：聆聽只分得出我／對方，對方多人分不開，會後還要再跑 pyannote；舊首頁一套流程、工作區一套，重複。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
+- 步驟：工人 C19 `84bea4a29`、C18 `a12504b61`；監工合併 `cf20327e1`；修正 `7f95690ff`、`d369e221e`（工人修 12 條）、`6f9b9505b`、`f435cce86`；推 main `14990b600`
+  - C18：`lib/live/speakers.py` pyannote 聲紋（載入 8.9 秒、每句 33–68 ms）、餘弦分群門檻 0.75、停止時重新分群、改名、「記住這個聲音」存 `%LOCALAPPDATA%\meeting-service\voices.json`（只有名字與 256 個數字）、刪除即不再比對
+  - C19：首頁只剩工作區入口；舊頁獨有功能（ChatGPT／Claude 按鈕、轉錄速度、卡住提示、舊同步結果）搬進「會後整理」面板；刪 `POST /api/settings`
+  - 監工：聲音檔位置改用 `paths.cloud` 同一條規則並避開輸出目的地；最後存檔先等辨識與分講者收尾（冷啟動時講者標籤全空，實測重現後修）
+  - 審查：critic Deep 0c/5m/9n＋Codex 5m（工人修 A–L：收尾不可取消、GPU 卸載後才釋放、場次結束清記憶體、Windows／WSL 同一聲音檔、ring 外不算聲紋、改名框不被重畫、改成同名＝合併、分群移出事件迴圈、錯長度向量、刪除即不再叫人、檔案鎖、壞檔不覆蓋、關掉 pyannote 遙測）；Codex 第二輪 5m（4 條修，1 條不成立改寫成測試），修前寫下 4 條不變量（見計畫「進度（段 4）」）
+- 驗證：
+  - `python -m pytest tests -q` → 195 passed；突變：刪除守衛、壞檔不覆蓋、暫存檔清理各拔一次 → 紅，還原綠
+  - 真實（8434）：兩種電腦語音輪流 6 句，即時分講者 6/6；新伺服器 11 秒片段在模型載完前停止，2 句照樣存進場次並有講者；工人三種合成聲音 12/14（1 秒以上全對）；工作區上傳到貼回會議記錄跑完
+  - 8420 重啟：`/` 只剩入口、`/workspace`、`/api/jobs` 200、`POST /api/settings` 405
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py two_voices.wav local 8434 save listen=auto target=none speakers; python -m pytest tests -q | exit=0 | ms=410000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/9n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=check_location|write_again|voices_path|no_telemetry|VoicesUnreadable|regrouping | hits=27
+- ORACLE: Codex `agency-os/reports/oracle/2026-11-27-partialreview-44d2420a.md`、`agency-os/reports/oracle/2026-11-29-partialreview-9e2d6639.md`
+- 未達成：C18 的 80% 驗收要三位以上真人錄音（操作者提供）；門檻 0.75 只用合成聲音量過；WSL 啟動方式沒有實跑
+- 剩餘風險：不到 1 秒的句子沿用上一句講者（標「推定」）；聆聽存完檔後再改名不會寫進場次
+- rollback：`git revert f435cce86 6f9b9505b d369e221e 7f95690ff cf20327e1`；`voices.json` 在專案外，可手動刪
 ## 2026-11-29（續1）— 筆電對齊遠端 71 個提交；影片工作台「多張參考圖」收尾提交
 
 - 根因：2026-11-27 額度用完時「影片模型可放多張參考圖」寫完未提交；之後操作者用手機推了 71 個提交，筆電 `main` 落後且 94 個 tracked 檔 dirty，`ao-resume.ps1 -FullMainlineParity` 被 `agency-os/TASKS.md` 一處衝突擋住（平台監工那行兩邊都改）。
