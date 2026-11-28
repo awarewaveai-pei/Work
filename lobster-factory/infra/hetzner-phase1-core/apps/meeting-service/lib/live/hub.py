@@ -339,6 +339,7 @@ class Hub:
         # The GPU rule, in one place: any local channel, or live speakers, claims it once for the whole listening.
         # Speakers alone give way to a batch job holding the GPU (the captions still run).
         note = ""
+        live_speakers = live_speakers and speakers.READY
         if live_speakers and not settings.key("hf_token"):
             live_speakers, note = False, "還沒填 Hugging Face 金鑰（設定面板），這場不即時分講者，字幕照常"
         local = "local" in kinds.values()

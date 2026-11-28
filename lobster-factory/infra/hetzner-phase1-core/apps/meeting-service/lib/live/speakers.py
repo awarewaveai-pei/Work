@@ -33,6 +33,10 @@ MODEL = "pyannote/wespeaker-voxceleb-resnet34-LM"
 # women, Hanhan and Yating, 0.52-0.65; at 0.5 they became one speaker). Synthetic voices are more uniform
 # than people: real voices in a real room are not measured yet.
 THRESHOLD = 0.75
+# Not offered: on the operator's real recording (2026-11-29, 3 people through a phone) the same person's lines
+# were only 0.38 alike (median; computer voices 0.9), 3/16 lines right, 11/16 at the best threshold: under the
+# card's 80%. The post-meeting chain keeps pyannote over the whole recording. Turn on only with a method that passes.
+READY = False
 SHORT_SEC = 1.0
 DIM = 256                                  # the model's vector length; a saved vector of another length is skipped
 HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # meeting-service/
